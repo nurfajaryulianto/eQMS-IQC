@@ -6,6 +6,9 @@ assets/css/tailwind.css
 tailwindcss.exe
 tailwindcss
 
+# Tailwind v3 config (tidak digunakan di v4, config ada di tailwind-input.css)
+tailwind.config.js
+
 # macOS
 .DS_Store
 .AppleDouble
