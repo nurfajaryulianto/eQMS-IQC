@@ -366,7 +366,9 @@ function roleBadge(role) {
     return { admin: 'bg-purple-100 text-purple-700', supervisor: 'bg-blue-100 text-blue-700', auditor: 'bg-slate-100 text-slate-600' }[role] || 'bg-slate-100 text-slate-600';
 }
 
-
+function handleUserSubmit(e) {
+    e.preventDefault();
+    const nik  = document.getElementById('user-input-nik').value.trim();
     const name = document.getElementById('user-input-name').value.trim();
     const role = document.getElementById('user-input-role').value;
     if (!nik || !name || !role) return;
@@ -397,7 +399,7 @@ function roleBadge(role) {
         }
     };
     finish();
-
+}
 
 window.__adminEditUser = function(id) {
     const user = getUsers().find(u => u.id === id);
