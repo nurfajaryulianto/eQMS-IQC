@@ -1,0 +1,919 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f1f5f9;
+    color: #1e293b;
+    line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode styles for body (if you implement dark mode toggle via JS) */
+body.dark {
+    background-color: #1a202c; /* Darker background for dark mode */
+    color: #e2e8f0; /* Lighter text for dark mode */
+}
+
+/* URL Error Overlay */
+#url-error-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(153, 27, 27, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    color: white;
+    text-align: center;
+    padding: 2rem;
+}
+
+#url-error-overlay.hidden {
+    display: none;
+}
+
+.error-content {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 2rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.error-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.error-message {
+    font-size: 1.25rem;
+}
+
+.error-code-block {
+    margin-top: 1rem;
+    font-size: 1.125rem;
+    background-color: #1f2937;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+.error-code-highlight {
+    background-color: #facc15;
+    color: #000;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Loading Overlay & Spinner */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    color: white;
+    flex-direction: column;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+#loading-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #3b82f6; /* Blue spinner */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    margin-top: 1rem;
+    font-size: 1.125rem;
+}
+
+/* Main Content Area */
+.main-content {
+    min-height: 100vh;
+    background-color: #f1f5f9; /* Matches body background */
+    color: #1e293b; /* Matches body text color */
+}
+
+body.dark .main-content {
+    background-color: #1a202c;
+    color: #e2e8f0;
+}
+
+/* Header */
+.header {
+    background: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+body.dark .header {
+    background-color: #2d3748; /* Darker header for dark mode */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+body.dark .header-title {
+    color: #e2e8f0;
+}
+
+/* E-QMS Link Styling - New/Modified */
+.header-title-link {
+    font-size: 1.2rem; /* Slightly smaller than main title */
+    font-weight: 600;
+    color: white; /* Text color for the button */
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8); /* Blue gradient background */
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    text-decoration: none; /* Remove underline */
+    transition: all 0.3s ease; /* Smooth transition for hover effects */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+.header-title-link:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af); /* Darker gradient on hover */
+    transform: translateY(-2px); /* Slight lift effect */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* More prominent shadow on hover */
+}
+
+body.dark .header-title-link {
+    background: linear-gradient(135deg, #2563eb, #1e40af); /* Darker gradient for dark mode */
+    color: #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .header-title-link:hover {
+    background: linear-gradient(135deg, #1e40af, #1c3d8a); /* Even darker gradient on hover in dark mode */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* =========================================== */
+/* Auth: Dashboard User Info & Logout Button   */
+/* =========================================== */
+.dash-user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-left: 0.75rem;
+    flex-shrink: 0;
+}
+
+.dash-user-name {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dash-logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.35rem 0.75rem;
+    transition: background 0.2s, transform 0.1s;
+    white-space: nowrap;
+}
+
+.dash-logout-btn:hover {
+    background: rgba(255, 255, 255, 0.28);
+    transform: scale(1.03);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+    .dash-user-name {
+        display: none;
+    }
+}
+
+
+
+
+/* Content Area */
+.content {
+    padding: 0.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Card Styles - General styling for sections */
+.card {
+    background: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+    /* Dihapus: display: flex, flex-direction: column, height: 100% */
+    /* Properti ini hanya akan diterapkan pada .chart-card secara spesifik */
+}
+
+body.dark .card {
+    background-color: #2d3748; /* Darker card background */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+    padding: 0.5rem 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+body.dark .card-header {
+    border-bottom-color: #4a5568;
+}
+
+.card-header h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0; /* Override default h3 margin */
+}
+
+body.dark .card-header h3 {
+    color: #e2e8f0;
+}
+
+.card-header h3 i {
+    color: #3b82f6;
+    margin-right: 0.5rem; /* gap: 0.5rem from filters-header h3 i */
+}
+
+.card-body {
+    padding: 2rem;
+    /* --- MODIFIKASI: Pastikan ini ada dan sudah benar --- */
+    flex-grow: 1; /* Memungkinkan card-body mengambil semua ruang vertikal yang tersisa */
+    display: flex; /* Mengubah card-body menjadi flex container untuk chart-container */
+    flex-direction: column; /* Mengatur chart-container secara vertikal di dalamnya */
+}
+
+/* Filters Section */
+.filters-section {
+    /* Uses .card styles */
+    border-bottom: none; /* Remove extra border-bottom as it's a card now */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Re-apply card shadow */
+    margin-bottom: 0.5rem; /* Ensure consistent spacing */
+}
+
+.filters-header {
+    /* Uses .card-header styles */
+    margin-bottom: 0; /* Reset margin as it's part of card-header */
+}
+
+.filters-content {
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+}
+
+body.dark .filters-content {
+    background-color: #2a3340; /* Darker background for filter content */
+    border-color: #4a5568;
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    align-items: flex-end; /* align-items: end */
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-group label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 0.875rem;
+}
+
+body.dark .filter-group label {
+    color: #cbd5e0;
+}
+
+.form-input,
+.form-select {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    background: white;
+    color: #1e293b; /* Default text color for inputs */
+}
+
+body.dark .form-input,
+body.dark .form-select {
+    background-color: #374151; /* Darker input background */
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Invalid Input Style */
+.invalid-input {
+    border-color: #ef4444; /* Red border */
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); /* Red ring */
+}
+
+
+.filter-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center; /* Center content for full-width buttons */
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #4b5563;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Button Group (for chart/table filters) */
+.btn-group {
+    display: inline-flex;
+    border-radius: 0.5rem; /* Consistent with other buttons */
+    overflow: hidden; /* Ensures rounded corners apply to inner buttons */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-group .btn {
+    padding: 0.5rem 1rem; /* Smaller padding for grouped buttons */
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1e293b;
+    background-color: white;
+    border: 1px solid #e2e8f0; /* Light border */
+    border-right: none; /* Remove right border for grouping */
+    border-radius: 0; /* Remove individual button rounding */
+    transition: all 0.2s ease;
+}
+
+body.dark .btn-group .btn {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+.btn-group .btn:last-child {
+    border-right: 1px solid #e2e8f0; /* Add back border for the last button */
+}
+
+body.dark .btn-group .btn:last-child {
+    border-right: 1px solid #4a5568;
+}
+
+.btn-group .btn:hover {
+    background-color: #f1f5f9;
+    transform: none; /* No translateY for grouped buttons */
+    box-shadow: none; /* No shadow on hover for grouped buttons */
+}
+
+body.dark .btn-group .btn:hover {
+    background-color: #3a475a;
+}
+
+.btn-group .btn.active {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    border-color: #1d4ed8;
+}
+
+body.dark .btn-group .btn.active {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    border-color: #1e40af;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+body.dark .stat-card {
+    background-color: #2d3748;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+body.dark .stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-icon.bg-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.stat-icon.bg-green { background: linear-gradient(135deg, #10b981, #059669); }
+.stat-icon.bg-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.stat-icon.bg-yellow { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.stat-icon.bg-orange { background: linear-gradient(135deg, #f97316, #ea580c); }
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+body.dark .stat-content h3 {
+    color: #e2e8f0;
+}
+
+.stat-content p {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+body.dark .stat-content p {
+    color: #a0aec0;
+}
+
+/* Chart Sections */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); /* Adjusted minmax for better layout */
+    gap: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.chart-card {
+    min-height: 550px; /* Consistent chart height */
+    /* --- MODIFIKASI: Pastikan ini ada dan sudah benar --- */
+    display: flex; /* Hanya chart-card yang menjadi flex container */
+    flex-direction: column; /* Susun header dan body secara vertikal di dalam chart-card */
+}
+
+.chart-container {
+    position: relative;
+    height: 100%; /* Fill parent card-body */
+    width: 100%;
+    /* No extra padding here, card-body already provides it */
+}
+
+/* Table Styles */
+.table-section {
+    /* Uses .card styles */
+}
+
+.table-header {
+    /* Uses .card-header styles */
+}
+
+.table-title {
+    /* Uses .card-header h3 styles */
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.data-table th {
+    background: #f8fafc;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+    font-size: 13px; /* From reference */
+}
+
+body.dark .data-table th {
+    background-color: #3a475a; /* Darker table header */
+    color: #cbd5e0;
+    border-bottom-color: #4a5568;
+}
+
+.data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+    vertical-align: middle;
+    color: #4b5563; /* Default text color for table cells */
+}
+
+body.dark .data-table td {
+    border-bottom-color: #2a3340;
+    color: #a0aec0;
+}
+
+.data-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+body.dark .data-table tbody tr:hover {
+    background-color: #3a475a;
+}
+
+/* Status Badge (if used in table) */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-pass {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-fail {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* Grade Badge Styles */
+.grade-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    display: inline-block;
+    min-width: 24px;
+}
+
+.grade-a {
+    background-color: #10b981;
+    color: white;
+}
+
+.grade-b {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.grade-c {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.grade-d {
+    background-color: #ef4444;
+    color: white;
+}
+
+.grade-ng {
+    background-color: #6b7280;
+    color: white;
+}
+
+/* Defect Severity Colors */
+.defect-critical { color: #dc2626; font-weight: bold; }
+.defect-major { color: #ea580c; }
+.defect-minor { color: #ca8a04; }
+
+/* FTT Rate Colors */
+.ftt-excellent { color: #059669; font-weight: bold; }
+.ftt-good { color: #0d9488; }
+.ftt-warning { color: #d97706; }
+.ftt-poor { color: #dc2626; }
+
+/* NCVS Station Badges */
+.ncvs-badge {
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    background-color: #e5e7eb;
+    color: #374151;
+    display: inline-block;
+}
+
+body.dark .ncvs-badge {
+    background-color: #4a5568;
+    color: #cbd5e0;
+}
+
+/* Trend Indicators (for stat cards if you add them) */
+.stat-change {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.stat-change.negative {
+    color: #ef4444;
+}
+
+.stat-change.positive {
+    color: #10b981;
+}
+
+.stat-change.neutral {
+    color: #6b7280;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .charts-grid {
+        grid-template-columns: 1fr; /* Stack charts on smaller screens */
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 1rem;
+    }
+
+    .header-title {
+        font-size: 1.25rem;
+    }
+
+    .content {
+        padding: 1rem;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .card-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .filters-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .filter-actions {
+        justify-content: stretch;
+        margin-top: 0.5rem;
+    }
+
+    .filter-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr; /* Stack stat cards on mobile */
+    }
+
+    .stat-card {
+        padding: 1.5rem;
+    }
+
+    .chart-card {
+        min-height: 300px; /* Slightly shorter charts on mobile */
+        /* --- MODIFIKASI: Pastikan ini juga ada di media query --- */
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    /* No user-profile span to hide anymore */
+
+    .data-table {
+        font-size: 0.75rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem;
+    }
+
+    .btn-group .btn {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Styling for table filters group */
+.table-filters-group {
+    display: flex;
+    gap: 1rem; /* Jarak antara dropdown */
+    align-items: center;
+}
+
+.filter-group-inline {
+    display: flex;
+    flex-direction: column; /* Label di atas dropdown */
+    align-items: flex-start;
+}
+
+.filter-group-inline label {
+    font-size: 0.8rem;
+    color: #6b7280; /* Warna teks label */
+    margin-bottom: 0.25rem; /* Jarak antara label dan dropdown */
+}
+
+/* Hide labels visually but keep them for screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Basic styling for the new select elements */
+.form-select-inline {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem; /* rounded-md */
+    background-color: #ffffff;
+    font-size: 0.875rem; /* text-sm */
+    line-height: 1.25rem;
+    color: #374151;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm); /* Ensure this variable is defined in your CSS */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-select-inline:focus {
+    border-color: #3b82f6; /* focus:ring-blue-500 focus:border-blue-500 */
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); /* example focus ring */
+}
+
+/* --- Penyesuaian Perataan Teks untuk Tabel --- */
+
+/* Rata Tengah untuk Header Kolom yang Ditentukan */
+.data-table th:nth-child(1), /* Timestamp */
+.data-table th:nth-child(2), /* Auditor */
+.data-table th:nth-child(3), /* NCVS */
+.data-table th:nth-child(4), /* Model */
+.data-table th:nth-child(5), /* Qty Inspect */
+.data-table th:nth-child(6), /* FTT */
+.data-table th:nth-child(7), /* Rework Rate */
+.data-table th:nth-child(8), /* A-Grade */
+.data-table th:nth-child(9), /* B-Grade */
+.data-table th:nth-child(10), /* C-Grade */
+.data-table th:nth-child(11) /* Rework (L/R/P) */
+{
+    text-align: center;
+}
+
+/* Rata Tengah untuk Isi Data Kolom yang Ditentukan */
+.data-table td:nth-child(3), /* NCVS */
+.data-table td:nth-child(5), /* Qty Inspect */
+.data-table td:nth-child(6), /* FTT */
+.data-table td:nth-child(7), /* Rework Rate */
+.data-table td:nth-child(8), /* A-Grade */
+.data-table td:nth-child(9), /* B-Grade */
+.data-table td:nth-child(10), /* C-Grade */
+.data-table td:nth-child(11) /* Rework (L/R/P) */
+{
+    text-align: center;
+}
+
+/* Memastikan Kolom Rata Kiri (Timestamp, Auditor, Model) - meskipun ini default, eksplisit lebih baik */
+.data-table th:nth-child(1), /* Timestamp */
+.data-table th:nth-child(2), /* Auditor */
+.data-table th:nth-child(4) /* Model */
+{
+    text-align: center;
+}
+
+.data-table td:nth-child(1), /* Timestamp */
+.data-table td:nth-child(2), /* Auditor */
+.data-table td:nth-child(4) /* Model */
+{
+    text-align: left;
+}

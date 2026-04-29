@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html class="h-full bg-white antialiased" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspection Form</title>
+    <link rel="stylesheet" href="assets/css/tailwind.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; }
+        /* FTT color states set by JS */
+        .high-ftt { color: #16a34a !important; }
+        .medium-ftt { color: #d97706 !important; }
+        .low-ftt { color: #dc2626 !important; }
+        /* Defect button active state */
+        .defect-button.active { outline: 3px solid #2563eb; outline-offset: -2px; font-weight: 600; }
+        .defect-button.inactive, .input-button.inactive { opacity: 0.4; cursor: not-allowed; }
+        /* Scrollbar thin */
+        .thin-scroll::-webkit-scrollbar { width: 4px; } .thin-scroll::-webkit-scrollbar-track { background: transparent; } .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        /* Loading overlay */
+        #loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; align-items: center; justify-content: center; }
+        #loading-overlay.active { display: flex; }
+        .spinner { width: 48px; height: 48px; border: 5px solid #fff; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Announcement popup */
+        #announcement-popup { display: none; position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        #announcement-popup.active { display: flex; }
+        .announcement-content { background: white; border-radius: 12px; padding: 24px; max-width: 480px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); position: relative; }
+        .announcement-date { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: #64748b; font-size: 13px; }
+        .announcement-nav { background: #f1f5f9; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 14px; }
+        .announcement-nav:hover { background: #e2e8f0; }
+        .announcement-text { color: #1e293b; font-size: 14px; line-height: 1.6; }
+        .close-button { position: absolute; top: 12px; right: 16px; font-size: 22px; cursor: pointer; color: #94a3b8; line-height: 1; }
+        .close-button:hover { color: #475569; }
+        /* Grade counter active state */
+        .input-button.active { box-shadow: 0 0 0 3px rgba(37,99,235,0.4); }
+        /* Metric counters: uniform size regardless of JS className replacement */
+        .counter { font-size: 1.875rem; font-weight: 700; line-height: 1.2; }
+        .counter.high-ftt  { color: #16a34a; }
+        .counter.medium-ftt{ color: #d97706; }
+        .counter.low-ftt   { color: #dc2626; }
+        /* SPA nav active states */
+        .nav-link { color: #64748b; transition: color 0.15s; }
+        .nav-link:hover { color: #0f172a; }
+        .nav-link.active { color: #2563eb; font-weight: 600; border-bottom: 2px solid #2563eb; }
+        .sidenav-link { color: #64748b; transition: background 0.15s; }
+        .sidenav-link:hover { background: #e2e8f0; }
+        .sidenav-link.active { background: white; color: #2563eb; border-right: 2px solid #2563eb; font-weight: 600; }
+        .app-view.hidden { display: none !important; }
+        /* Analytics loading overlay (scoped to analytics view) */
+        #analytics-loading-overlay { display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.85); z-index: 100; align-items: center; justify-content: center; }
+        #analytics-loading-overlay.active { display: flex; }
+        /* Dashboard CSS compat shims */
+        .card { background: white; border-radius: 0.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
+        .card-header { padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .card-header h3 { font-size: 0.9rem; font-weight: 600; color: #1e293b; margin: 0; }
+        .card-body { padding: 1rem; }
+        .chart-container { position: relative; height: 260px; }
+        .btn-group { display: flex; gap: 4px; }
+        .btn-group .btn { padding: 3px 10px; font-size: 11px; border-radius: 4px; border: 1px solid #cbd5e1; background: white; cursor: pointer; color: #64748b; }
+        .btn-group .btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+        .stat-card { background: white; border-radius: 0.5rem; border: 1px solid #e2e8f0; padding: 1rem; display: flex; align-items: center; gap: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+        .stat-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
+        .stat-icon.bg-green { background: #dcfce7; color: #16a34a; }
+        .stat-icon.bg-yellow { background: #fef9c3; color: #ca8a04; }
+        .stat-icon.bg-blue { background: #dbeafe; color: #2563eb; }
+        .stat-content h3 { font-size: 1.4rem; font-weight: 700; margin: 0; color: #1e293b; }
+        .stat-content p { font-size: 0.75rem; color: #64748b; margin: 2px 0 0 0; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .data-table th { background: #f8fafc; padding: 8px 12px; text-align: left; font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        .data-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; white-space: nowrap; }
+        .data-table tr:hover td { background: #f8fafc; }
+        .table-responsive { overflow-x: auto; }
+        .form-input, .form-select { width: 100%; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #1e293b; background: white; }
+        .form-select-inline { padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+        .btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: none; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        /* Confirmation popup */
+        .confirmation-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9997; display: flex; align-items: center; justify-content: center; }
+        .confirmation-content { background: white; border-radius: 12px; padding: 24px; max-width: 360px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .confirmation-content p { font-size: 15px; color: #1e293b; margin-bottom: 20px; text-align: center; }
+        .confirmation-buttons { display: flex; gap: 12px; justify-content: center; }
+        .button-back { padding: 8px 24px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; cursor: pointer; font-size: 14px; }
+        .button-confirm { padding: 8px 24px; border-radius: 8px; border: none; background: #2563eb; color: white; cursor: pointer; font-size: 14px; font-weight: 600; }
+        /* Summary item */
+        .summary-item { display: flex; padding: 8px 16px; font-size: 12px; border-bottom: 1px solid #f1f5f9; gap: 8px; }
+        .summary-item .defect-col { flex: 1; font-weight: 500; color: #1e293b; }
+        .summary-item .position-col { width: 48px; color: #64748b; }
+        .summary-item .level-col { width: 80px; color: #475569; }
+        .summary-item .count { background: #e2e8f0; padding: 1px 6px; border-radius: 9999px; font-weight: 600; color: #1e293b; margin-left: 4px; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-50 text-slate-900">
+
+<!-- Top App Bar -->
+<header class="flex justify-between items-center px-6 h-16 w-full bg-white border-b border-slate-200 shadow-sm z-50 sticky top-0">
+    <div class="flex items-center gap-4">
+        <div class="text-xl font-bold tracking-tight text-slate-900">E-QMS</div>
+    </div>
+    <nav class="hidden md:flex gap-1 items-center h-full">
+        <a data-view="dashboard" onclick="showView('dashboard')" class="nav-link active h-full flex items-center px-3 text-sm cursor-pointer">Dashboard</a>
+        <a data-view="inspections" onclick="showView('inspections')" class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Inspections</a>
+        <a data-view="analytics" onclick="showView('analytics')" class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Analytics</a>
+        <a data-view="defect-library" onclick="showView('defect-library')" class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Defect Library</a>
+        <a data-view="settings" onclick="showView('settings')" class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Settings</a>
+        <a data-view="admin" onclick="showView('admin')" class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
+    </nav>
+    <div class="flex items-center gap-1">
+        <button id="announcement-button" title="Announcements" class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+            <span class="material-symbols-outlined text-[20px]">notifications</span>
+        </button>
+        <button class="statistic-button p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors" title="Lihat Statistik Data">
+            <span class="material-symbols-outlined text-[20px]">bar_chart</span>
+        </button>
+        <span id="user-display" class="text-sm text-slate-600 font-medium px-2 hidden sm:inline"></span>
+        <span id="user-role-badge" class="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize"></span>
+        <button id="logout-button" title="Logout" class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+            <span class="material-symbols-outlined text-[20px]">logout</span>
+        </button>
+    </div>
+</header>
+
+<div class="flex flex-1 overflow-hidden">
+    <!-- Side Nav -->
+    <aside class="hidden md:flex fixed left-0 top-16 h-[calc(100vh-4rem)] flex-col bg-slate-50 border-r border-slate-200 w-56 z-40 overflow-y-auto">
+        <div class="p-4 border-b border-slate-200">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-9 h-9 rounded bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                    <span class="material-symbols-outlined text-[18px]">shield</span>
+                </div>
+                <div>
+                    <div class="text-sm font-bold text-slate-900">Quality Control</div>
+                    <div class="text-[10px] text-slate-400">Plant Floor 01</div>
+                </div>
+            </div>
+            <button id="new-inspection-btn" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium flex items-center justify-center gap-1 transition-colors">
+                <span class="material-symbols-outlined text-[16px]">add</span> New Inspection
+            </button>
+        </div>
+        <nav class="flex-1 flex flex-col gap-0.5 p-2">
+            <a data-view="dashboard" onclick="showView('dashboard')" class="sidenav-link active flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">dashboard</span> Dashboard
+            </a>
+            <a data-view="inspections" onclick="showView('inspections')" class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">fact_check</span> Inspections
+            </a>
+            <a data-view="analytics" onclick="showView('analytics')" class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">bar_chart</span> Analytics
+            </a>
+            <a data-view="defect-library" onclick="showView('defect-library')" class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">category</span> Defect Library
+            </a>
+            <a data-view="settings" onclick="showView('settings')" class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">settings</span> Settings
+            </a>
+            <a data-view="admin" onclick="showView('admin')" class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer" style="display:none">
+                <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin
+            </a>
+        </nav>
+        <div class="border-t border-slate-200 p-2">
+            <a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-200 rounded-sm text-sm transition-colors" href="#">
+                <span class="material-symbols-outlined text-[18px]">contact_support</span> Support
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto md:ml-56">
+
+    <!-- ====== VIEW: DASHBOARD (Inspection Form) ====== -->
+    <div id="view-dashboard" class="app-view p-4 lg:p-6">
+        <div class="max-w-[1400px] mx-auto">
+
+            <!-- Top Metrics Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <!-- FTT -->
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">FTT</p>
+                        <div class="flex items-baseline gap-2">
+                            <div id="fttOutput" class="counter text-3xl font-bold text-blue-600">0%</div>
+                        </div>
+                    </div>
+                    <div class="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-blue-600 text-[22px]">monitoring</span>
+                    </div>
+                </div>
+                <!-- Rework Rate -->
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rework Rate</p>
+                        <div id="redoRateOutput" class="counter text-3xl font-bold text-orange-500">0%</div>
+                    </div>
+                    <div class="w-11 h-11 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-orange-500 text-[22px]">build</span>
+                    </div>
+                </div>
+                <!-- Qty Inspect -->
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Qty Inspect</p>
+                        <div id="qtyInspectOutput" class="counter text-3xl font-bold text-slate-800">0</div>
+                    </div>
+                    <div class="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-slate-500 text-[22px]">inventory_2</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main 3-Column Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+                <!-- LEFT: Session Details -->
+                <div class="col-span-1 lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col">
+                    <div class="px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Session Details</h3>
+                    </div>
+                    <div class="p-4 flex-1 overflow-y-auto thin-scroll space-y-3">
+                        <div>
+                            <label for="qty-sample-set" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Incoming</label>
+                            <input type="number" id="qty-sample-set" value="0" placeholder="Masukkan jumlah sampel"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="tanggal-incoming" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal Incoming</label>
+                            <input type="date" id="tanggal-incoming"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="auditor" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                                Auditor
+                                <span id="auditor-session-badge" class="hidden ml-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full normal-case tracking-normal">from session</span>
+                            </label>
+                            <input type="text" id="auditor" readonly placeholder="—"
+                                class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-700 text-sm px-3 py-2 focus:outline-none cursor-default">
+                        </div>
+                        <div>
+                            <label for="vendor" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
+                            <select id="vendor" class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                <option value="">Pilih Vendor</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="component" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component</label>
+                            <select id="component" class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                <option value="">Pilih Component</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="style-number" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Style Number</label>
+                            <input type="text" id="style-number" placeholder="Style number diisi lengkap"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="model-name" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Model Name</label>
+                            <input type="text" id="model-name" placeholder="Enter model name" readonly
+                                class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm px-3 py-2 focus:outline-none cursor-default">
+                        </div>
+                    </div>
+                    <div class="px-4 py-3 border-t border-slate-200">
+                        <button class="save-button w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                            <span class="material-symbols-outlined text-[16px]">save</span> Simpan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CENTER: Defect Panel -->
+                <div class="col-span-1 lg:col-span-6 flex flex-col gap-4">
+
+                    <!-- Defect Input -->
+                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                        <h3 class="text-base font-semibold text-slate-900 mb-3">Defect Input</h3>
+                        <div id="defect-buttons-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <!-- Populated dynamically by admin.js -->
+                        </div>
+                    </div>
+
+                    <!-- Grade Summary -->
+                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                        <h3 class="text-base font-semibold text-slate-900 mb-3">Grade Summary</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex flex-col items-center gap-1">
+                                <button class="input-button pass w-full bg-green-100 hover:bg-green-200 border border-green-300 text-green-800 text-xs font-semibold rounded-lg py-2 transition-colors">Pass</button>
+                                <div id="pass-counter" class="text-2xl font-bold text-green-700">0</div>
+                            </div>
+                            <div class="flex flex-col items-center gap-1">
+                                <button class="input-button defect w-full bg-red-100 hover:bg-red-200 border border-red-300 text-red-800 text-xs font-semibold rounded-lg py-2 transition-colors">Defect</button>
+                                <div id="defect-counter" class="text-2xl font-bold text-red-600">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: Summary Defect -->
+                <div class="col-span-1 lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col min-h-[400px]">
+                    <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-lg">
+                        <h3 class="text-base font-semibold text-slate-900">Summary Defect</h3>
+                    </div>
+                    <div id="summary-list" class="flex-1 overflow-y-auto thin-scroll divide-y divide-slate-100">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+            </div><!-- end grid -->
+        </div><!-- end max-w -->
+    </div><!-- end view-dashboard -->
+
+    <!-- ====== VIEW: INSPECTIONS ====== -->
+    <div id="view-inspections" class="app-view hidden p-4 lg:p-6">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-slate-900">Inspections</h2>
+                <p class="text-sm text-slate-500 mt-1">Track and review submitted inspection sessions.</p>
+            </div>
+            <!-- Today's summary cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Sessions Today</p>
+                    <div id="insp-sessions-today" class="text-3xl font-bold text-blue-600">—</div>
+                </div>
+                <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Units Inspected</p>
+                    <div id="insp-units-today" class="text-3xl font-bold text-slate-800">—</div>
+                </div>
+            </div>
+            <!-- Recent sessions table (from localStorage cache) -->
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+                <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-slate-900">Today's Session Log</h3>
+                    <span class="text-xs text-slate-400">Data from current device session</span>
+                </div>
+                <div id="insp-session-log" class="divide-y divide-slate-100">
+                    <div class="flex flex-col items-center justify-center py-16 text-slate-400">
+                        <span class="material-symbols-outlined text-5xl mb-3">assignment</span>
+                        <p class="text-sm font-medium">No sessions recorded yet today.</p>
+                        <p class="text-xs mt-1">Complete an inspection and click Simpan to log a session.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Info banner -->
+            <div class="mt-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                <span class="material-symbols-outlined text-blue-500 text-[20px] mt-0.5">info</span>
+                <p class="text-sm text-blue-700">Full inspection history with filters and export is available in the <button onclick="showView('analytics')" class="font-semibold underline">Analytics</button> view (Supervisor/Admin only).</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== VIEW: ANALYTICS (Statistics Dashboard) ====== -->
+    <div id="view-analytics" class="app-view hidden p-4 lg:p-6" style="position:relative;">
+        <!-- Analytics loading overlay -->
+        <div id="analytics-loading-overlay">
+            <div class="spinner"></div>
+        </div>
+        <!-- URL error overlay -->
+        <div id="url-error-overlay" style="display:none;position:absolute;inset:0;background:rgba(153,27,27,0.9);align-items:center;justify-content:center;z-index:200;border-radius:8px;">
+            <div style="background:rgba(0,0,0,0.7);padding:2rem;border-radius:0.75rem;color:white;text-align:center;max-width:480px;">
+                <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:0.75rem;">Configuration Error</h2>
+                <p>Web App URL has not been configured.</p>
+            </div>
+        </div>
+        <div class="max-w-[1400px] mx-auto">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Inspection Statistics</h2>
+                    <p class="text-sm text-slate-500 mt-1">Aggregated data across all auditors and lines.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="dash-user-display" class="text-sm text-slate-600 font-medium"></span>
+                    <button id="dash-logout-button" class="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg px-3 py-1.5 transition-colors">
+                        <span class="material-symbols-outlined text-[14px]">logout</span> Logout
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-header"><h3>Data Filters</h3></div>
+                <div class="card-body">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Start Date</label>
+                            <input type="date" id="startDate" class="form-input">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">End Date</label>
+                            <input type="date" id="endDate" class="form-input">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Auditor</label>
+                            <select id="auditorFilter" class="form-select"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">NCVS</label>
+                            <select id="ncvsFilter" class="form-select"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
+                            <select id="modelFilter" class="form-select"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Style Number</label>
+                            <select id="styleNumberFilter" class="form-select"></select>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="applyFilter" class="btn btn-primary flex-1">Apply</button>
+                            <button id="resetFilter" class="btn btn-secondary">Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-green"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-content"><h3><span id="analytics-fttOutput">0.00%</span></h3><p>FTT (First Time Through)</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-yellow"><i class="fas fa-sync-alt"></i></div>
+                    <div class="stat-content"><h3><span id="reworkRateOutput">0.00%</span></h3><p>Rework Rate</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-blue"><i class="fas fa-award"></i></div>
+                    <div class="stat-content"><h3><span id="aGradeOutput">0.00%</span></h3><p>A-Grade</p></div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>FTT Statistics</h3>
+                        <div id="ftt-time-filter" class="btn-group">
+                            <button type="button" class="btn active" data-period="days">Daily</button>
+                            <button type="button" class="btn" data-period="months">Monthly</button>
+                        </div>
+                    </div>
+                    <div class="card-body"><div class="chart-container"><canvas id="fttChart"></canvas></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Top 3 Defects</h3>
+                        <div id="defect-plant-filter" class="btn-group">
+                            <button type="button" class="btn active" data-plant="all">All</button>
+                            <button type="button" class="btn" data-plant="plant1">Plant 1</button>
+                            <button type="button" class="btn" data-plant="plant2">Plant 2</button>
+                        </div>
+                    </div>
+                    <div class="card-body"><div class="chart-container"><canvas id="defectChart"></canvas></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Grade Distribution</h3>
+                        <div id="grade-plant-filter" class="btn-group">
+                            <button type="button" class="btn active" data-plant="all">All</button>
+                            <button type="button" class="btn" data-plant="plant1">Plant 1</button>
+                            <button type="button" class="btn" data-plant="plant2">Plant 2</button>
+                        </div>
+                    </div>
+                    <div class="card-body"><div class="chart-container"><canvas id="gradePieChart"></canvas></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>NCVS Performance</h3>
+                        <div id="ncvs-sort-filter" class="btn-group">
+                            <button type="button" class="btn active" data-sort="desc">Highest</button>
+                            <button type="button" class="btn" data-sort="asc">Lowest</button>
+                        </div>
+                    </div>
+                    <div class="card-body"><div class="chart-container"><canvas id="ncvsFttChart"></canvas></div></div>
+                </div>
+            </div>
+
+            <!-- Full Inspection Data Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Full Inspection Data</h3>
+                    <div class="flex gap-2">
+                        <select id="auditorTableFilter" class="form-select-inline">
+                            <option value="all">All Auditor</option>
+                        </select>
+                        <select id="limitViewFilter" class="form-select-inline">
+                            <option value="today" selected>Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="this_week">This Week</option>
+                            <option value="last_week">Last Week</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Auditor</th>
+                                    <th>NCVS</th>
+                                    <th>Model</th>
+                                    <th>Qty Inspect</th>
+                                    <th>FTT</th>
+                                    <th>Rework Rate</th>
+                                    <th>A-Grade</th>
+                                    <th>B-Grade</th>
+                                    <th>C-Grade</th>
+                                    <th>Rework (L/R/P)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inspectionTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== VIEW: DEFECT LIBRARY ====== -->
+    <div id="view-defect-library" class="app-view hidden p-4 lg:p-6">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-slate-900">Defect Library</h2>
+                <p class="text-sm text-slate-500 mt-1">Reference catalog of all defect types by severity category.</p>
+            </div>
+            <div id="defect-library-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-6"></div>
+            <!-- Severity legend -->
+            <div class="mt-6 bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                <h3 class="text-sm font-semibold text-slate-700 mb-3">Grading Guidelines</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div class="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                        <span class="w-3 h-3 mt-0.5 rounded-full bg-green-500 flex-shrink-0"></span>
+                        <div><p class="text-xs font-semibold text-green-800">A-Grade</p><p class="text-xs text-green-700 mt-0.5">No defects found. Passes all criteria.</p></div>
+                    </div>
+                    <div class="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                        <span class="w-3 h-3 mt-0.5 rounded-full bg-orange-400 flex-shrink-0"></span>
+                        <div><p class="text-xs font-semibold text-orange-800">Rework</p><p class="text-xs text-orange-700 mt-0.5">Minor defect. Fixable before next process.</p></div>
+                    </div>
+                    <div class="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <span class="w-3 h-3 mt-0.5 rounded-full bg-slate-400 flex-shrink-0"></span>
+                        <div><p class="text-xs font-semibold text-slate-700">B-Grade</p><p class="text-xs text-slate-600 mt-0.5">Visible defect. Downgraded product.</p></div>
+                    </div>
+                    <div class="flex items-start gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                        <span class="w-3 h-3 mt-0.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                        <div><p class="text-xs font-semibold text-red-800">C-Grade</p><p class="text-xs text-red-700 mt-0.5">Critical defect. Reject / quarantine.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== VIEW: SETTINGS ====== -->
+    <div id="view-settings" class="app-view hidden p-4 lg:p-6">
+        <div class="max-w-[900px] mx-auto">
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-slate-900">Settings</h2>
+                <p class="text-sm text-slate-500 mt-1">Application configuration and preferences.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4">
+                <!-- Session Info -->
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+                    <div class="px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Current Session</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center justify-between py-2 border-b border-slate-100">
+                            <span class="text-sm text-slate-600">Logged in as</span>
+                            <span id="settings-user-display" class="text-sm font-semibold text-slate-900">—</span>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b border-slate-100">
+                            <span class="text-sm text-slate-600">Role</span>
+                            <span id="settings-user-role" class="text-sm font-semibold text-slate-900 capitalize">—</span>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b border-slate-100">
+                            <span class="text-sm text-slate-600">App Mode</span>
+                            <span id="settings-app-mode" class="text-xs font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">UI TEST MODE</span>
+                        </div>
+                        <div class="flex items-center justify-between py-2">
+                            <span class="text-sm text-slate-600">Today's Date</span>
+                            <span id="settings-date" class="text-sm font-semibold text-slate-900">—</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Inspection Defaults -->
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+                    <div class="px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Inspection Defaults</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <p class="text-sm font-medium text-slate-700">Default Qty Incoming</p>
+                                <p class="text-xs text-slate-400 mt-0.5">Saved to device. Applies on next session.</p>
+                            </div>
+                            <span id="settings-qty-sample" class="text-sm font-semibold text-slate-900">—</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Data -->
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+                    <div class="px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">Data & Storage</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <p class="text-sm text-slate-500">Form progress is auto-saved to this device via localStorage. It persists across browser refresh but not across devices.</p>
+                        <button onclick="if(confirm('Clear all saved form data? This cannot be undone.')){localStorage.clear();location.reload();}" class="flex items-center gap-2 text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">
+                            <span class="material-symbols-outlined text-[14px]">delete_sweep</span> Clear Saved Data
+                        </button>
+                    </div>
+                </div>
+                <!-- About -->
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
+                    <div class="px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-base font-semibold text-slate-900">About</h3>
+                    </div>
+                    <div class="p-4 space-y-1 text-sm text-slate-600">
+                        <p><span class="font-medium text-slate-800">E-QMS</span> — Electronic Quality Management System</p>
+                        <p>Version: <span class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">v2025.07</span></p>
+                        <p class="text-xs text-slate-400 mt-2">Nike Quality Control · Plant Floor 01</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== VIEW: ADMIN ====== -->
+    <div id="view-admin" class="app-view hidden p-4 lg:p-6">
+        <div class="max-w-[1100px] mx-auto">
+            <div class="mb-5">
+                <h2 class="text-xl font-bold text-slate-900">Admin Panel</h2>
+                <p class="text-sm text-slate-500 mt-1">Manage defect catalog and system users.</p>
+            </div>
+            <!-- Error banner (ditampilkan jika Supabase gagal) -->
+            <div id="admin-error-banner" class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-200 mb-6">
+                <button id="admin-tab-defects" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-blue-600 text-blue-600 -mb-px transition-colors">
+                    <span class="material-symbols-outlined text-[16px] align-middle mr-1">category</span>Defects
+                </button>
+                <button id="admin-tab-vendors" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
+                    <span class="material-symbols-outlined text-[16px] align-middle mr-1">factory</span>Vendors
+                </button>
+                <button id="admin-tab-components" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
+                    <span class="material-symbols-outlined text-[16px] align-middle mr-1">construction</span>Components
+                </button>
+                <button id="admin-tab-users" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
+                    <span class="material-symbols-outlined text-[16px] align-middle mr-1">group</span>Users
+                </button>
+            </div>
+
+            <!-- DEFECTS PANEL -->
+            <div id="admin-panel-defects">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <!-- Table -->
+                    <div class="lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Defect Catalog</h3>
+                            <span id="admin-defects-count" class="text-xs text-slate-400"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Label</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Key Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr></thead>
+                                <tbody id="admin-defects-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Form -->
+                    <div class="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+                        <h3 id="admin-defect-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add Defect</h3>
+                        <form id="admin-defect-form" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Display Label</label>
+                                <input id="defect-input-label" type="text" placeholder="e.g. Over Cement" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Key Name</label>
+                                <input id="defect-input-name" type="text" placeholder="e.g. OVER CEMENT" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none font-mono">
+                                <p class="text-[11px] text-slate-400 mt-1">Internal key. Will be auto-uppercased on save.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                                <select id="defect-input-category" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">Select category</option>
+                                    <option value="minor">Minor / Cosmetic</option>
+                                    <option value="major">Major / Aesthetic</option>
+                                    <option value="critical">Critical / Structural</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                <button type="button" id="admin-defect-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VENDORS PANEL -->
+            <div id="admin-panel-vendors" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div class="lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Vendor List</h3>
+                            <span id="admin-vendors-count" class="text-xs text-slate-400"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr></thead>
+                                <tbody id="admin-vendors-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+                        <h3 id="admin-vendor-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add Vendor</h3>
+                        <form id="admin-vendor-form" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor Name</label>
+                                <input id="vendor-input-name" type="text" placeholder="e.g. PT. Sumber Makmur" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                <button type="button" id="admin-vendor-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPONENTS PANEL -->
+            <div id="admin-panel-components" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div class="lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Component List</h3>
+                            <span id="admin-components-count" class="text-xs text-slate-400"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr></thead>
+                                <tbody id="admin-components-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+                        <h3 id="admin-component-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add Component</h3>
+                        <form id="admin-component-form" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component Name</label>
+                                <input id="component-input-name" type="text" placeholder="e.g. Upper" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                <button type="button" id="admin-component-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USERS PANEL -->
+            <div id="admin-panel-users" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <!-- Table -->
+                    <div class="lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">System Users</h3>
+                            <span class="text-xs text-slate-400">TEST MODE — stored locally</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">NIK</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Role</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr></thead>
+                                <tbody id="admin-users-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div class="px-4 py-3 border-t border-slate-100 bg-yellow-50">
+                            <p class="text-xs text-yellow-700"><span class="font-semibold">Note:</span> In production, manage users via Supabase Dashboard.</p>
+                        </div>
+                    </div>
+                    <!-- Form -->
+                    <div class="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+                        <h3 id="admin-user-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add User</h3>
+                        <form id="admin-user-form" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">NIK</label>
+                                <input id="user-input-nik" type="text" placeholder="e.g. 12345 or spv001" required maxlength="20" class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none font-mono">
+                                <p class="text-[11px] text-slate-400 mt-1">Alphanumeric only. Used to login.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Display Name</label>
+                                <input id="user-input-name" type="text" placeholder="e.g. Badrowi" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Role</label>
+                                <select id="user-input-role" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">Select role</option>
+                                    <option value="auditor">Auditor</option>
+                                    <option value="supervisor">Supervisor</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                <button type="button" id="admin-user-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </main>
+</div>
+
+<!-- Announcement Popup -->
+<div id="announcement-popup">
+    <div class="announcement-content">
+        <span class="close-button">&times;</span>
+        <div class="announcement-date">
+            <button id="prev-announcement" class="announcement-nav">&lt;</button>
+            <span id="date-text"></span>
+            <button id="next-announcement" class="announcement-nav">&gt;</button>
+        </div>
+        <div id="announcement-text" class="announcement-text"></div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+</div>
+
+<!-- SPA Navigation controller -->
+<script>
+    let analyticsReady = false;
+    let adminReady = false;
+    const VIEW_ROLES = { 'analytics': ['supervisor', 'admin'], 'admin': ['admin'] };
+    function showView(name) {
+        if (VIEW_ROLES[name]) {
+            const role = window.__eqmsUserRole;
+            if (!role || !VIEW_ROLES[name].includes(role)) return;
+        }
+        document.querySelectorAll('.app-view').forEach(v => v.classList.add('hidden'));
+        const view = document.getElementById('view-' + name);
+        if (view) view.classList.remove('hidden');
+        document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+        document.querySelectorAll('.sidenav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+        if (name === 'analytics' && !analyticsReady) {
+            analyticsReady = true;
+            import('./js/dashboard.js').then(m => m.initDashboard()).catch(e => console.error('Analytics init failed:', e));
+        }
+        if (name === 'admin' && !adminReady) {
+            adminReady = true;
+            import('./js/admin.js').then(m => m.initAdminPanel()).catch(e => console.error('Admin init failed:', e));
+        }
+        if (name === 'settings') populateSettingsView();
+        if (name === 'inspections') populateInspectionsView();
+    }
+    function populateSettingsView() {
+        const raw = localStorage.getItem('eqms_test_session_v1');
+        const session = raw ? JSON.parse(raw) : {};
+        const el = id => document.getElementById(id);
+        if (el('settings-user-display')) el('settings-user-display').textContent = session.display_name || session.nik || '—';
+        if (el('settings-user-role')) el('settings-user-role').textContent = session.role || '—';
+        if (el('settings-date')) el('settings-date').textContent = new Date().toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        const qty = localStorage.getItem('qtySampleSet') || '—';
+        if (el('settings-qty-sample')) el('settings-qty-sample').textContent = qty;
+    }
+    function populateInspectionsView() {
+        const logEl = document.getElementById('insp-session-log');
+        if (!logEl) return;
+        const raw = localStorage.getItem('sessionLog');
+        let sessions = [];
+        try { sessions = raw ? JSON.parse(raw) : []; } catch(e) {}
+        const today = new Date().toDateString();
+        const todaySessions = sessions.filter(s => new Date(s.timestamp).toDateString() === today);
+        const sEl = document.getElementById('insp-sessions-today');
+        const uEl = document.getElementById('insp-units-today');
+        if(sEl) sEl.textContent = todaySessions.length || 0;
+        if(uEl) uEl.textContent = todaySessions.reduce((acc, s) => acc + (parseInt(s.qtyInspect)||0), 0) || 0;
+        if (todaySessions.length === 0) {
+            logEl.innerHTML = '<div class="flex flex-col items-center justify-center py-16 text-slate-400"><span class="material-symbols-outlined text-5xl mb-3">assignment</span><p class="text-sm font-medium">No sessions recorded yet today.</p><p class="text-xs mt-1">Complete an inspection and click Simpan to log a session.</p></div>';
+        } else {
+            logEl.innerHTML = todaySessions.slice().reverse().map(s => `
+                <div class="flex items-center gap-4 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
+                    <span class="text-xs text-slate-400 w-28 flex-shrink-0">${new Date(s.timestamp).toLocaleTimeString('id-ID')}</span>
+                    <span class="font-medium w-24 flex-shrink-0">${s.auditor || '—'}</span>
+                    <span class="text-slate-500 flex-1">${s.modelName || '—'}</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${s.ftt >= 95 ? 'bg-green-100 text-green-700' : s.ftt >= 80 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}">FTT ${s.ftt || 0}%</span>
+                </div>`).join('');
+        }
+    }
+    window.showView = showView;
+</script>
+<script src="js/script.js" type="module"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,27 @@
+# Node / build
+node_modules/
+assets/css/tailwind.css
+
+# Tailwind binary (tidak perlu di-commit)
+tailwindcss.exe
+tailwindcss
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment (jangan pernah commit secret ke repo)
+.env
+.env.local
+.env.*.local

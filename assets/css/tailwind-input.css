@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Custom theme tokens — replaces tailwind.config.js in v4 */
+@theme {
+    --font-sans: 'Inter', sans-serif;
+    --font-inter: 'Inter', sans-serif;
+    --color-primary: #005bbf;
+    --color-background: #f9f9ff;
+    --color-on-surface: #191c23;
+    --color-on-surface-variant: #414754;
+    --color-outline-variant: #c1c6d6;
+}
+
+/* Explicit sources: paths are relative to this CSS file */
+@source "../../index.html";
+@source "../../login.html";
+@source "../../unauthorized.html";
+@source "../../js/script.js";
+@source "../../js/dashboard.js";

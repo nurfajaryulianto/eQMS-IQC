@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html class="h-full bg-white antialiased" lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Akses Ditolak — E-QMS</title>
+    <link rel="stylesheet" href="assets/css/tailwind.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; }
+    </style>
+</head>
+<body class="h-full flex items-center justify-center bg-slate-50">
+    <div class="w-full max-w-sm mx-auto px-4">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+            <!-- Icon -->
+            <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-5">
+                <span class="material-symbols-outlined text-red-500 text-[32px]">block</span>
+            </div>
+            <!-- Title -->
+            <h1 class="text-xl font-bold text-slate-900 mb-2">Akses Ditolak</h1>
+            <p class="text-sm text-slate-500 mb-5 leading-relaxed">
+                Anda tidak memiliki izin untuk mengakses halaman ini.<br>
+                Silakan hubungi administrator jika ini adalah kesalahan.
+            </p>
+            <!-- Role badge -->
+            <div class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
+                <span class="material-symbols-outlined text-[14px]">badge</span>
+                Role: <span id="user-role-display" class="capitalize">—</span>
+            </div>
+            <!-- Actions -->
+            <div class="flex flex-col gap-3">
+                <a href="/index.html" class="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">home</span>
+                    Kembali ke Halaman Utama
+                </a>
+                <button id="logout-btn" class="flex items-center justify-center gap-2 w-full py-2.5 bg-white hover:bg-slate-50 text-red-600 text-sm font-semibold rounded-lg border border-slate-200 transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">logout</span>
+                    Logout
+                </button>
+            </div>
+        </div>
+        <p class="text-center text-xs text-slate-400 mt-4">E-QMS · Electronic Quality Management System</p>
+    </div>
+
+    <script type="module">
+        import { getUserRole, signOut } from './js/auth.js';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const roleEl = document.getElementById('user-role-display');
+            try {
+                const role = await getUserRole();
+                if (roleEl) roleEl.textContent = role || 'tidak diketahui';
+            } catch {
+                if (roleEl) roleEl.textContent = 'tidak diketahui';
+            }
+
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await signOut();
+            });
+        });
+    </script>
+</body>
+</html>

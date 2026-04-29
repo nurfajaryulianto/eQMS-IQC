@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspection Data Statistics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+</head>
+<body>
+
+    <div id="url-error-overlay" class="hidden">
+        <div class="error-content">
+            <h2 class="error-title">Configuration Error</h2>
+            <p class="error-message">
+                You have not entered the Google Apps Script Web App URL.
+            </p>
+            <p class="error-code-block">
+                Open the HTML file, find the line <code class="error-code-highlight">'ENTER_YOUR_WEB_APP_URL_HERE'</code>, and replace it with your valid Web App URL.
+            </p>
+        </div>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p class="loading-text">Loading inspection statistics...</p>
+    </div>
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-left">
+                <!-- Restored original dashboard title -->
+                <h1 class="header-title">Inspection Data Statistics Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <!-- Moved E-QMS link to top right and made it clickable -->
+                <a href="index.html" class="header-title-link">E-QMS</a>
+                <!-- User Info & Logout -->
+                <div class="dash-user-info">
+                    <span id="dash-user-display" class="dash-user-name"></span>
+                    <button id="dash-logout-button" class="dash-logout-btn" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <div class="card filters-section">
+                <div class="card-header filters-header">
+                    <h3><i class="fas fa-filter"></i> Data Filters</h3>
+                </div>
+                <div class="card-body filters-content">
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label for="startDate">Start Date</label>
+                            <input type="date" id="startDate" class="form-input">
+                        </div>
+                        <div class="filter-group">
+                            <label for="endDate">End Date</label>
+                            <input type="date" id="endDate" class="form-input">
+                        </div>
+                        <div class="filter-group">
+                            <label for="auditorFilter">Auditor</label>
+                            <select id="auditorFilter" class="form-select"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="ncvsFilter">NCVS</label>
+                            <select id="ncvsFilter" class="form-select"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="modelFilter">Model</label>
+                            <select id="modelFilter" class="form-select"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="styleNumberFilter">Style Number</label>
+                            <select id="styleNumberFilter" class="form-select"></select>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFilter" class="btn btn-primary">
+                                <i class="fas fa-filter"></i>Apply Filters
+                            </button>
+                            <button id="resetFilter" class="btn btn-secondary">
+                                <i class="fas fa-redo"></i>Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon bg-green">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><span id="fttOutput">0.00%</span></h3>
+                        <p>FTT (First Time Through)</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-yellow">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><span id="reworkRateOutput">0.00%</span></h3>
+                        <p>Rework Rate</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-blue">
+                        <i class="fas fa-award"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><span id="aGradeOutput">0.00%</span></h3>
+                        <p>A-Grade</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h3>FTT Statistics</h3>
+                        <div id="ftt-time-filter" class="chart-controls btn-group" role="group">
+                            <button type="button" class="btn active" data-period="days">Daily</button>
+                            <button type="button" class="btn" data-period="months">Monthly</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="fttChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h3>Top 3 Defects</h3>
+                        <div id="defect-plant-filter" class="chart-controls btn-group" role="group">
+                            <button type="button" class="btn active" data-plant="all">All</button>
+                            <button type="button" class="btn" data-plant="plant1">Plant 1</button>
+                            <button type="button" class="btn" data-plant="plant2">Plant 2</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="defectChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h3>Grade Distribution</h3>
+                        <div id="grade-plant-filter" class="chart-controls btn-group" role="group">
+                            <button type="button" class="btn active" data-plant="all">All</button>
+                            <button type="button" class="btn" data-plant="plant1">Plant 1</button>
+                            <button type="button" class="btn" data-plant="plant2">Plant 2</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="gradePieChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <div class="card-header">
+                        <h3>NCVS Performance</h3>
+                        <div id="ncvs-sort-filter" class="chart-controls btn-group" role="group">
+                            <button type="button" class="btn active" data-sort="desc">Highest</button>
+                            <button type="button" class="btn" data-sort="asc">Lowest</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container"><canvas id="ncvsFttChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+<div class="card table-section">
+                <div class="card-header">
+                    <h2 class="table-title">Full Inspection Data</h2>
+                    <div class="table-filters-group"> <div class="filter-group-inline">
+                            <label for="auditorTableFilter" class="sr-only">Filter Auditor</label>
+                            <select id="auditorTableFilter" class="form-select-inline">
+                                <option value="all">All Auditor</option>
+                                <option value="Badrowi">Badrowi</option>
+                                <option value="Iksan">Iksan</option>
+                                <option value="Sopan Sopian">Sopan Sopian</option>
+<option value="Elita">Elita</option>
+<option value="Puji">Puji</option>
+<option value="Muadaroh">Muadaroh</option>
+<option value="Yaffie">Yaffie</option>
+<option value="Inda">Inda</option>
+<option value="Inggit">Inggit</option>
+<option value="Yusuf">Yusuf</option>
+<option value="Anin">Anin</option>
+                            </select>
+                        </div>
+                        <div class="filter-group-inline">
+                            <label for="limitViewFilter" class="sr-only">View Limit</label>
+                            <select id="limitViewFilter" class="form-select-inline">
+                                <option value="today" selected>Today</option> <option value="yesterday">Yesterday</option>
+                                <option value="this_week">This Week</option>
+                                <option value="last_week">Last Week</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Auditor</th>
+                                    <th>NCVS</th>
+                                    <th>Model</th>
+                                    <th>Qty Inspect</th>
+                                    <th>FTT</th>
+                                    <th>Rework Rate</th>
+                                    <th>A-Grade</th>
+                                    <th>B-Grade</th>
+                                    <th>C-Grade</th>
+                                    <th>Rework (L/R/P)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inspectionTableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js" type="module"></script>
+</body>
+</html>

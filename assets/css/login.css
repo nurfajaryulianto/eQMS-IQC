@@ -1,0 +1,246 @@
+/* =====================================================
+   login.css — Styles untuk halaman login E-QMS
+   ===================================================== */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1565C0 0%, #0D47A1 50%, #1B5E20 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =====================================================
+   Layout
+   ===================================================== */
+.login-page {
+    width: 100%;
+    max-width: 420px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* =====================================================
+   Card
+   ===================================================== */
+.login-card {
+    width: 100%;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    padding: 2.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* =====================================================
+   Header
+   ===================================================== */
+.login-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.login-logo {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    margin-bottom: 0.25rem;
+}
+
+.login-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1565C0;
+    letter-spacing: 2px;
+}
+
+.login-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+/* =====================================================
+   Alerts
+   ===================================================== */
+.login-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.login-alert i {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.login-alert--error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #dc2626;
+}
+
+.login-alert--warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+
+/* =====================================================
+   Form
+   ===================================================== */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 0.9rem;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.6rem;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: #1f2937;
+    background: #f9fafb;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    outline: none;
+}
+
+.form-input:focus {
+    border-color: #1565C0;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.15);
+}
+
+.form-input--password {
+    padding-right: 3rem; /* Ruang untuk tombol toggle */
+}
+
+/* Toggle password button */
+.toggle-password {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.toggle-password:hover {
+    color: #1565C0;
+}
+
+/* =====================================================
+   Login Button
+   ===================================================== */
+.login-btn {
+    width: 100%;
+    padding: 0.8rem;
+    background: linear-gradient(135deg, #1565C0, #0D47A1);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
+    box-shadow: 0 4px 14px rgba(21, 101, 192, 0.4);
+}
+
+.login-btn:hover:not(:disabled) {
+    opacity: 0.92;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(21, 101, 192, 0.5);
+}
+
+.login-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.login-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* =====================================================
+   Footer
+   ===================================================== */
+.login-footer {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+}
+
+/* =====================================================
+   Utility
+   ===================================================== */
+.hidden {
+    display: none !important;
+}
+
+/* =====================================================
+   Responsive
+   ===================================================== */
+@media (max-width: 480px) {
+    .login-card {
+        padding: 2rem 1.25rem;
+    }
+
+    .login-title {
+        font-size: 1.75rem;
+    }
+}
