@@ -194,7 +194,7 @@
                 <!-- Rework Rate -->
                 <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
                     <div>
-                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Rework Rate</p>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Defect Rate</p>
                         <div id="redoRateOutput" class="counter text-3xl font-bold text-orange-500">0%</div>
                     </div>
                     <div class="w-11 h-11 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
@@ -265,7 +265,7 @@
                     </div>
                     <div class="px-4 py-3 border-t border-slate-200">
                         <button class="save-button w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
-                            <span class="material-symbols-outlined text-[16px]">save</span> Simpan
+                            Simpan
                         </button>
                     </div>
                 </div>
@@ -423,7 +423,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon bg-yellow"><i class="fas fa-sync-alt"></i></div>
-                    <div class="stat-content"><h3><span id="reworkRateOutput">0.00%</span></h3><p>Rework Rate</p></div>
+                    <div class="stat-content"><h3><span id="reworkRateOutput">0.00%</span></h3><p>Defect Rate</p></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon bg-blue"><i class="fas fa-award"></i></div>
@@ -504,7 +504,7 @@
                                     <th>Model</th>
                                     <th>Qty Inspect</th>
                                     <th>FTT</th>
-                                    <th>Rework Rate</th>
+                                    <th>Defect Rate</th>
                                     <th>A-Grade</th>
                                     <th>B-Grade</th>
                                     <th>C-Grade</th>
@@ -877,14 +877,26 @@
         if (name === 'inspections') populateInspectionsView();
     }
     function populateSettingsView() {
-        const raw = localStorage.getItem('eqms_test_session_v1');
-        const session = raw ? JSON.parse(raw) : {};
         const el = id => document.getElementById(id);
-        if (el('settings-user-display')) el('settings-user-display').textContent = session.display_name || session.nik || '—';
-        if (el('settings-user-role')) el('settings-user-role').textContent = session.role || '—';
+        // User info — set by script.js initApp() after Supabase auth
+        const displayName = window.__eqmsDisplayName || '—';
+        const role = window.__eqmsUserRole || '—';
+        const isTestMode = window.__eqmsIsTestMode;
+        if (el('settings-user-display')) el('settings-user-display').textContent = displayName;
+        if (el('settings-user-role')) el('settings-user-role').textContent = role;
         if (el('settings-date')) el('settings-date').textContent = new Date().toLocaleDateString('id-ID', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        const qty = localStorage.getItem('qtySampleSet') || '—';
-        if (el('settings-qty-sample')) el('settings-qty-sample').textContent = qty;
+        const qty = localStorage.getItem('qtySampleSet');
+        if (el('settings-qty-sample')) el('settings-qty-sample').textContent = (qty && qty !== '0') ? qty : '—';
+        const modeEl = el('settings-app-mode');
+        if (modeEl) {
+            if (isTestMode) {
+                modeEl.textContent = 'UI TEST MODE';
+                modeEl.className = 'text-xs font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700';
+            } else {
+                modeEl.textContent = 'PRODUCTION';
+                modeEl.className = 'text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-700';
+            }
+        }
     }
     function populateInspectionsView() {
         const logEl = document.getElementById('insp-session-log');

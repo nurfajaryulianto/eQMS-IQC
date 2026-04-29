@@ -708,7 +708,12 @@ function resetAllFields() {
     currentInspectionPairs = [];
     reworkLog = [];
     
-    currentInspectionLimit = qtySampleSetInput ? parseInt(qtySampleSetInput.value, 10) || 0 : 0;
+    // Reset Qty Incoming ke 0 setelah simpan
+    if (qtySampleSetInput) {
+        qtySampleSetInput.value = 0;
+        localStorage.setItem('qtySampleSet', 0);
+    }
+    currentInspectionLimit = 0;
 
     updateAllDisplays();
     if (summaryContainer) summaryContainer.innerHTML = "";
@@ -765,6 +770,8 @@ async function initApp() {
 
     // Bridge: expose role synchronously for showView() gate in inline script
     window.__eqmsUserRole = userRole;
+    window.__eqmsDisplayName = user?.user_metadata?.display_name || user?.user_metadata?.nik || '—';
+    window.__eqmsIsTestMode = UI_TEST_MODE;
 
     // Update role badge in header
     const roleBadgeEl = document.getElementById('user-role-badge');
