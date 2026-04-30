@@ -64,7 +64,8 @@ export async function initDashboard() {
         }
     });
 
-    document.getElementById('defect-plant-filter').addEventListener('click', (e) => {
+    const defectPlantEl = document.getElementById('defect-plant-filter');
+    if (defectPlantEl) defectPlantEl.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
             currentDefectPlant = e.target.dataset.plant;
             document.querySelectorAll('#defect-plant-filter .btn').forEach(btn => btn.classList.remove('active'));
@@ -73,7 +74,8 @@ export async function initDashboard() {
         }
     });
 
-    document.getElementById('grade-plant-filter').addEventListener('click', (e) => {
+    const gradePlantEl = document.getElementById('grade-plant-filter');
+    if (gradePlantEl) gradePlantEl.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
             currentGradePlant = e.target.dataset.plant;
             document.querySelectorAll('#grade-plant-filter .btn').forEach(btn => btn.classList.remove('active'));
@@ -218,30 +220,31 @@ async function fetchData() {
 function populateFilters(filters) {
     const populate = (elementId, options) => {
         const select = document.getElementById(elementId);
-        select.innerHTML = '<option value="">All</option>'; // Changed text
-        options.forEach(option => {
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">All</option>';
+        (options || []).forEach(option => {
             const opt = document.createElement('option');
             opt.value = opt.textContent = option;
             select.appendChild(opt);
         });
+        if (currentVal) select.value = currentVal;
     };
-    populate('auditorFilter', filters.auditors.sort());
-    populate('ncvsFilter', filters.ncvs.sort());
-    populate('modelFilter', filters.models.sort());
-    populate('styleNumberFilter', filters.styleNumbers.sort());
+    populate('auditorFilter', (filters.auditors || []).sort());
+    populate('vendorFilter',  (filters.vendors  || []).sort());
+    populate('modelFilter',   (filters.models   || []).sort());
 
     // Populate the table auditor filter dynamically from actual data
     const auditorTableSelect = document.getElementById('auditorTableFilter');
     if (auditorTableSelect) {
         const currentVal = auditorTableSelect.value;
         auditorTableSelect.innerHTML = '<option value="all">All Auditor</option>';
-        filters.auditors.slice().sort().forEach(name => {
+        (filters.auditors || []).slice().sort().forEach(name => {
             const opt = document.createElement('option');
             opt.value = name;
             opt.textContent = name;
             auditorTableSelect.appendChild(opt);
         });
-        // Restore previous selection if still valid
         if (currentVal && currentVal !== 'all') {
             auditorTableSelect.value = currentVal;
         }
@@ -252,65 +255,71 @@ function resetFilters() {
     document.getElementById('startDate').value = '';
     document.getElementById('endDate').value = '';
     document.getElementById('auditorFilter').value = '';
-    document.getElementById('ncvsFilter').value = '';
+    const vf = document.getElementById('vendorFilter');       if (vf) vf.value = '';
+    const mf = document.getElementById('materialTypeFilter'); if (mf) mf.value = '';
     document.getElementById('modelFilter').value = '';
-    document.getElementById('styleNumberFilter').value = '';
     updateDashboard();
 }
 
 function updateDashboard() {
     const filters = {
-        startDate: document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null,
-        endDate: document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null,
-        auditor: document.getElementById('auditorFilter').value,
-        ncvs: document.getElementById('ncvsFilter').value,
-        model: document.getElementById('modelFilter').value,
-        styleNumber: document.getElementById('styleNumberFilter').value,
+        startDate:    document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null,
+        endDate:      document.getElementById('endDate').value   ? new Date(document.getElementById('endDate').value)   : null,
+        auditor:      document.getElementById('auditorFilter').value,
+        vendor:       document.getElementById('vendorFilter')?.value       || '',
+        materialType: document.getElementById('materialTypeFilter')?.value || '',
+        model:        document.getElementById('modelFilter').value,
     };
 
     if (filters.endDate) filters.endDate.setHours(23, 59, 59, 999);
 
     const filteredInspections = allInspections.filter(item => {
-        const itemDate = item.Timestamp;
-        return (!filters.startDate || itemDate >= filters.startDate) &&
-            (!filters.endDate || itemDate <= filters.endDate) &&
-            (!filters.auditor || item.Auditor === filters.auditor) &&
-            (!filters.ncvs || item.NCVS == filters.ncvs) &&
-            (!filters.model || item.Model === filters.model);
+        const d = item.Timestamp;
+        return (!filters.startDate    || d >= filters.startDate) &&
+               (!filters.endDate      || d <= filters.endDate) &&
+               (!filters.auditor      || item.Auditor      === filters.auditor) &&
+               (!filters.vendor       || item.Vendor       === filters.vendor) &&
+               (!filters.materialType || item.MaterialType === filters.materialType) &&
+               (!filters.model        || item.Model        === filters.model);
     });
 
-    const filteredDefects = allDefects.filter(item => {
-        const itemDate = item.Timestamp;
-        return (!filters.startDate || itemDate >= filters.startDate) &&
-            (!filters.endDate || itemDate <= filters.endDate) &&
-            (!filters.auditor || item.Auditor === filters.auditor) &&
-            (!filters.ncvs || item.NCVS == filters.ncvs) &&
-            (!filters.model || item.Model === filters.model) &&
-            (!filters.styleNumber || item['Style Number'] === filters.styleNumber);
-    });
+    // Match defects by SessionId from filtered sessions
+    const sessionIds = new Set(filteredInspections.map(s => s.SessionId).filter(Boolean));
+    const filteredDefects = sessionIds.size > 0
+        ? allDefects.filter(d => sessionIds.has(d.SessionId))
+        : allDefects.filter(d => {
+            const dt = d.TanggalIncoming ? new Date(d.TanggalIncoming) : null;
+            return (!filters.startDate || !dt || dt >= filters.startDate) &&
+                   (!filters.endDate   || !dt || dt <= filters.endDate) &&
+                   (!filters.vendor    || d.Vendor === filters.vendor);
+          });
 
     updateMetrics(filteredInspections);
     updateFttChart(filteredInspections, currentFttPeriod);
-    updateDefectChart(filteredDefects, currentDefectPlant);
-    updateGradePieChart(filteredInspections, currentGradePlant);
+    updateDefectChart(filteredDefects);
+    updateGradePieChart(filteredInspections);
     updateNcvsFttChart(filteredInspections, ncvsFttSortOrder);
     updateInspectionTable(filteredInspections);
 }
 
 function updateMetrics(data) {
-    const totalInspected = data.reduce((sum, item) => sum + item.Qty_Inspect, 0);
-    const totalAGrade = data.reduce((sum, item) => sum + item.A_Grade, 0);
+    const totalQtyInspect = data.reduce((sum, item) => sum + item.Qty_Inspect, 0);
+    const totalPass       = data.reduce((sum, item) => sum + item.Pass,        0);
+    const totalDefect     = data.reduce((sum, item) => sum + item.Defect,      0);
 
-    const fttSum = data.reduce((sum, item) => sum + item.FTT, 0);
-    const reworkSum = data.reduce((sum, item) => sum + item.Rework_Rate, 0);
+    const fttPct        = totalQtyInspect > 0 ? (totalPass   / totalQtyInspect) * 100 : 0;
+    const defectRatePct = totalQtyInspect > 0 ? (totalDefect / totalQtyInspect) * 100 : 0;
 
-    const avgFtt = data.length > 0 ? fttSum / data.length : 0;
-    const avgRework = data.length > 0 ? reworkSum / data.length : 0;
-    const aGradePercentage = totalInspected > 0 ? (totalAGrade / totalInspected) * 100 : 0;
+    document.getElementById('analytics-fttOutput').textContent = `${fttPct.toFixed(2)}%`;
+    document.getElementById('reworkRateOutput').textContent    = `${defectRatePct.toFixed(2)}%`;
+    const totalEl = document.getElementById('totalInspectedOutput');
+    if (totalEl) totalEl.textContent = totalQtyInspect.toLocaleString('id-ID');
 
-    document.getElementById('analytics-fttOutput').textContent = `${(avgFtt * 100).toFixed(2)}%`;
-    document.getElementById('reworkRateOutput').textContent = `${(avgRework * 100).toFixed(2)}%`;
-    document.getElementById('aGradeOutput').textContent = `${aGradePercentage.toFixed(2)}%`;
+    // Animate circular progress rings
+    const fttRing = document.getElementById('ftt-ring');
+    if (fttRing) fttRing.setAttribute('stroke-dasharray', `${Math.min(fttPct, 100).toFixed(1)}, 100`);
+    const defectRing = document.getElementById('defectrate-ring');
+    if (defectRing) defectRing.setAttribute('stroke-dasharray', `${Math.min(defectRatePct, 100).toFixed(1)}, 100`);
 }
 
 function renderChart(ctx, type, data, options) {
@@ -406,144 +415,103 @@ function updateFttChart(data, period) {
 }
 
 
-function updateDefectChart(data, plant) {
+function updateDefectChart(data) {
     const ctx = document.getElementById('defectChart').getContext('2d');
-    let filteredData = data;
-
-    if (plant === 'plant1') {
-        filteredData = data.filter(d => plant1Auditors.includes(d.Auditor));
-    } else if (plant === 'plant2') {
-        filteredData = data.filter(d => plant2Auditors.includes(d.Auditor));
-    }
-
-    const defectCounts = {};
-    filteredData.forEach(item => {
-        const defectName = item.Defect; // Ini akan menjadi kunci utama, misalnya 'overcement'
-        let count = Number(item.Total) || 0;
-
-        // --- START MODIFIKASI UNTUK LOGIKA PAIRS ---
-        // Asumsi: Jika ada kolom 'Type' dalam data defect Anda dan nilainya 'pairs'
-        if (item.Position === 'Pairs') { // Pastikan kolom 'Position' ini ada di data defects Anda
-            count = count * 2; // Kalikan dua jika tipenya 'pairs'
-        }
-        // --- END MODIFIKASI ---
-
-        // Sekarang jumlahkan ke defectName utama
-        defectCounts[defectName] = (defectCounts[defectName] || 0) + count;
+    const defectTotals = {};
+    data.forEach(item => {
+        const name = item.DefectType;
+        if (!name) return;
+        defectTotals[name] = (defectTotals[name] || 0) + (Number(item.Count) || 0);
     });
 
-    const sortedDefects = Object.entries(defectCounts)
+    const sorted = Object.entries(defectTotals)
         .sort(([, a], [, b]) => b - a)
-        .slice(0, 3);
+        .slice(0, 5);
 
-    const labels = sortedDefects.map(d => d[0]);
-    const chartData = sortedDefects.map(d => d[1]);
-
+    const palette = [
+        'rgba(239,68,68,0.75)', 'rgba(245,158,11,0.75)', 'rgba(99,102,241,0.75)',
+        'rgba(16,185,129,0.75)', 'rgba(107,114,128,0.75)',
+    ];
     renderChart(ctx, 'bar', {
-        labels: labels,
+        labels: sorted.map(d => d[0]),
         datasets: [{
             label: 'Total Defects',
-            data: chartData,
-            backgroundColor: ['rgba(255, 99, 132, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 205, 86, 0.6)'],
-            borderColor: ['rgba(255, 99, 132, 1)', 'rgba(255, 159, 64, 1)', 'rgba(255, 205, 86, 1)'],
-            borderWidth: 1
+            data: sorted.map(d => d[1]),
+            backgroundColor: sorted.map((_, i) => palette[i] || palette[4]),
+            borderRadius: 4,
         }]
     }, {
         responsive: true, maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true } }
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     });
 }
 
-function updateGradePieChart(data, plant) {
+function updateGradePieChart(data) {
     const ctx = document.getElementById('gradePieChart').getContext('2d');
-    let filteredData = data;
+    const totalPass   = data.reduce((sum, item) => sum + item.Pass,   0);
+    const totalDefect = data.reduce((sum, item) => sum + item.Defect, 0);
 
-    if (plant === 'plant1') {
-        filteredData = data.filter(d => plant1Auditors.includes(d.Auditor));
-    } else if (plant === 'plant2') {
-        filteredData = data.filter(d => plant2Auditors.includes(d.Auditor));
-    }
-
-    const totals = { a: 0, rework: 0, b: 0, c: 0 };
-
-    filteredData.forEach(item => {
-        totals.a += item.A_Grade;
-        totals.b += item.B_Grade;
-        totals.c += item.C_Grade;
-        totals.rework += ((item.Rework_Kiri + item.Rework_Kanan) / 2) + item.Rework_Pairs;
-    });
-
-    renderChart(ctx, 'pie', {
-        labels: ['A-Grade', 'Rework', 'B-Grade', 'C-Grade'],
+    renderChart(ctx, 'doughnut', {
+        labels: ['Pass', 'Defect'],
         datasets: [{
-            data: [totals.a, totals.rework, totals.b, totals.c],
-            backgroundColor: ['#4CAF50', '#FFC107', '#FF9800', '#F44336'],
+            data: [totalPass, totalDefect],
+            backgroundColor: ['#22c55e', '#ef4444'],
+            borderWidth: 2,
         }]
-    }, { responsive: true, maintainAspectRatio: false });
+    }, {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = totalPass + totalDefect;
+                        const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                        return ` ${context.label}: ${context.parsed} (${pct}%)`;
+                    }
+                }
+            }
+        }
+    });
 }
 
 function updateNcvsFttChart(data, sortOrder) {
     const ctx = document.getElementById('ncvsFttChart').getContext('2d');
-    const ncvsData = {};
+    const vendorData = {};
 
     data.forEach(item => {
-        const ncvs = item.NCVS;
-        if (!ncvs) return;
-        if (!ncvsData[ncvs]) {
-            ncvsData[ncvs] = { fttSum: 0, count: 0 };
-        }
-        ncvsData[ncvs].fttSum += item.FTT;
-        ncvsData[ncvs].count++;
+        const vendor = item.Vendor;
+        if (!vendor) return;
+        if (!vendorData[vendor]) vendorData[vendor] = { passSum: 0, inspectSum: 0 };
+        vendorData[vendor].passSum    += item.Pass;
+        vendorData[vendor].inspectSum += item.Qty_Inspect;
     });
 
-    let processedData = Object.entries(ncvsData).map(([ncvs, values]) => ({
-        ncvs: ncvs,
-        avgFtt: values.count > 0 ? (values.fttSum / values.count) * 100 : 0
+    let processed = Object.entries(vendorData).map(([vendor, vals]) => ({
+        vendor,
+        avgFtt: vals.inspectSum > 0 ? (vals.passSum / vals.inspectSum) * 100 : 0
     }));
 
-    processedData.sort((a, b) => {
-        return sortOrder === 'asc' ? a.avgFtt - b.avgFtt : b.avgFtt - a.avgFtt;
-    });
-
-    const labels = processedData.map(item => item.ncvs);
-    const chartData = processedData.map(item => item.avgFtt);
+    processed.sort((a, b) => sortOrder === 'asc' ? a.avgFtt - b.avgFtt : b.avgFtt - a.avgFtt);
 
     renderChart(ctx, 'bar', {
-        labels: labels,
+        labels: processed.map(d => d.vendor),
         datasets: [{
-            label: 'Average FTT (%)', // Changed label
-            data: chartData,
-            backgroundColor: 'rgba(153, 102, 255, 0.6)',
-            borderColor: 'rgba(153, 102, 255, 1)',
-            borderWidth: 1
+            label: 'FTT (%)',
+            data: processed.map(d => d.avgFtt),
+            backgroundColor: 'rgba(99, 102, 241, 0.65)',
+            borderRadius: 4,
         }]
     }, {
         indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
-        scales: {
-            x: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                    callback: value => `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)}%`
-                }
-            }
-        },
         plugins: {
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
-                        }
-                        if (context.parsed.x !== null) {
-                            label += `${context.parsed.x.toFixed(2)}%`;
-                        }
-                        return label;
-                    }
-                }
-            }
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toFixed(2)}%` } }
+        },
+        scales: {
+            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }
@@ -552,17 +520,14 @@ function updateInspectionTable(data) {
     const tbody = document.getElementById('inspectionTableBody');
     tbody.innerHTML = '';
 
-    let limitedData = data; // Ini adalah data yang sudah difilter dari filter utama (startDate, endDate, auditorFilter, ncvsFilter, modelFilter)
+    let limitedData = data;
 
-    // --- BARU: Filter data berdasarkan Auditor dari dropdown tabel ---
     if (currentAuditorTableFilter !== 'all') {
         limitedData = limitedData.filter(item => item.Auditor === currentAuditorTableFilter);
     }
-    // --- AKHIR FILTER AUDITOR BARU ---
 
-    // Menginisialisasi tanggal acuan
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Awal hari ini (00:00:00)
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // --- MODIFIKASI: Logika pemfilteran tanggal berdasarkan currentLimitView ---
     if (currentLimitView === 'today') {
@@ -597,28 +562,34 @@ function updateInspectionTable(data) {
 
     const sortedData = limitedData.sort((a, b) => b.Timestamp.getTime() - a.Timestamp.getTime());
 
-    if (sortedData.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="11" class="px-6 py-4 text-center text-sm text-gray-500">No data available for the selected view.</td>`;
-        tbody.appendChild(row);
+    if (!sortedData.length) {
+        tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-sm text-slate-400">No data available for the selected period.</td></tr>`;
         return;
     }
 
     sortedData.forEach(item => {
+        const fttPct = item.Qty_Inspect > 0 ? ((item.Pass / item.Qty_Inspect) * 100).toFixed(1) : '0.0';
+        const fttColor = parseFloat(fttPct) >= 92 ? 'text-green-600' : parseFloat(fttPct) >= 80 ? 'text-yellow-600' : 'text-red-600';
+        const materialBadge = item.MaterialType === 'upper'
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">Upper</span>'
+            : item.MaterialType === 'bottom'
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Bottom</span>'
+            : '<span class="text-slate-400">—</span>';
         const row = document.createElement('tr');
-        const reworkText = `${item.Rework_Kiri.toFixed(0)} / ${item.Rework_Kanan.toFixed(0)} / ${item.Rework_Pairs.toFixed(0)}`;
+        row.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
         row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.Timestamp.toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.Auditor}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.NCVS}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.Model}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.Qty_Inspect}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${(item.FTT * 100).toFixed(2)}%</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${(item.Rework_Rate * 100).toFixed(2)}%</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.A_Grade}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.B_Grade}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${item.C_Grade}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">${reworkText}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${item.Timestamp.toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalIncoming || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${item.Auditor}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">${item.Vendor || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap">${materialBadge}</td>
+            <td class="px-4 py-3 text-xs text-slate-600 max-w-[140px] truncate">${item.Component || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-slate-700">${item['Style Number'] || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.QtyIncoming}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.Qty_Inspect}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-green-600 font-medium">${item.Pass}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-red-500 font-medium">${item.Defect}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold tabular-nums ${fttColor}">${fttPct}%</td>
         `;
         tbody.appendChild(row);
     });
