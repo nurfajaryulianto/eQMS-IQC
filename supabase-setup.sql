@@ -187,13 +187,13 @@ ALTER TABLE public.processes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "dev_anon_processes" ON public.processes
   FOR ALL TO anon USING (true) WITH CHECK (true);
 
--- Production policies (uncomment saat production)
-/*
+-- Authenticated policies (diperlukan saat UI_TEST_MODE = false)
+-- Semua user login bisa SELECT
 CREATE POLICY "auth_read_processes" ON public.processes
   FOR SELECT TO authenticated USING (true);
 
+-- Hanya admin yang bisa INSERT / UPDATE / DELETE
 CREATE POLICY "admin_write_processes" ON public.processes
   FOR ALL TO authenticated
   USING     ((auth.jwt()->'user_metadata'->>'role') = 'admin')
   WITH CHECK ((auth.jwt()->'user_metadata'->>'role') = 'admin');
-*/

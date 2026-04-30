@@ -273,6 +273,15 @@ export async function initAdminPanel() {
 
     document.getElementById('admin-process-form').addEventListener('submit', handleProcessSubmit);
     document.getElementById('admin-process-cancel').addEventListener('click', cancelProcessEdit);
+
+    const procVendorSel = document.getElementById('process-input-vendor');
+    if (procVendorSel) {
+        procVendorSel.addEventListener('change', () => {
+            const procCompSel = document.getElementById('process-input-component');
+            if (procCompSel) procCompSel.value = '';
+            _populateProcessFormComponent(procVendorSel.value);
+        });
+    }
 }
 
 function switchAdminTab(tab) {
@@ -715,20 +724,40 @@ function populateAdminFormSelects() {
         });
         if (cur) compVendorSel.value = cur;
     }
-    // Component select in process form
-    const procCompSel = document.getElementById('process-input-component');
-    if (procCompSel) {
-        const components = getComponents();
-        const cur = procCompSel.value;
-        procCompSel.innerHTML = '<option value="">Pilih Component</option>';
-        components.forEach(c => {
+    // Vendor select in process form
+    const procVendorSel = document.getElementById('process-input-vendor');
+    if (procVendorSel) {
+        const vendors = getVendors();
+        const cur = procVendorSel.value;
+        procVendorSel.innerHTML = '<option value="">Pilih Vendor (opsional)</option>';
+        vendors.forEach(v => {
             const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = c.name;
-            procCompSel.appendChild(opt);
+            opt.value = v.id;
+            opt.textContent = v.name;
+            procVendorSel.appendChild(opt);
         });
-        if (cur) procCompSel.value = cur;
+        if (cur) procVendorSel.value = cur;
     }
+    // Component select in process form (filtered by vendor if selected)
+    _populateProcessFormComponent(procVendorSel ? procVendorSel.value : '');
+}
+
+function _populateProcessFormComponent(vendorId) {
+    const procCompSel = document.getElementById('process-input-component');
+    if (!procCompSel) return;
+    const components = getComponents();
+    const cur = procCompSel.value;
+    procCompSel.innerHTML = '<option value="">Pilih Component</option>';
+    const filtered = vendorId
+        ? components.filter(c => String(c.vendor_id) === String(vendorId))
+        : components;
+    filtered.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        procCompSel.appendChild(opt);
+    });
+    if (cur) procCompSel.value = cur;
 }
 
 function refreshDropdownsInForm() {
@@ -800,6 +829,12 @@ window.__adminEditProcess = function(id) {
     const proc = getProcesses().find(p => p.id === id);
     if (!proc) return;
     editingProcessId = id;
+    // Restore vendor first (look up via component), then filter & set component
+    const comp = getComponents().find(c => c.id === proc.component_id);
+    const vendorId = comp ? (comp.vendor_id ?? '') : '';
+    const procVendorSel = document.getElementById('process-input-vendor');
+    if (procVendorSel) procVendorSel.value = vendorId;
+    _populateProcessFormComponent(String(vendorId));
     document.getElementById('process-input-component').value = proc.component_id ?? '';
     document.getElementById('process-input-name').value      = proc.name;
     document.getElementById('admin-process-form-title').textContent = 'Edit Process';
@@ -823,6 +858,9 @@ window.__adminDeleteProcess = async function(id) {
 function cancelProcessEdit() {
     editingProcessId = null;
     document.getElementById('admin-process-form').reset();
+    const procVendorSel = document.getElementById('process-input-vendor');
+    if (procVendorSel) procVendorSel.value = '';
+    _populateProcessFormComponent('');
     document.getElementById('admin-process-form-title').textContent = 'Add Process';
     document.getElementById('admin-process-cancel').classList.add('hidden');
 }
