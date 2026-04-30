@@ -80,16 +80,16 @@ export async function dbGetVendors() {
     return unwrap(await db.from('vendors').select('*').order('id'), 'getVendors');
 }
 
-export async function dbInsertVendor({ name }) {
+export async function dbInsertVendor({ name, material_type }) {
     return unwrap(
-        await db.from('vendors').insert({ name }).select().single(),
+        await db.from('vendors').insert({ name, material_type: material_type || null }).select().single(),
         'insertVendor'
     );
 }
 
-export async function dbUpdateVendor(id, { name }) {
+export async function dbUpdateVendor(id, { name, material_type }) {
     return unwrap(
-        await db.from('vendors').update({ name }).eq('id', id).select().single(),
+        await db.from('vendors').update({ name, material_type: material_type || null }).eq('id', id).select().single(),
         'updateVendor'
     );
 }

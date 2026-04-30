@@ -724,6 +724,7 @@
                             <table class="w-full">
                                 <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
                                     <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Material Type</th>
                                     <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr></thead>
                                 <tbody id="admin-vendors-tbody"></tbody>
@@ -736,6 +737,14 @@
                             <div>
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor Name</label>
                                 <input id="vendor-input-name" type="text" placeholder="e.g. PT. Sumber Makmur" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Material Type</label>
+                                <select id="vendor-input-material-type" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">Pilih Material Type</option>
+                                    <option value="upper">Upper</option>
+                                    <option value="bottom">Bottom</option>
+                                </select>
                             </div>
                             <div class="flex gap-2 pt-1">
                                 <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>

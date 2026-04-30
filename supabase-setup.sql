@@ -167,7 +167,11 @@ CREATE POLICY "admin_write_app_users"  ON public.app_users
 ALTER TABLE public.components
   ADD COLUMN IF NOT EXISTS vendor_id BIGINT REFERENCES public.vendors(id) ON DELETE SET NULL;
 
--- 2. Buat tabel processes
+-- 2. Tambahkan kolom material_type ke tabel vendors
+ALTER TABLE public.vendors
+  ADD COLUMN IF NOT EXISTS material_type TEXT CHECK (material_type IN ('upper', 'bottom'));
+
+-- 3. Buat tabel processes
 CREATE TABLE IF NOT EXISTS public.processes (
   id           BIGSERIAL    PRIMARY KEY,
   name         TEXT         NOT NULL,

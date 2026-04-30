@@ -487,22 +487,31 @@ function renderVendorsTab() {
     if (!tbody) return;
     const countEl = document.getElementById('admin-vendors-count');
     if (countEl) countEl.textContent = `${vendors.length} vendors`;
-    tbody.innerHTML = vendors.map(v => `
+    tbody.innerHTML = vendors.map(v => {
+        const typeBadge = v.material_type === 'upper'
+            ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">Upper</span>'
+            : v.material_type === 'bottom'
+            ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Bottom</span>'
+            : '<span class="text-xs text-slate-400">&mdash;</span>';
+        return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(v.name)}</td>
+            <td class="px-4 py-2.5">${typeBadge}</td>
             <td class="px-4 py-2.5">
                 <div class="flex gap-3">
                     <button onclick="window.__adminEditVendor(${v.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
                     <button onclick="window.__adminDeleteVendor(${v.id})" class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
                 </div>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 function handleVendorSubmit(e) {
     e.preventDefault();
-    const name = document.getElementById('vendor-input-name').value.trim();
-    if (!name) return;
+    const name         = document.getElementById('vendor-input-name').value.trim();
+    const materialType = document.getElementById('vendor-input-material-type').value;
+    if (!name || !materialType) { alert('Vendor Name dan Material Type wajib diisi.'); return; }
 
     const btn = e.target.querySelector('button[type="submit"]');
     setFormBusy(btn, true);
@@ -510,9 +519,9 @@ function handleVendorSubmit(e) {
     const finish = async () => {
         try {
             if (editingVendorId !== null) {
-                await dbUpdateVendor(editingVendorId, { name });
+                await dbUpdateVendor(editingVendorId, { name, material_type: materialType });
             } else {
-                await dbInsertVendor({ name });
+                await dbInsertVendor({ name, material_type: materialType });
             }
             const fresh = await dbGetVendors();
             saveVendors(fresh);
@@ -532,7 +541,8 @@ window.__adminEditVendor = function(id) {
     const vendor = getVendors().find(v => v.id === id);
     if (!vendor) return;
     editingVendorId = id;
-    document.getElementById('vendor-input-name').value = vendor.name;
+    document.getElementById('vendor-input-name').value          = vendor.name;
+    document.getElementById('vendor-input-material-type').value = vendor.material_type ?? '';
     document.getElementById('admin-vendor-form-title').textContent = 'Edit Vendor';
     document.getElementById('admin-vendor-cancel').classList.remove('hidden');
     document.getElementById('vendor-input-name').focus();
