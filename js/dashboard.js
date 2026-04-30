@@ -158,43 +158,38 @@ async function fetchData() {
         const rawDefects  = data.defects  || [];
 
         allInspections = rawSessions.map(item => {
-            const qtyInspect = Number(item.QtyInspect || item.Qty_Inspect) || 0;
-            const pass       = Number(item.Pass)   || 0;
-            const defect     = Number(item.Defect) || 0;
-            // FTT & DefectRate dihitung dari data mentah (tidak disimpan di sheet)
+            // Support both new schema (camelCase) and old schema (spaced headers)
+            const qtyInspect = Number(item.QtyInspect || item.Qty_Inspect || item['Qty Inspect']) || 0;
+            const pass       = Number(item.Pass   || item['Qty Pass'])   || 0;
+            const defect     = Number(item.Defect || item['Qty Defect']) || 0;
             const ftt        = qtyInspect > 0 ? pass   / qtyInspect : 0;
             const defectRate = qtyInspect > 0 ? defect / qtyInspect : 0;
             return {
-                Timestamp:       new Date(item.Timestamp),
-                TanggalIncoming: item.TanggalIncoming || '',
-                MaterialType:    item.MaterialType    || '',
-                Auditor:         item.Auditor         || '',
+                Timestamp:       new Date(item.Timestamp || item.timeStamp),
+                TanggalIncoming: item.TanggalIncoming || item.Date        || '',
+                MaterialType:    item.MaterialType    || item['Material Type'] || '',
+                Auditor:         item.Auditor         || item['User Login'] || '',
                 Vendor:          item.Vendor          || '',
                 Component:       item.Component       || '',
                 Process:         item.Process         || '',
                 'Style Number':  item.StyleNumber     || item['Style Number'] || '',
                 Model:           item.ModelName       || item.Model           || '',
-                QtyIncoming:     Number(item.QtyIncoming) || 0,
+                QtyIncoming:     Number(item.QtyIncoming || item['Qty Incoming']) || 0,
                 Qty_Inspect:     qtyInspect,
                 Pass:            pass,
                 Defect:          defect,
                 FTT:             ftt,
                 Rework_Rate:     defectRate,
-                SessionId:       item.SessionId || '',
-                // backward-compat
-                NCVS:    item.NCVS    || '',
-                A_Grade: Number(item.A_Grade) || 0,
-                B_Grade: Number(item.B_Grade) || 0,
-                C_Grade: Number(item.C_Grade) || 0,
+                SessionId:       item.SessionId || item.SessionID || '',
             };
         });
 
         allDefects = rawDefects.map(item => ({
-            SessionId:       item.SessionId       || '',
-            TanggalIncoming: item.TanggalIncoming || '',
+            SessionId:       item.SessionId       || item.SessionID      || '',
+            TanggalIncoming: item.TanggalIncoming || item.Date           || '',
             Vendor:          item.Vendor          || '',
             Component:       item.Component       || '',
-            DefectType:      item.DefectType      || item.Type || '',
+            DefectType:      item.DefectType      || item['Issue Findings'] || item.Type || '',
             Count:           Number(item.Count)   || 0,
         }));
 
