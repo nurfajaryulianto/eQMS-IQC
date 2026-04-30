@@ -6,7 +6,7 @@ import { styleModelDatabase } from './databasemodel.js';
 
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, renderComponentOptions, renderProcessOptions, syncAllFromSupabase } from './admin.js';
+import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getComponents, getProcesses, syncAllFromSupabase } from './admin.js';
 
 let totalInspected = 0;
 let defectCounts = {}; 
@@ -39,8 +39,6 @@ let modelNameInput;
 let styleNumberInput;
 let tanggalIncomingInput;
 let vendorSelect;
-let componentSelect;
-let processSelect;
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -54,6 +52,98 @@ const STORAGE_KEYS = {
     QTY_SAMPLE_SET: 'qtySampleSet'
 };
 
+// ─── Multi-Select Helpers ────────────────────────────────────────────
+function msEscHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildMultiSelectOptions(optionsId, labelId, items, placeholder, onChange) {
+    const container = document.getElementById(optionsId);
+    if (!container) return;
+    container.innerHTML = items.length === 0
+        ? '<p class="text-xs text-slate-400 px-2 py-2 text-center">Tidak ada pilihan</p>'
+        : items.map(item =>
+            `<label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer select-none"><input type="checkbox" value="${msEscHtml(item)}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"><span class="text-sm text-slate-800">${msEscHtml(item)}</span></label>`
+          ).join('');
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const vals = getMultiSelectValues(optionsId);
+            updateMultiSelectLabel(labelId, vals, placeholder);
+            onChange(vals);
+        });
+    });
+}
+
+function getMultiSelectValues(optionsId) {
+    const container = document.getElementById(optionsId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+}
+
+function setMultiSelectValues(optionsId, labelId, values, placeholder) {
+    const container = document.getElementById(optionsId);
+    if (!container) return;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = values.includes(cb.value); });
+    updateMultiSelectLabel(labelId, getMultiSelectValues(optionsId), placeholder);
+}
+
+function clearMultiSelect(optionsId, labelId, placeholder) {
+    const container = document.getElementById(optionsId);
+    if (container) container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    updateMultiSelectLabel(labelId, [], placeholder);
+}
+
+function updateMultiSelectLabel(labelId, values, placeholder) {
+    const label = document.getElementById(labelId);
+    if (!label) return;
+    if (!values || values.length === 0) {
+        label.textContent = placeholder;
+        label.classList.add('text-slate-400');
+        label.classList.remove('text-slate-900');
+    } else {
+        label.textContent = values.join(', ');
+        label.classList.remove('text-slate-400');
+        label.classList.add('text-slate-900');
+    }
+}
+
+function initMultiSelectToggle(toggleId, panelId) {
+    const toggle = document.getElementById(toggleId);
+    const panel  = document.getElementById(panelId);
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', e => {
+        e.stopPropagation();
+        document.querySelectorAll('[id$="-ms-panel"]').forEach(p => { if (p.id !== panelId) p.classList.add('hidden'); });
+        panel.classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => panel.classList.add('hidden'));
+}
+
+function rebuildComponentMultiSelect(vendorName) {
+    const components = getComponents();
+    const vendors    = getVendors();
+    let filtered = components;
+    if (vendorName) {
+        const vendor = vendors.find(v => v.name === vendorName);
+        filtered = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
+    }
+    buildMultiSelectOptions('component-ms-options', 'component-ms-label', filtered.map(c => c.name), 'Pilih Component', vals => {
+        rebuildProcessMultiSelect(vals);
+        clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
+        saveToLocalStorage();
+    });
+}
+
+function rebuildProcessMultiSelect(componentNames) {
+    const processes  = getProcesses();
+    const components = getComponents();
+    const compIds    = components.filter(c => componentNames.includes(c.name)).map(c => c.id);
+    const filtered   = processes.filter(p => compIds.includes(p.component_id));
+    buildMultiSelectOptions('process-ms-options', 'process-ms-label', filtered.map(p => p.name), 'Pilih Process', () => {
+        saveToLocalStorage();
+    });
+}
+
 // ===========================================
 // 2. Fungsi localStorage Komprehensif (Modifikasi)
 // ===========================================
@@ -64,10 +154,10 @@ function saveToLocalStorage() {
             auditor: auditorSelect ? auditorSelect.value : '',
             modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
             styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
-            process: document.getElementById("process") ? document.getElementById("process").value : '',
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
             vendor: vendorSelect ? vendorSelect.value : '',
-            component: componentSelect ? componentSelect.value : ''
+            component: getMultiSelectValues('component-ms-options'),
+            process: getMultiSelectValues('process-ms-options')
         };
         localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
         localStorage.setItem(STORAGE_KEYS.DEFECT_COUNTS, JSON.stringify(defectCounts));
@@ -100,13 +190,21 @@ function loadFromLocalStorage() {
             if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
             if (vendorSelect && formData.vendor) {
                 vendorSelect.value = formData.vendor;
-                if (componentSelect) renderComponentOptions(componentSelect, formData.vendor);
+                rebuildComponentMultiSelect(formData.vendor);
             }
-            if (componentSelect && formData.component) {
-                componentSelect.value = formData.component;
-                if (processSelect) renderProcessOptions(processSelect, formData.component);
+            const compVals = Array.isArray(formData.component)
+                ? formData.component
+                : (formData.component ? [formData.component] : []);
+            if (compVals.length) {
+                setMultiSelectValues('component-ms-options', 'component-ms-label', compVals, 'Pilih Component');
+                rebuildProcessMultiSelect(compVals);
             }
-            if (processSelect && formData.process) processSelect.value = formData.process;
+            const procVals = Array.isArray(formData.process)
+                ? formData.process
+                : (formData.process ? [formData.process] : []);
+            if (procVals.length) {
+                setMultiSelectValues('process-ms-options', 'process-ms-label', procVals, 'Pilih Process');
+            }
         }
 
         const savedDefectCounts = localStorage.getItem(STORAGE_KEYS.DEFECT_COUNTS);
@@ -541,8 +639,8 @@ async function saveData() {
         auditor: document.getElementById("auditor").value,
         tanggalIncoming: document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value : '',
         vendor: document.getElementById("vendor") ? document.getElementById("vendor").value : '',
-        component: document.getElementById("component") ? document.getElementById("component").value : '',
-        process: document.getElementById("process") ? document.getElementById("process").value : '',
+        component: getMultiSelectValues('component-ms-options').join(', '),
+        process: getMultiSelectValues('process-ms-options').join(', '),
         modelName: document.getElementById("model-name").value,
         styleNumber: document.getElementById("style-number").value,
         qtyInspect: totalInspected,
@@ -701,9 +799,8 @@ function resetAllFields() {
     }
     // Reset new fields (except tanggal-incoming which resets to today)
     if (vendorSelect) vendorSelect.value = "";
-    if (componentSelect) componentSelect.value = "";
-    const processEl = document.getElementById("process");
-    if (processEl) processEl.value = "";
+    clearMultiSelect('component-ms-options', 'component-ms-label', 'Pilih Component');
+    clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
     if (tanggalIncomingInput) tanggalIncomingInput.value = new Date().toISOString().split('T')[0];
     
     if (modelNameInput) {
@@ -856,14 +953,13 @@ async function initApp() {
     styleNumberInput = document.getElementById("style-number");
     tanggalIncomingInput = document.getElementById('tanggal-incoming');
     vendorSelect    = document.getElementById('vendor');
-    componentSelect = document.getElementById('component');
-    processSelect   = document.getElementById('process');
-    if (vendorSelect)    renderVendorOptions(vendorSelect);
-    if (componentSelect) renderComponentOptions(componentSelect, vendorSelect ? vendorSelect.value : '');
-    if (processSelect)   renderProcessOptions(processSelect, componentSelect ? componentSelect.value : '');
-    window.__reattachVendorOptions    = () => { if (vendorSelect)    renderVendorOptions(vendorSelect); };
-    window.__reattachComponentOptions = () => { if (componentSelect) renderComponentOptions(componentSelect, vendorSelect ? vendorSelect.value : ''); };
-    window.__reattachProcessOptions   = () => { if (processSelect)   renderProcessOptions(processSelect, componentSelect ? componentSelect.value : ''); };
+    if (vendorSelect) renderVendorOptions(vendorSelect);
+    rebuildComponentMultiSelect(vendorSelect ? vendorSelect.value : '');
+    initMultiSelectToggle('component-ms-toggle', 'component-ms-panel');
+    initMultiSelectToggle('process-ms-toggle',   'process-ms-panel');
+    window.__reattachVendorOptions    = () => { if (vendorSelect) renderVendorOptions(vendorSelect); };
+    window.__reattachComponentOptions = () => { rebuildComponentMultiSelect(vendorSelect ? vendorSelect.value : ''); };
+    window.__reattachProcessOptions   = () => { rebuildProcessMultiSelect(getMultiSelectValues('component-ms-options')); };
 
     // --- AUTO-FILL AUDITOR FROM SESSION ---
     if (auditorSelect && user) {
@@ -894,24 +990,10 @@ async function initApp() {
 
     if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', saveToLocalStorage);
     if (vendorSelect) vendorSelect.addEventListener('change', () => {
-        if (componentSelect) {
-            renderComponentOptions(componentSelect, vendorSelect.value);
-            componentSelect.value = '';
-        }
-        if (processSelect) {
-            renderProcessOptions(processSelect, '');
-            processSelect.value = '';
-        }
+        rebuildComponentMultiSelect(vendorSelect.value);
+        clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
         saveToLocalStorage();
     });
-    if (componentSelect) componentSelect.addEventListener('change', () => {
-        if (processSelect) {
-            renderProcessOptions(processSelect, componentSelect.value);
-            processSelect.value = '';
-        }
-        saveToLocalStorage();
-    });
-    if (processSelect) processSelect.addEventListener('change', saveToLocalStorage);
 
     function attachDefectListeners() {
         defectButtons = document.querySelectorAll('.defect-button');
