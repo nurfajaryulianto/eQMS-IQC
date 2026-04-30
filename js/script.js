@@ -72,8 +72,8 @@ function renderVendorButtons() {
         btn.type = 'button';
         btn.textContent = v.name;
         btn.dataset.value = v.name;
-        btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
-            bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-700`;
+        btn.className = `${VENDOR_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+            bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
         if (selectedVendor === v.name) applyVendorActive(btn);
         btn.addEventListener('click', () => {
             selectedVendor = (selectedVendor === v.name) ? '' : v.name;
@@ -97,12 +97,12 @@ function refreshVendorButtons() {
 }
 
 function applyVendorActive(btn) {
-    btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
+    btn.className = `${VENDOR_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
         bg-blue-600 border-blue-600 text-white shadow-sm`;
 }
 function applyVendorInactive(btn) {
-    btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
-        bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-700`;
+    btn.className = `${VENDOR_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+        bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
 }
 
 function renderComponentButtons(vendorName) {
@@ -125,8 +125,8 @@ function renderComponentButtons(vendorName) {
         btn.type = 'button';
         btn.textContent = c.name;
         btn.dataset.value = c.name;
-        btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
-            bg-white border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700`;
+        btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+            bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
         if (selectedComponents.includes(c.name)) applyComponentActive(btn);
         btn.addEventListener('click', () => {
             const idx = selectedComponents.indexOf(c.name);
@@ -149,12 +149,12 @@ function refreshComponentButtons() {
 }
 
 function applyComponentActive(btn) {
-    btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
-        bg-indigo-600 border-indigo-600 text-white shadow-sm`;
+    btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+        bg-blue-600 border-blue-600 text-white shadow-sm`;
 }
 function applyComponentInactive(btn) {
-    btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
-        bg-white border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700`;
+    btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+        bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
 }
 
 function rebuildProcessButtons() {
@@ -186,8 +186,8 @@ function renderProcessButtons(componentNames) {
         btn.type = 'button';
         btn.textContent = name;
         btn.dataset.value = name;
-        btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
-            bg-white border-slate-300 text-slate-700 hover:border-emerald-400 hover:text-emerald-700`;
+        btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+            bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
         if (selectedProcesses.includes(name)) applyProcessActive(btn);
         btn.addEventListener('click', () => {
             const idx = selectedProcesses.indexOf(name);
@@ -209,12 +209,26 @@ function refreshProcessButtons() {
 }
 
 function applyProcessActive(btn) {
-    btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
-        bg-emerald-600 border-emerald-600 text-white shadow-sm`;
+    btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+        bg-blue-600 border-blue-600 text-white shadow-sm`;
 }
 function applyProcessInactive(btn) {
-    btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
-        bg-white border-slate-300 text-slate-700 hover:border-emerald-400 hover:text-emerald-700`;
+    btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
+        bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
+}
+
+/**
+ * Reset only the Context Selection (Vendor / Component / Process) without clearing other form fields.
+ */
+function resetContextSelection() {
+    selectedVendor    = '';
+    selectedComponents = [];
+    selectedProcesses  = [];
+    renderVendorButtons();
+    renderComponentButtons('');
+    renderProcessButtons([]);
+    checkInfoCompleteAndLockButtons();
+    saveToLocalStorage();
 }
 
 /**
@@ -1096,6 +1110,10 @@ async function initApp() {
     window.__reattachVendorOptions    = () => { renderVendorButtons(); };
     window.__reattachComponentOptions = () => { renderComponentButtons(selectedVendor); };
     window.__reattachProcessOptions   = () => { rebuildProcessButtons(); };
+
+    // Wire Reset button in Context Selection card
+    const resetSelectionBtn = document.getElementById('reset-selection-btn');
+    if (resetSelectionBtn) resetSelectionBtn.addEventListener('click', resetContextSelection);
 
     // --- AUTO-FILL AUDITOR FROM SESSION ---
     if (auditorSelect && user) {
