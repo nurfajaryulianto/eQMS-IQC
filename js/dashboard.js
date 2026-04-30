@@ -1,5 +1,5 @@
 // PENTING: Ganti dengan URL Web App Google Apps Script Anda
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxn-5o2ABoVSZvSMWoDYx0T7VHTkbx98750LjqI-RI8YGzgA6NASgKgsbJJa9z7dIsO/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 
 // --- IMPOR AUTH MODULE ---
 import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
@@ -155,42 +155,45 @@ async function fetchData() {
         const rawSessions = data.sessions || data.inspections || [];
         const rawDefects  = data.defects  || [];
 
-        allInspections = rawSessions.map(item => ({
-            Timestamp:       new Date(item.Timestamp    || item.Timestamp),
-            TanggalIncoming: item.TanggalIncoming || '',
-            MaterialType:    item.MaterialType    || '',
-            Auditor:         item.Auditor         || '',
-            Vendor:          item.Vendor          || '',
-            Component:       item.Component       || '',
-            Process:         item.Process         || '',
-            'Style Number':  item.StyleNumber     || item['Style Number'] || '',
-            Model:           item.ModelName       || item.Model           || '',
-            QtyIncoming:     Number(item.QtyIncoming)  || 0,
-            Qty_Inspect:     Number(item.QtyInspect || item.Qty_Inspect)  || 0,
-            Pass:            Number(item.Pass)          || 0,
-            Defect:          Number(item.Defect)        || 0,
-            FTT:             Number(item.FTT)           || 0,
-            Rework_Rate:     Number(item.DefectRate || item.Rework_Rate)  || 0,
-            SessionId:       item.SessionId       || '',
-            // Backward-compat fields (lama)
-            NCVS:            item.NCVS            || '',
-            A_Grade:         Number(item.A_Grade)  || 0,
-            B_Grade:         Number(item.B_Grade)  || 0,
-            C_Grade:         Number(item.C_Grade)  || 0,
-        }));
+        allInspections = rawSessions.map(item => {
+            const qtyInspect = Number(item.QtyInspect || item.Qty_Inspect) || 0;
+            const pass       = Number(item.Pass)   || 0;
+            const defect     = Number(item.Defect) || 0;
+            // FTT & DefectRate dihitung dari data mentah (tidak disimpan di sheet)
+            const ftt        = qtyInspect > 0 ? pass   / qtyInspect : 0;
+            const defectRate = qtyInspect > 0 ? defect / qtyInspect : 0;
+            return {
+                Timestamp:       new Date(item.Timestamp),
+                TanggalIncoming: item.TanggalIncoming || '',
+                MaterialType:    item.MaterialType    || '',
+                Auditor:         item.Auditor         || '',
+                Vendor:          item.Vendor          || '',
+                Component:       item.Component       || '',
+                Process:         item.Process         || '',
+                'Style Number':  item.StyleNumber     || item['Style Number'] || '',
+                Model:           item.ModelName       || item.Model           || '',
+                QtyIncoming:     Number(item.QtyIncoming) || 0,
+                Qty_Inspect:     qtyInspect,
+                Pass:            pass,
+                Defect:          defect,
+                FTT:             ftt,
+                Rework_Rate:     defectRate,
+                SessionId:       item.SessionId || '',
+                // backward-compat
+                NCVS:    item.NCVS    || '',
+                A_Grade: Number(item.A_Grade) || 0,
+                B_Grade: Number(item.B_Grade) || 0,
+                C_Grade: Number(item.C_Grade) || 0,
+            };
+        });
 
         allDefects = rawDefects.map(item => ({
-            ...item,
-            Timestamp:    new Date(item.Timestamp),
-            SessionId:    item.SessionId    || '',
-            Vendor:       item.Vendor       || '',
-            Component:    item.Component    || '',
-            Process:      item.Process      || '',
-            MaterialType: item.MaterialType || '',
-            DefectType:   item.DefectType   || item.Type || '',
-            Position:     item.Position     || '',
-            Level:        item.Level        || '',
-            Count:        Number(item.Count) || 0,
+            SessionId:       item.SessionId       || '',
+            TanggalIncoming: item.TanggalIncoming || '',
+            Vendor:          item.Vendor          || '',
+            Component:       item.Component       || '',
+            DefectType:      item.DefectType      || item.Type || '',
+            Count:           Number(item.Count)   || 0,
         }));
 
         populateFilters({

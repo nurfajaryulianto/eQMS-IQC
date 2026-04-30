@@ -35,25 +35,28 @@ const SESSIONS_HEADERS = [
   'QtyInspect',
   'Pass',
   'Defect',
-  'FTT',
-  'DefectRate',
 ];
 
 const DEFECT_HEADERS = [
   'SessionId',
-  'Timestamp',
+  'TanggalIncoming',
+  'Vendor',
+  'Component',
+  'DefectType',
+  'Count',
+];
+
+// Tab PivotReady — flat join, siap langsung dipakai Pivot Table
+// Tidak ada SessionId, tidak ada QtyInspect/FTT → hindari double-counting
+const PIVOT_HEADERS = [
   'TanggalIncoming',
   'MaterialType',
   'Auditor',
   'Vendor',
   'Component',
   'Process',
-  'StyleNumber',
-  'ModelName',
   'DefectType',
-  'Position',
-  'Level',
-  'Count',
+  'DefectCount',
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -66,6 +69,7 @@ function doPost(e) {
 
     const sessionSheet = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
+    const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',     PIVOT_HEADERS);
 
     // Buat sessionId unik: tanggal + random 4 karakter
     const sessionId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
@@ -87,31 +91,33 @@ function doPost(e) {
       data.qtyInspect       || 0,
       data.pass             || 0,
       data.defect           || 0,
-      roundPct(data.ftt),
-      roundPct(data.redoRate),
     ];
     sessionSheet.appendRow(sessionRow);
 
-    // Tulis baris per defect ke DefectDetails
+    // Tulis baris per defect ke DefectDetails (slim — 6 kolom)
     if (Array.isArray(data.defects) && data.defects.length > 0) {
-      const defectRows = data.defects.map(d => [
-        sessionId,
-        data.timestamp        || '',
-        data.tanggalIncoming  || '',
-        data.materialType     || '',
-        data.auditor          || '',
-        data.vendor           || '',
-        data.component        || '',
-        data.process          || '',
-        data.styleNumber      || '',
-        data.modelName        || '',
-        d.type     || '',
-        d.position || '',
-        d.level    || '',
-        d.count    || 0,
-      ]);
-      // appendRow satu per satu agar aman
-      defectRows.forEach(row => defectSheet.appendRow(row));
+      data.defects.forEach(d => {
+        defectSheet.appendRow([
+          sessionId,
+          data.tanggalIncoming || '',
+          data.vendor          || '',
+          data.component       || '',
+          d.type  || '',
+          d.count || 0,
+        ]);
+
+        // Tulis juga ke PivotReady — flat join lengkap untuk pivot table
+        pivotSheet.appendRow([
+          data.tanggalIncoming || '',
+          data.materialType    || '',
+          data.auditor         || '',
+          data.vendor          || '',
+          data.component       || '',
+          data.process         || '',
+          d.type  || '',
+          d.count || 0,
+        ]);
+      });
     }
 
     return jsonResponse({ status: 'ok', message: 'Data berhasil disimpan!', sessionId });
@@ -133,7 +139,14 @@ function doGet(e) {
     const sessions = sheetToObjects(sessionSheet);
     const defects  = sheetToObjects(defectSheet);
 
-    return jsonResponse({ status: 'ok', sessions, defects });
+    // FTT dihitung dari data mentah, bukan disimpan di sheet
+    const sessionsWithFtt = sessions.map(s => ({
+      ...s,
+      FTT:        s.QtyInspect > 0 ? s.Pass / s.QtyInspect : 0,
+      DefectRate: s.QtyInspect > 0 ? s.Defect / s.QtyInspect : 0,
+    }));
+
+    return jsonResponse({ status: 'ok', sessions: sessionsWithFtt, defects });
 
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.message });
@@ -188,10 +201,4 @@ function jsonResponse(payload) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * Bulatkan angka desimal ke 4 digit untuk FTT / DefectRate.
- */
-function roundPct(val) {
-  const n = parseFloat(val);
-  return isNaN(n) ? 0 : Math.round(n * 10000) / 10000;
-}
+
