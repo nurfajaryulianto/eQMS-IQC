@@ -10,6 +10,7 @@ import {
     dbGetComponents,dbInsertComponent,dbUpdateComponent,dbDeleteComponent,
     dbGetProcesses, dbInsertProcess,  dbUpdateProcess,  dbDeleteProcess,
 } from './db.js';
+import { showAlert, showConfirm } from './dialog.js';
 
 export const DEFECTS_KEY    = 'eqms_defects_v1';
 export const USERS_KEY      = 'eqms_users_v1';
@@ -352,7 +353,7 @@ function handleDefectSubmit(e) {
             refreshDefectButtonsInForm();
             cancelDefectEdit();
         } catch (err) {
-            alert(`Gagal menyimpan defect: ${err.message}`);
+            await showAlert(`Gagal menyimpan defect: ${err.message}`, 'error');
         } finally {
             setFormBusy(btn, false);
         }
@@ -373,7 +374,8 @@ window.__adminEditDefect = function(id) {
 };
 
 window.__adminDeleteDefect = async function(id) {
-    if (!confirm('Hapus defect ini? Log inspeksi yang sudah ada tidak terpengaruh.')) return;
+    const confirmed = await showConfirm('Log inspeksi yang sudah ada tidak terpengaruh.', 'Hapus defect ini?', 'Ya, Hapus', 'Batal');
+    if (!confirmed) return;
     try {
         await dbDeleteDefect(id);
         const fresh = await dbGetDefects();
@@ -381,7 +383,7 @@ window.__adminDeleteDefect = async function(id) {
         renderDefectsTab();
         refreshDefectButtonsInForm();
     } catch (err) {
-        alert(`Gagal menghapus defect: ${err.message}`);
+        await showAlert(`Gagal menghapus defect: ${err.message}`, 'error');
     }
 };
 
@@ -428,7 +430,7 @@ function handleUserSubmit(e) {
     if (!nik || !name || !role) return;
 
     if (!/^[a-zA-Z0-9]{1,20}$/.test(nik)) {
-        alert('NIK hanya boleh alfanumerik, maks 20 karakter.');
+        showAlert('NIK hanya boleh alfanumerik, maks 20 karakter.', 'warning', 'Format NIK Tidak Valid');
         return;
     }
 
@@ -447,7 +449,7 @@ function handleUserSubmit(e) {
             renderUsersTab();
             cancelUserEdit();
         } catch (err) {
-            alert(`Gagal menyimpan user: ${err.message}`);
+            await showAlert(`Gagal menyimpan user: ${err.message}`, 'error');
         } finally {
             setFormBusy(btn, false);
         }
@@ -470,14 +472,15 @@ window.__adminEditUser = function(id) {
 window.__adminDeleteUser = async function(id) {
     const user = getUsers().find(u => u.id === id);
     if (!user) return;
-    if (!confirm(`Hapus user "${user.display_name}" (${user.nik})?`)) return;
+    const confirmed = await showConfirm(`User "${user.display_name}" (${user.nik}) akan dihapus permanen.`, 'Hapus User?', 'Ya, Hapus', 'Batal');
+    if (!confirmed) return;
     try {
         await dbDeleteAppUser(id);
         const fresh = await dbGetAppUsers();
         saveUsers(fresh);
         renderUsersTab();
     } catch (err) {
-        alert(`Gagal menghapus user: ${err.message}`);
+        await showAlert(`Gagal menghapus user: ${err.message}`, 'error');
     }
 };
 
@@ -520,7 +523,7 @@ function handleVendorSubmit(e) {
     e.preventDefault();
     const name         = document.getElementById('vendor-input-name').value.trim();
     const materialType = document.getElementById('vendor-input-material-type').value;
-    if (!name || !materialType) { alert('Vendor Name dan Material Type wajib diisi.'); return; }
+    if (!name || !materialType) { showAlert('Vendor Name dan Material Type wajib diisi.', 'warning', 'Form Tidak Lengkap'); return; }
 
     const btn = e.target.querySelector('button[type="submit"]');
     setFormBusy(btn, true);
@@ -538,7 +541,7 @@ function handleVendorSubmit(e) {
             refreshDropdownsInForm();
             cancelVendorEdit();
         } catch (err) {
-            alert(`Gagal menyimpan vendor: ${err.message}`);
+            await showAlert(`Gagal menyimpan vendor: ${err.message}`, 'error');
         } finally {
             setFormBusy(btn, false);
         }
@@ -558,7 +561,8 @@ window.__adminEditVendor = function(id) {
 };
 
 window.__adminDeleteVendor = async function(id) {
-    if (!confirm('Hapus vendor ini?')) return;
+    const confirmed = await showConfirm('Vendor yang dihapus tidak dapat dikembalikan.', 'Hapus Vendor?', 'Ya, Hapus', 'Batal');
+    if (!confirmed) return;
     try {
         await dbDeleteVendor(id);
         const fresh = await dbGetVendors();
@@ -566,7 +570,7 @@ window.__adminDeleteVendor = async function(id) {
         renderVendorsTab();
         refreshDropdownsInForm();
     } catch (err) {
-        alert(`Gagal menghapus vendor: ${err.message}`);
+        await showAlert(`Gagal menghapus vendor: ${err.message}`, 'error');
     }
 };
 
@@ -624,7 +628,7 @@ function handleComponentSubmit(e) {
             refreshDropdownsInForm();
             cancelComponentEdit();
         } catch (err) {
-            alert(`Gagal menyimpan component: ${err.message}`);
+            await showAlert(`Gagal menyimpan component: ${err.message}`, 'error');
         } finally {
             setFormBusy(btn, false);
         }
@@ -644,7 +648,8 @@ window.__adminEditComponent = function(id) {
 };
 
 window.__adminDeleteComponent = async function(id) {
-    if (!confirm('Hapus component ini?')) return;
+    const confirmed = await showConfirm('Component yang dihapus tidak dapat dikembalikan.', 'Hapus Component?', 'Ya, Hapus', 'Batal');
+    if (!confirmed) return;
     try {
         await dbDeleteComponent(id);
         const fresh = await dbGetComponents();
@@ -652,7 +657,7 @@ window.__adminDeleteComponent = async function(id) {
         renderComponentsTab();
         refreshDropdownsInForm();
     } catch (err) {
-        alert(`Gagal menghapus component: ${err.message}`);
+        await showAlert(`Gagal menghapus component: ${err.message}`, 'error');
     }
 };
 
@@ -799,7 +804,7 @@ function handleProcessSubmit(e) {
     e.preventDefault();
     const name        = document.getElementById('process-input-name').value.trim();
     const componentId = parseInt(document.getElementById('process-input-component').value, 10) || null;
-    if (!name || !componentId) { alert('Pilih component dan masukkan nama process.'); return; }
+    if (!name || !componentId) { showAlert('Pilih component dan masukkan nama process.', 'warning', 'Form Tidak Lengkap'); return; }
 
     const btn = e.target.querySelector('button[type="submit"]');
     setFormBusy(btn, true);
@@ -817,7 +822,7 @@ function handleProcessSubmit(e) {
             cancelProcessEdit();
             refreshDropdownsInForm();
         } catch (err) {
-            alert(`Gagal menyimpan process: ${err.message}`);
+            await showAlert(`Gagal menyimpan process: ${err.message}`, 'error');
         } finally {
             setFormBusy(btn, false);
         }
@@ -843,7 +848,8 @@ window.__adminEditProcess = function(id) {
 };
 
 window.__adminDeleteProcess = async function(id) {
-    if (!confirm('Hapus process ini?')) return;
+    const confirmed = await showConfirm('Process yang dihapus tidak dapat dikembalikan.', 'Hapus Process?', 'Ya, Hapus', 'Batal');
+    if (!confirmed) return;
     try {
         await dbDeleteProcess(id);
         const fresh = await dbGetProcesses();
@@ -851,7 +857,7 @@ window.__adminDeleteProcess = async function(id) {
         renderProcessesTab();
         refreshDropdownsInForm();
     } catch (err) {
-        alert(`Gagal menghapus process: ${err.message}`);
+        await showAlert(`Gagal menghapus process: ${err.message}`, 'error');
     }
 };
 

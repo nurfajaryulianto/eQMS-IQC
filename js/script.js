@@ -7,6 +7,7 @@ import { styleModelDatabase } from './databasemodel.js';
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
 import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getComponents, getProcesses, syncAllFromSupabase } from './admin.js';
+import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
 let defectCounts = {}; 
@@ -752,7 +753,7 @@ async function saveData() {
         // ── UI TESTING MODE: Skip POST ke GAS, simulasikan respons sukses ──
         if (UI_TEST_MODE) {
             console.log("[TEST MODE] Data yang akan dikirim:", JSON.stringify(dataToSend, null, 2));
-            alert("[TEST MODE] Data berhasil disimpan! (simulasi — tidak ada data yang dikirim ke server)");
+            await showAlert('Data berhasil disimpan! (simulasi — tidak ada data yang dikirim ke server)', 'success', '[TEST MODE]');
             appendSessionLog(dataToSend);
             resetAllFields();
             return;
@@ -765,15 +766,19 @@ async function saveData() {
         });
         const resultText = await response.text();
         console.log("Respons server:", resultText);
-        alert(resultText);
-
-        if (response.ok && resultText.toLowerCase().includes("berhasil")) {
+        let parsedResult = {};
+        try { parsedResult = JSON.parse(resultText); } catch { /* plain text response */ }
+        const isSuccess = response.ok && (parsedResult.status === 'ok' || resultText.toLowerCase().includes('berhasil'));
+        if (isSuccess) {
+            await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
             appendSessionLog(dataToSend);
             resetAllFields();
-        } 
+        } else {
+            await showAlert(parsedResult.message || resultText || 'Gagal menyimpan data.', 'error');
+        }
     } catch (error) {
         console.error("Error saat mengirim data:", error);
-        alert("Terjadi kesalahan saat menyimpan data.");
+        await showAlert('Terjadi kesalahan saat menyimpan data. Periksa koneksi internet.', 'error');
     } finally {
         if (loadingOverlay) {
             loadingOverlay.classList.remove('visible');
@@ -795,33 +800,33 @@ function validateInputs() {
     const tanggalIncoming = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
 
     if (!auditor) {
-        alert("Harap login terlebih dahulu sebelum menyimpan data.");
+        showAlert('Harap login terlebih dahulu sebelum menyimpan data.', 'warning', 'Belum Login');
         return false;
     }
     if (!tanggalIncoming) {
-        alert("Harap isi Tanggal Incoming sebelum menyimpan data.");
+        showAlert('Harap isi Tanggal Incoming sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
     if (!selectedVendor) {
-        alert("Harap pilih Vendor sebelum menyimpan data.");
+        showAlert('Harap pilih Vendor sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
     if (!selectedComponents.length) {
-        alert("Harap pilih Component sebelum menyimpan data.");
+        showAlert('Harap pilih Component sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
     if (!selectedProcesses.length) {
-        alert("Harap pilih Process sebelum menyimpan data.");
+        showAlert('Harap pilih Process sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
     if (!modelName || !styleNumber) {
-        alert("Harap isi Style Number dan Model Name sebelum menyimpan data.");
+        showAlert('Harap isi Style Number dan Model Name sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
 
     const styleNumberPattern = /^[a-zA-Z0-9]{6}-[a-zA-Z0-9]{3}$/;
     if (!styleNumberPattern.test(styleNumber)) {
-        alert("Format Style Number tidak sesuai. Contoh: AH1567-100 atau 767688-001");
+        showAlert('Format Style Number tidak sesuai. Contoh: AH1567-100 atau 767688-001', 'warning', 'Format Tidak Valid');
         styleNumberInput.classList.add('invalid-input');
         return false;
     } else {
@@ -843,7 +848,7 @@ function validateDefects() {
     const hasDefectGradeInput = qtyInspectOutputs['defect'] > 0;
 
     if (hasDefectGradeInput && !hasDefectRecorded) {
-        alert('Jika ada item Defect, harap pastikan setidaknya ada satu defect yang tercatat sebelum menyimpan data!');
+        showAlert('Jika ada item Defect, harap pastikan setidaknya ada satu defect yang tercatat sebelum menyimpan data.', 'warning', 'Defect Belum Dicatat');
         return false;
     }
     return true;
@@ -861,14 +866,14 @@ function validateQtySampleSet() {
     const qtySampleSetValue = parseInt(qtySampleSetInput.value, 10);
 
     if (isNaN(qtySampleSetValue) || qtySampleSetValue <= 0) {
-        alert("Harap masukkan Jumlah Qty Sample Set yang valid dan lebih dari 0.");
+        showAlert('Harap masukkan Jumlah Qty Sample Set yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
         return false;
     }
 
     const currentTotalInspect = totalInspected;
 
     if (currentTotalInspect !== qtySampleSetValue) {
-        alert(`Jumlah total Qty Inspect (${currentTotalInspect}) harus sama dengan Qty Sample Set (${qtySampleSetValue}).`);
+        showAlert(`Jumlah total Qty Inspect (${currentTotalInspect}) harus sama dengan Qty Sample Set (${qtySampleSetValue}).`, 'warning', 'Qty Tidak Sesuai');
         return false;
     }
 
@@ -1016,7 +1021,8 @@ async function initApp() {
     const logoutBtn = document.getElementById('logout-button');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
-            if (confirm('Yakin ingin logout?')) {
+            const yes = await showConfirm('Sesi Anda akan diakhiri dan data form akan direset.', 'Yakin ingin logout?', 'Ya, Logout', 'Batal');
+            if (yes) {
                 clearAllFormStorage();
                 await signOut();
             }
@@ -1164,13 +1170,13 @@ async function initApp() {
             let newQty = parseInt(qtySampleSetInput.value, 10);
             
             if (isNaN(newQty) || newQty < 0) {
-                alert("Qty Sample Set tidak boleh kurang dari 0.");
+                showAlert('Qty Sample Set tidak boleh kurang dari 0.', 'warning', 'Input Tidak Valid');
                 qtySampleSetInput.value = currentInspectionLimit;
                 return;
             }
             
             if (newQty < totalInspected) {
-                alert(`Qty Sample Set tidak bisa lebih rendah dari Qty Inspect saat ini (${totalInspected}).`);
+                showAlert(`Qty Sample Set tidak bisa lebih rendah dari Qty Inspect saat ini (${totalInspected}).`, 'warning', 'Input Tidak Valid');
                 qtySampleSetInput.value = currentInspectionLimit;
                 return;
             }

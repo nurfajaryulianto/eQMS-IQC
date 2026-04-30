@@ -3,6 +3,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6V
 
 // --- IMPOR AUTH MODULE ---
 import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
+import { showAlert, showConfirm } from './dialog.js';
 
 // Global variables
 let allInspections = [];
@@ -45,9 +46,8 @@ export async function initDashboard() {
     const logoutBtn = document.getElementById('dash-logout-button');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
-            if (confirm('Yakin ingin logout?')) {
-                await signOut();
-            }
+            const yes = await showConfirm('Sesi Anda akan diakhiri.', 'Yakin ingin logout?', 'Ya, Logout', 'Batal');
+            if (yes) await signOut();
         });
     }
 
@@ -207,7 +207,7 @@ async function fetchData() {
     } catch (error) {
         console.error('Error fetching data:', error);
         // Changed alert message
-        alert('Failed to load data. Please ensure the Web App URL is correct, re-deployed, and accessible to "Anyone".\nError: ' + error.message);
+        await showAlert('Gagal memuat data. Pastikan URL Web App sudah benar, sudah di-deploy ulang, dan akses diset ke "Anyone".\nError: ' + error.message, 'error', 'Gagal Memuat Data');
     } finally {
         loadingOverlay.style.display = 'none';
     }
