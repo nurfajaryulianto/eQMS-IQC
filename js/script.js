@@ -139,7 +139,9 @@ function rebuildProcessMultiSelect(componentNames) {
     const components = getComponents();
     const compIds    = components.filter(c => componentNames.includes(c.name)).map(c => c.id);
     const filtered   = processes.filter(p => compIds.includes(p.component_id));
-    buildMultiSelectOptions('process-ms-options', 'process-ms-label', filtered.map(p => p.name), 'Pilih Process', () => {
+    // Deduplicate by name — same process name across components shows only once
+    const uniqueNames = [...new Set(filtered.map(p => p.name))];
+    buildMultiSelectOptions('process-ms-options', 'process-ms-label', uniqueNames, 'Pilih Process', () => {
         saveToLocalStorage();
     });
 }
