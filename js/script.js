@@ -64,13 +64,15 @@ const COMPONENT_BTN_CLS = 'component-sel-btn';
 const PROCESS_BTN_CLS   = 'process-sel-btn';
 
 function renderVendorButtons() {
-    const vendors   = getVendors();
     const container = document.getElementById('vendor-btn-container');
     if (!container) return;
     container.innerHTML = '';
-    const filtered = selectedMaterialType
-        ? vendors.filter(v => v.material_type === selectedMaterialType)
-        : vendors;
+    if (!selectedMaterialType) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih material type terlebih dahulu —</span>';
+        return;
+    }
+    const vendors  = getVendors();
+    const filtered = vendors.filter(v => v.material_type === selectedMaterialType);
     if (!filtered.length) {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada vendor untuk tipe ini —</span>';
         return;
@@ -114,18 +116,19 @@ function applyVendorInactive(btn) {
 }
 
 function renderComponentButtons(vendorName) {
-    const components = getComponents();
-    const vendors    = getVendors();
     const container  = document.getElementById('component-btn-container');
     if (!container) return;
     container.innerHTML = '';
-    let filtered = components;
-    if (vendorName) {
-        const vendor = vendors.find(v => v.name === vendorName);
-        filtered = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
-    }
-    if (!filtered.length) {
+    if (!vendorName) {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih vendor terlebih dahulu —</span>';
+        return;
+    }
+    const components = getComponents();
+    const vendors    = getVendors();
+    const vendor     = vendors.find(v => v.name === vendorName);
+    const filtered   = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
+    if (!filtered.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada component untuk vendor ini —</span>';
         return;
     }
     filtered.forEach(c => {
@@ -307,79 +310,7 @@ function saveToLocalStorage() {
     }
 }
 
-function loadFromLocalStorage() {
-    try {
-        const savedFormData = localStorage.getItem(STORAGE_KEYS.FORM_DATA);
-        if (savedFormData) {
-            const formData = JSON.parse(savedFormData);
-            // Only restore auditor if not locked by session
-            if (auditorSelect && !auditorSelect.dataset.sessionLocked) {
-                auditorSelect.value = formData.auditor || '';
-            }
-            if (document.getElementById("model-name")) document.getElementById("model-name").value = formData.modelName || '';
-            if (document.getElementById("style-number")) document.getElementById("style-number").value = formData.styleNumber || '';
-            if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
-            // Restore material type filter
-            selectedMaterialType = formData.materialType || '';
-            const mtSelect = document.getElementById('material-type');
-            if (mtSelect) mtSelect.value = selectedMaterialType;
-            // Restore vendor button selection
-            selectedVendor = formData.vendor || '';
-            renderVendorButtons();
-            // Restore component button selection
-            renderComponentButtons(selectedVendor);
-            const compVals = Array.isArray(formData.component)
-                ? formData.component
-                : (formData.component ? [formData.component] : []);
-            selectedComponents = compVals;
-            refreshComponentButtons();
-            // Restore process button selection
-            rebuildProcessButtons();
-            const procVals = Array.isArray(formData.process)
-                ? formData.process
-                : (formData.process ? [formData.process] : []);
-            selectedProcesses = procVals;
-            refreshProcessButtons();
-        }
-
-        const savedDefectCounts = localStorage.getItem(STORAGE_KEYS.DEFECT_COUNTS);
-        if (savedDefectCounts) {
-            defectCounts = JSON.parse(savedDefectCounts);
-        }
-
-        const savedQtyOutputs = localStorage.getItem(STORAGE_KEYS.QTY_OUTPUTS);
-        if (savedQtyOutputs) {
-            const qtyData = JSON.parse(savedQtyOutputs);
-            for (const grade in qtyData) {
-                qtyInspectOutputs[grade] = qtyData[grade];
-            }
-        }
-
-        const savedStateVariables = localStorage.getItem(STORAGE_KEYS.STATE_VARIABLES);
-        if (savedStateVariables) {
-            const stateData = JSON.parse(savedStateVariables);
-            selectedDefects = stateData.selectedDefects || [];
-            currentInspectionPairs = stateData.currentInspectionPairs || [];
-            totalInspected = stateData.totalInspected || 0;
-            reworkLog = stateData.reworkLog || [];
-        }
-        
-        // Memuat Qty Sample Set
-        const savedQtySampleSet = localStorage.getItem(STORAGE_KEYS.QTY_SAMPLE_SET);
-        if (qtySampleSetInput && savedQtySampleSet) {
-            qtySampleSetInput.value = parseInt(savedQtySampleSet, 10) >= 0 ? savedQtySampleSet : '0';
-            currentInspectionLimit = parseInt(savedQtySampleSet, 10) || 0;
-        }
-        
-        // Update semua tampilan berdasarkan data yang dimuat
-        updateAllDisplays();
-        updateButtonStatesFromLoadedData();
-
-    } catch (error) {
-        console.error("Error saat memuat data dari localStorage:", error);
-        resetAllFields();
-    }
-}
+// loadFromLocalStorage dihapus — form selalu dimulai bersih setiap page load.
 
 function updateAllDisplays() {
     // Update counter grade
@@ -393,19 +324,7 @@ function updateAllDisplays() {
     updateTotalQtyInspect();
 }
 
-function updateButtonStatesFromLoadedData() {
-    // Reset semua highlight dan state
-    defectButtons.forEach(btn => btn.classList.remove('active'));
-    
-    // Highlight defect yang sedang dipilih dari data yang di-load
-    selectedDefects.forEach(defectName => {
-        const button = Array.from(defectButtons).find(btn => (btn.dataset.defect || btn.textContent.trim()) === defectName);
-        if (button) button.classList.add('active');
-    });
-
-    updateAGradeButtonState();
-    updateQtySectionState();
-}
+// updateButtonStatesFromLoadedData dihapus — tidak diperlukan karena form selalu fresh.
 
 function clearLocalStorageExceptQtySampleSet() {
     try {
@@ -413,9 +332,17 @@ function clearLocalStorageExceptQtySampleSet() {
         localStorage.removeItem(STORAGE_KEYS.DEFECT_COUNTS);
         localStorage.removeItem(STORAGE_KEYS.QTY_OUTPUTS);
         localStorage.removeItem(STORAGE_KEYS.STATE_VARIABLES);
-        console.log("localStorage dibersihkan (kecuali qty sample set)");
     } catch (error) {
         console.error("Error saat membersihkan localStorage:", error);
+    }
+}
+
+/** Hapus semua form storage termasuk qtySampleSet. Dipanggil saat refresh/logout. */
+function clearAllFormStorage() {
+    try {
+        Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+        console.error("Error saat membersihkan semua form storage:", error);
     }
 }
 
@@ -619,7 +546,7 @@ function updateDefectSummaryDisplay() {
                         item.innerHTML = `
                             <div class="defect-col">${defectType}</div>
                             <div class="position-col">${position}</div>
-                            <div class="level-col">DEFECT <span class="count">${count}</span></div>
+                            <div class="level-col"><span class="count">${count}</span></div>
                         `;
                         summaryItems.push({
                             defectType,
@@ -1023,10 +950,12 @@ function autoFillModelName() {
 }
 
 // ===========================================
-// 16. Inisialisasi Aplikasi dan Event Listeners (Dilengkapi dengan loadFromLocalStorage)
+// 16. Inisialisasi Aplikasi dan Event Listeners
 // ===========================================
 async function initApp() {
-    console.log("Menginisialisasi aplikasi dengan alur yang diperbarui...");
+    // Selalu mulai dengan state bersih — tidak memuat form data dari sesi sebelumnya
+    clearAllFormStorage();
+    console.log("Menginisialisasi aplikasi...");
 
     // --- AUTH GUARD: Selalu aktif. Perangkat baru/tanpa sesi → redirect login ---
     const session = await requireAuth();
@@ -1088,6 +1017,7 @@ async function initApp() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             if (confirm('Yakin ingin logout?')) {
+                clearAllFormStorage();
                 await signOut();
             }
         });
@@ -1269,16 +1199,12 @@ async function initApp() {
         });
     }
 
-    loadFromLocalStorage();
-
-    if (selectedDefects.length === 0 && currentInspectionPairs.length === 0) {
-        initButtonStates();
-    }
-    
+    initButtonStates();
+    updateAllDisplays();
     checkInfoCompleteAndLockButtons();
     updateTotalQtyInspect();
 
-    console.log("Aplikasi berhasil diinisialisasi sepenuhnya dengan localStorage.");
+    console.log("Aplikasi berhasil diinisialisasi.");
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
