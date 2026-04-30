@@ -57,6 +57,7 @@ const STORAGE_KEYS = {
 let selectedVendor    = '';
 let selectedComponents = [];  // array of names
 let selectedProcesses  = [];  // array of names
+let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 
 const VENDOR_BTN_CLS    = 'vendor-sel-btn';
 const COMPONENT_BTN_CLS = 'component-sel-btn';
@@ -67,7 +68,14 @@ function renderVendorButtons() {
     const container = document.getElementById('vendor-btn-container');
     if (!container) return;
     container.innerHTML = '';
-    vendors.forEach(v => {
+    const filtered = selectedMaterialType
+        ? vendors.filter(v => v.material_type === selectedMaterialType)
+        : vendors;
+    if (!filtered.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada vendor untuk tipe ini —</span>';
+        return;
+    }
+    filtered.forEach(v => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = v.name;
@@ -221,6 +229,9 @@ function applyProcessInactive(btn) {
  * Reset only the Context Selection (Vendor / Component / Process) without clearing other form fields.
  */
 function resetContextSelection() {
+    selectedMaterialType = '';
+    const mtSelectEl = document.getElementById('material-type');
+    if (mtSelectEl) mtSelectEl.value = '';
     selectedVendor    = '';
     selectedComponents = [];
     selectedProcesses  = [];
@@ -274,6 +285,7 @@ function saveToLocalStorage() {
             modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
             styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
+            materialType: selectedMaterialType,
             vendor: selectedVendor,
             component: selectedComponents,
             process: selectedProcesses
@@ -307,6 +319,10 @@ function loadFromLocalStorage() {
             if (document.getElementById("model-name")) document.getElementById("model-name").value = formData.modelName || '';
             if (document.getElementById("style-number")) document.getElementById("style-number").value = formData.styleNumber || '';
             if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
+            // Restore material type filter
+            selectedMaterialType = formData.materialType || '';
+            const mtSelect = document.getElementById('material-type');
+            if (mtSelect) mtSelect.value = selectedMaterialType;
             // Restore vendor button selection
             selectedVendor = formData.vendor || '';
             renderVendorButtons();
@@ -943,6 +959,9 @@ function resetAllFields() {
     }
     // Reset new fields (except tanggal-incoming which resets to today)
     if (vendorSelect) vendorSelect.value = "";
+    selectedMaterialType = '';
+    const mtSelectEl = document.getElementById('material-type');
+    if (mtSelectEl) mtSelectEl.value = '';
     selectedVendor = '';
     selectedComponents = [];
     selectedProcesses  = [];
@@ -1114,6 +1133,29 @@ async function initApp() {
     // Wire Reset button in Context Selection card
     const resetSelectionBtn = document.getElementById('reset-selection-btn');
     if (resetSelectionBtn) resetSelectionBtn.addEventListener('click', resetContextSelection);
+
+    // Material Type filter
+    const materialTypeSelect = document.getElementById('material-type');
+    if (materialTypeSelect) {
+        materialTypeSelect.addEventListener('change', () => {
+            selectedMaterialType = materialTypeSelect.value;
+            // If current vendor no longer matches the new filter, clear the cascade
+            if (selectedVendor) {
+                const vendors = getVendors();
+                const vendor  = vendors.find(v => v.name === selectedVendor);
+                if (!vendor || (selectedMaterialType && vendor.material_type !== selectedMaterialType)) {
+                    selectedVendor     = '';
+                    selectedComponents = [];
+                    selectedProcesses  = [];
+                    renderComponentButtons('');
+                    renderProcessButtons([]);
+                }
+            }
+            renderVendorButtons();
+            checkInfoCompleteAndLockButtons();
+            saveToLocalStorage();
+        });
+    }
 
     // --- AUTO-FILL AUDITOR FROM SESSION ---
     if (auditorSelect && user) {
