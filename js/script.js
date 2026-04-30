@@ -52,98 +52,201 @@ const STORAGE_KEYS = {
     QTY_SAMPLE_SET: 'qtySampleSet'
 };
 
-// ─── Multi-Select Helpers ────────────────────────────────────────────
-function msEscHtml(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// ─── Vendor / Component / Process Button-Selection ──────────────────────────
+// State: single selection for vendor, multi for component & process
+let selectedVendor    = '';
+let selectedComponents = [];  // array of names
+let selectedProcesses  = [];  // array of names
 
-function buildMultiSelectOptions(optionsId, labelId, items, placeholder, onChange) {
-    const container = document.getElementById(optionsId);
+const VENDOR_BTN_CLS    = 'vendor-sel-btn';
+const COMPONENT_BTN_CLS = 'component-sel-btn';
+const PROCESS_BTN_CLS   = 'process-sel-btn';
+
+function renderVendorButtons() {
+    const vendors   = getVendors();
+    const container = document.getElementById('vendor-btn-container');
     if (!container) return;
-    container.innerHTML = items.length === 0
-        ? '<p class="text-xs text-slate-400 px-2 py-2 text-center">Tidak ada pilihan</p>'
-        : items.map(item =>
-            `<label class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer select-none"><input type="checkbox" value="${msEscHtml(item)}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"><span class="text-sm text-slate-800">${msEscHtml(item)}</span></label>`
-          ).join('');
-    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const vals = getMultiSelectValues(optionsId);
-            updateMultiSelectLabel(labelId, vals, placeholder);
-            onChange(vals);
+    container.innerHTML = '';
+    vendors.forEach(v => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = v.name;
+        btn.dataset.value = v.name;
+        btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
+            bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-700`;
+        if (selectedVendor === v.name) applyVendorActive(btn);
+        btn.addEventListener('click', () => {
+            selectedVendor = (selectedVendor === v.name) ? '' : v.name;
+            selectedComponents = [];
+            selectedProcesses  = [];
+            refreshVendorButtons();
+            renderComponentButtons(selectedVendor);
+            renderProcessButtons([]);
+            checkInfoCompleteAndLockButtons();
+            saveToLocalStorage();
         });
+        container.appendChild(btn);
     });
 }
 
-function getMultiSelectValues(optionsId) {
-    const container = document.getElementById(optionsId);
-    if (!container) return [];
-    return Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
-}
-
-function setMultiSelectValues(optionsId, labelId, values, placeholder) {
-    const container = document.getElementById(optionsId);
-    if (!container) return;
-    container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = values.includes(cb.value); });
-    updateMultiSelectLabel(labelId, getMultiSelectValues(optionsId), placeholder);
-}
-
-function clearMultiSelect(optionsId, labelId, placeholder) {
-    const container = document.getElementById(optionsId);
-    if (container) container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
-    updateMultiSelectLabel(labelId, [], placeholder);
-}
-
-function updateMultiSelectLabel(labelId, values, placeholder) {
-    const label = document.getElementById(labelId);
-    if (!label) return;
-    if (!values || values.length === 0) {
-        label.textContent = placeholder;
-        label.classList.add('text-slate-400');
-        label.classList.remove('text-slate-900');
-    } else {
-        label.textContent = values.join(', ');
-        label.classList.remove('text-slate-400');
-        label.classList.add('text-slate-900');
-    }
-}
-
-function initMultiSelectToggle(toggleId, panelId) {
-    const toggle = document.getElementById(toggleId);
-    const panel  = document.getElementById(panelId);
-    if (!toggle || !panel) return;
-    toggle.addEventListener('click', e => {
-        e.stopPropagation();
-        document.querySelectorAll('[id$="-ms-panel"]').forEach(p => { if (p.id !== panelId) p.classList.add('hidden'); });
-        panel.classList.toggle('hidden');
+function refreshVendorButtons() {
+    document.querySelectorAll(`.${VENDOR_BTN_CLS}`).forEach(btn => {
+        if (btn.dataset.value === selectedVendor) applyVendorActive(btn);
+        else applyVendorInactive(btn);
     });
-    document.addEventListener('click', () => panel.classList.add('hidden'));
 }
 
-function rebuildComponentMultiSelect(vendorName) {
+function applyVendorActive(btn) {
+    btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
+        bg-blue-600 border-blue-600 text-white shadow-sm`;
+}
+function applyVendorInactive(btn) {
+    btn.className = `${VENDOR_BTN_CLS} px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors 
+        bg-white border-slate-300 text-slate-700 hover:border-blue-400 hover:text-blue-700`;
+}
+
+function renderComponentButtons(vendorName) {
     const components = getComponents();
     const vendors    = getVendors();
+    const container  = document.getElementById('component-btn-container');
+    if (!container) return;
+    container.innerHTML = '';
     let filtered = components;
     if (vendorName) {
         const vendor = vendors.find(v => v.name === vendorName);
         filtered = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
     }
-    buildMultiSelectOptions('component-ms-options', 'component-ms-label', filtered.map(c => c.name), 'Pilih Component', vals => {
-        rebuildProcessMultiSelect(vals);
-        clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
-        saveToLocalStorage();
+    if (!filtered.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih vendor terlebih dahulu —</span>';
+        return;
+    }
+    filtered.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = c.name;
+        btn.dataset.value = c.name;
+        btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
+            bg-white border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700`;
+        if (selectedComponents.includes(c.name)) applyComponentActive(btn);
+        btn.addEventListener('click', () => {
+            const idx = selectedComponents.indexOf(c.name);
+            if (idx > -1) selectedComponents.splice(idx, 1);
+            else selectedComponents.push(c.name);
+            refreshComponentButtons();
+            rebuildProcessButtons();
+            checkInfoCompleteAndLockButtons();
+            saveToLocalStorage();
+        });
+        container.appendChild(btn);
     });
 }
 
-function rebuildProcessMultiSelect(componentNames) {
+function refreshComponentButtons() {
+    document.querySelectorAll(`.${COMPONENT_BTN_CLS}`).forEach(btn => {
+        if (selectedComponents.includes(btn.dataset.value)) applyComponentActive(btn);
+        else applyComponentInactive(btn);
+    });
+}
+
+function applyComponentActive(btn) {
+    btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
+        bg-indigo-600 border-indigo-600 text-white shadow-sm`;
+}
+function applyComponentInactive(btn) {
+    btn.className = `${COMPONENT_BTN_CLS} px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors 
+        bg-white border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-700`;
+}
+
+function rebuildProcessButtons() {
+    renderProcessButtons(selectedComponents);
+    // Remove any selected processes no longer in the new list
     const processes  = getProcesses();
     const components = getComponents();
-    const compIds    = components.filter(c => componentNames.includes(c.name)).map(c => c.id);
-    const filtered   = processes.filter(p => compIds.includes(p.component_id));
-    // Deduplicate by name — same process name across components shows only once
-    const uniqueNames = [...new Set(filtered.map(p => p.name))];
-    buildMultiSelectOptions('process-ms-options', 'process-ms-label', uniqueNames, 'Pilih Process', () => {
-        saveToLocalStorage();
+    const compIds    = components.filter(c => selectedComponents.includes(c.name)).map(c => c.id);
+    const available  = [...new Set(processes.filter(p => compIds.includes(p.component_id)).map(p => p.name))];
+    selectedProcesses = selectedProcesses.filter(p => available.includes(p));
+}
+
+function renderProcessButtons(componentNames) {
+    const processes  = getProcesses();
+    const components = getComponents();
+    const container  = document.getElementById('process-btn-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const compIds  = components.filter(c => componentNames.includes(c.name)).map(c => c.id);
+    const filtered = [...new Set(processes.filter(p => compIds.includes(p.component_id)).map(p => p.name))];
+    if (!filtered.length) {
+        container.innerHTML = componentNames.length
+            ? '<span class="text-xs text-slate-400 italic">— Tidak ada process —</span>'
+            : '<span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>';
+        return;
+    }
+    filtered.forEach(name => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = name;
+        btn.dataset.value = name;
+        btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
+            bg-white border-slate-300 text-slate-700 hover:border-emerald-400 hover:text-emerald-700`;
+        if (selectedProcesses.includes(name)) applyProcessActive(btn);
+        btn.addEventListener('click', () => {
+            const idx = selectedProcesses.indexOf(name);
+            if (idx > -1) selectedProcesses.splice(idx, 1);
+            else selectedProcesses.push(name);
+            refreshProcessButtons();
+            checkInfoCompleteAndLockButtons();
+            saveToLocalStorage();
+        });
+        container.appendChild(btn);
     });
+}
+
+function refreshProcessButtons() {
+    document.querySelectorAll(`.${PROCESS_BTN_CLS}`).forEach(btn => {
+        if (selectedProcesses.includes(btn.dataset.value)) applyProcessActive(btn);
+        else applyProcessInactive(btn);
+    });
+}
+
+function applyProcessActive(btn) {
+    btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
+        bg-emerald-600 border-emerald-600 text-white shadow-sm`;
+}
+function applyProcessInactive(btn) {
+    btn.className = `${PROCESS_BTN_CLS} px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors 
+        bg-white border-slate-300 text-slate-700 hover:border-emerald-400 hover:text-emerald-700`;
+}
+
+/**
+ * Returns true when all required info is filled so defect/grade buttons can be used.
+ */
+function isInfoComplete() {
+    const qty = parseInt(qtySampleSetInput ? qtySampleSetInput.value : '0', 10);
+    const tanggal = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
+    return qty > 0 && tanggal && selectedVendor && selectedComponents.length > 0 && selectedProcesses.length > 0;
+}
+
+/**
+ * Lock or unlock defect + grade buttons based on info completeness.
+ * Also updates a visual hint banner.
+ */
+function checkInfoCompleteAndLockButtons() {
+    const complete = isInfoComplete();
+    const hint = document.getElementById('inspection-info-hint');
+    if (hint) hint.classList.toggle('hidden', complete);
+
+    if (!complete) {
+        toggleButtonGroup(defectButtons, false);
+        toggleButtonGroup(gradeInputButtons, false);
+    } else {
+        // Re-evaluate based on limit
+        updateButtonStatesBasedOnLimit();
+        if (currentInspectionLimit > 0 && totalInspected < currentInspectionLimit) {
+            if (selectedDefects.length === 0 && currentInspectionPairs.length === 0) {
+                initButtonStates();
+            }
+        }
+    }
 }
 
 // ===========================================
@@ -157,9 +260,9 @@ function saveToLocalStorage() {
             modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
             styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
-            vendor: vendorSelect ? vendorSelect.value : '',
-            component: getMultiSelectValues('component-ms-options'),
-            process: getMultiSelectValues('process-ms-options')
+            vendor: selectedVendor,
+            component: selectedComponents,
+            process: selectedProcesses
         };
         localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
         localStorage.setItem(STORAGE_KEYS.DEFECT_COUNTS, JSON.stringify(defectCounts));
@@ -190,23 +293,23 @@ function loadFromLocalStorage() {
             if (document.getElementById("model-name")) document.getElementById("model-name").value = formData.modelName || '';
             if (document.getElementById("style-number")) document.getElementById("style-number").value = formData.styleNumber || '';
             if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
-            if (vendorSelect && formData.vendor) {
-                vendorSelect.value = formData.vendor;
-                rebuildComponentMultiSelect(formData.vendor);
-            }
+            // Restore vendor button selection
+            selectedVendor = formData.vendor || '';
+            renderVendorButtons();
+            // Restore component button selection
+            renderComponentButtons(selectedVendor);
             const compVals = Array.isArray(formData.component)
                 ? formData.component
                 : (formData.component ? [formData.component] : []);
-            if (compVals.length) {
-                setMultiSelectValues('component-ms-options', 'component-ms-label', compVals, 'Pilih Component');
-                rebuildProcessMultiSelect(compVals);
-            }
+            selectedComponents = compVals;
+            refreshComponentButtons();
+            // Restore process button selection
+            rebuildProcessButtons();
             const procVals = Array.isArray(formData.process)
                 ? formData.process
                 : (formData.process ? [formData.process] : []);
-            if (procVals.length) {
-                setMultiSelectValues('process-ms-options', 'process-ms-label', procVals, 'Pilih Process');
-            }
+            selectedProcesses = procVals;
+            refreshProcessButtons();
         }
 
         const savedDefectCounts = localStorage.getItem(STORAGE_KEYS.DEFECT_COUNTS);
@@ -295,6 +398,28 @@ function toggleButtonGroup(buttons, enable) {
         button.classList.toggle('inactive', !enable);
         if (!enable) button.classList.remove('active');
     });
+}
+
+// ===========================================
+// FUNGSI BARU: Update Save Button (≥10% Qty Incoming)
+// ===========================================
+function updateSaveButtonState() {
+    const saveButton = document.querySelector('.save-button');
+    if (!saveButton) return;
+    const minInspected = currentInspectionLimit > 0 ? Math.ceil(currentInspectionLimit * 0.1) : 1;
+    const ready = currentInspectionLimit > 0 && totalInspected >= minInspected;
+    saveButton.disabled = !ready;
+    saveButton.classList.toggle('opacity-50', !ready);
+    saveButton.classList.toggle('cursor-not-allowed', !ready);
+    const hint = document.getElementById('save-progress-hint');
+    if (hint) {
+        if (currentInspectionLimit > 0) {
+            hint.textContent = `Terinsepksi: ${totalInspected} / ${minInspected} min (10% dari ${currentInspectionLimit})`;
+            hint.classList.toggle('hidden', ready);
+        } else {
+            hint.classList.add('hidden');
+        }
+    }
 }
 
 // ===========================================
@@ -406,6 +531,7 @@ function updateTotalQtyInspect() {
     updateFTT();
     updateRedoRate();
     saveToLocalStorage();
+    updateSaveButtonState();
 
     // Gunakan fungsi baru untuk mengecek limit
     updateButtonStatesBasedOnLimit();
@@ -640,9 +766,9 @@ async function saveData() {
         timestamp: new Date().toISOString(),
         auditor: document.getElementById("auditor").value,
         tanggalIncoming: document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value : '',
-        vendor: document.getElementById("vendor") ? document.getElementById("vendor").value : '',
-        component: getMultiSelectValues('component-ms-options').join(', '),
-        process: getMultiSelectValues('process-ms-options').join(', '),
+        vendor: selectedVendor,
+        component: selectedComponents.join(', '),
+        process: selectedProcesses.join(', '),
         modelName: document.getElementById("model-name").value,
         styleNumber: document.getElementById("style-number").value,
         qtyInspect: totalInspected,
@@ -694,8 +820,8 @@ async function saveData() {
             loadingOverlay.classList.remove('visible');
         }
 
-        saveButton.disabled = false;
         saveButton.textContent = "SIMPAN";
+        updateSaveButtonState();
     }
 }
 
@@ -707,9 +833,7 @@ function validateInputs() {
     const modelName = document.getElementById("model-name").value.trim();
     const styleNumberInput = document.getElementById("style-number");
     const styleNumber = styleNumberInput.value.trim();
-    const tanggalIncoming = document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value.trim() : '';
-    const vendor = document.getElementById("vendor") ? document.getElementById("vendor").value.trim() : '';
-    const component = document.getElementById("component") ? document.getElementById("component").value.trim() : '';
+    const tanggalIncoming = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
 
     if (!auditor) {
         alert("Harap login terlebih dahulu sebelum menyimpan data.");
@@ -719,12 +843,16 @@ function validateInputs() {
         alert("Harap isi Tanggal Incoming sebelum menyimpan data.");
         return false;
     }
-    if (!vendor) {
+    if (!selectedVendor) {
         alert("Harap pilih Vendor sebelum menyimpan data.");
         return false;
     }
-    if (!component) {
+    if (!selectedComponents.length) {
         alert("Harap pilih Component sebelum menyimpan data.");
+        return false;
+    }
+    if (!selectedProcesses.length) {
+        alert("Harap pilih Process sebelum menyimpan data.");
         return false;
     }
     if (!modelName || !styleNumber) {
@@ -801,8 +929,12 @@ function resetAllFields() {
     }
     // Reset new fields (except tanggal-incoming which resets to today)
     if (vendorSelect) vendorSelect.value = "";
-    clearMultiSelect('component-ms-options', 'component-ms-label', 'Pilih Component');
-    clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
+    selectedVendor = '';
+    selectedComponents = [];
+    selectedProcesses  = [];
+    renderVendorButtons();
+    renderComponentButtons('');
+    renderProcessButtons([]);
     if (tanggalIncomingInput) tanggalIncomingInput.value = new Date().toISOString().split('T')[0];
     
     if (modelNameInput) {
@@ -828,7 +960,8 @@ function resetAllFields() {
 
     updateAllDisplays();
     if (summaryContainer) summaryContainer.innerHTML = "";
-    initButtonStates();
+    checkInfoCompleteAndLockButtons();
+    updateSaveButtonState();
     clearLocalStorageExceptQtySampleSet();
 }
 
@@ -956,12 +1089,13 @@ async function initApp() {
     tanggalIncomingInput = document.getElementById('tanggal-incoming');
     vendorSelect    = document.getElementById('vendor');
     if (vendorSelect) renderVendorOptions(vendorSelect);
-    rebuildComponentMultiSelect(vendorSelect ? vendorSelect.value : '');
-    initMultiSelectToggle('component-ms-toggle', 'component-ms-panel');
-    initMultiSelectToggle('process-ms-toggle',   'process-ms-panel');
-    window.__reattachVendorOptions    = () => { if (vendorSelect) renderVendorOptions(vendorSelect); };
-    window.__reattachComponentOptions = () => { rebuildComponentMultiSelect(vendorSelect ? vendorSelect.value : ''); };
-    window.__reattachProcessOptions   = () => { rebuildProcessMultiSelect(getMultiSelectValues('component-ms-options')); };
+    // Render new button-based selectors
+    renderVendorButtons();
+    renderComponentButtons(selectedVendor);
+    renderProcessButtons(selectedComponents);
+    window.__reattachVendorOptions    = () => { renderVendorButtons(); };
+    window.__reattachComponentOptions = () => { renderComponentButtons(selectedVendor); };
+    window.__reattachProcessOptions   = () => { rebuildProcessButtons(); };
 
     // --- AUTO-FILL AUDITOR FROM SESSION ---
     if (auditorSelect && user) {
@@ -990,11 +1124,9 @@ async function initApp() {
         });
     }
 
-    if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', saveToLocalStorage);
-    if (vendorSelect) vendorSelect.addEventListener('change', () => {
-        rebuildComponentMultiSelect(vendorSelect.value);
-        clearMultiSelect('process-ms-options', 'process-ms-label', 'Pilih Process');
+    if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', () => {
         saveToLocalStorage();
+        checkInfoCompleteAndLockButtons();
     });
 
     function attachDefectListeners() {
@@ -1055,6 +1187,8 @@ async function initApp() {
             localStorage.setItem('qtySampleSet', newQty);
             
             updateButtonStatesBasedOnLimit();
+            checkInfoCompleteAndLockButtons();
+            updateSaveButtonState();
             saveToLocalStorage();
             
             console.log(`Qty Sample Set diubah menjadi: ${currentInspectionLimit}`);
@@ -1079,6 +1213,7 @@ async function initApp() {
         initButtonStates();
     }
     
+    checkInfoCompleteAndLockButtons();
     updateTotalQtyInspect();
 
     console.log("Aplikasi berhasil diinisialisasi sepenuhnya dengan localStorage.");

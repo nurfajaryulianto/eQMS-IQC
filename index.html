@@ -213,6 +213,34 @@
                 </div>
             </div>
 
+            <!-- ── Selection Bar: Vendor / Component / Process ── -->
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 space-y-3">
+
+                <!-- Vendor row -->
+                <div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Vendor</p>
+                    <div id="vendor-btn-container" class="flex flex-wrap gap-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Component row -->
+                <div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Component</p>
+                    <div id="component-btn-container" class="flex flex-wrap gap-2">
+                        <span class="text-xs text-slate-400 italic">— Pilih vendor terlebih dahulu —</span>
+                    </div>
+                </div>
+
+                <!-- Process row -->
+                <div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Process</p>
+                    <div id="process-btn-container" class="flex flex-wrap gap-2">
+                        <span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Main 3-Column Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
@@ -241,36 +269,6 @@
                                 class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-700 text-sm px-3 py-2 focus:outline-none cursor-default">
                         </div>
                         <div>
-                            <label for="vendor" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
-                            <select id="vendor" class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                <option value="">Pilih Vendor</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component</label>
-                            <div class="relative">
-                                <button type="button" id="component-ms-toggle" class="w-full rounded-md border border-slate-300 bg-white text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none text-left flex items-center justify-between gap-1 min-h-[38px]">
-                                    <span id="component-ms-label" class="text-slate-400 truncate flex-1 text-sm">Pilih Component</span>
-                                    <span class="material-symbols-outlined text-slate-400 text-[16px] flex-shrink-0">expand_more</span>
-                                </button>
-                                <div id="component-ms-panel" class="hidden absolute z-30 bg-white border border-slate-200 rounded-md shadow-lg mt-1 w-full max-h-48 overflow-y-auto thin-scroll">
-                                    <div id="component-ms-options" class="p-1.5 space-y-0.5"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Process</label>
-                            <div class="relative">
-                                <button type="button" id="process-ms-toggle" class="w-full rounded-md border border-slate-300 bg-white text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none text-left flex items-center justify-between gap-1 min-h-[38px]">
-                                    <span id="process-ms-label" class="text-slate-400 truncate flex-1 text-sm">Pilih Process</span>
-                                    <span class="material-symbols-outlined text-slate-400 text-[16px] flex-shrink-0">expand_more</span>
-                                </button>
-                                <div id="process-ms-panel" class="hidden absolute z-30 bg-white border border-slate-200 rounded-md shadow-lg mt-1 w-full max-h-48 overflow-y-auto thin-scroll">
-                                    <div id="process-ms-options" class="p-1.5 space-y-0.5"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
                             <label for="style-number" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Style Number</label>
                             <input type="text" id="style-number" placeholder="Style number diisi lengkap"
                                 class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
@@ -282,14 +280,21 @@
                         </div>
                     </div>
                     <div class="px-4 py-3 border-t border-slate-200">
-                        <button class="save-button w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <button class="save-button w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
                             Simpan
                         </button>
+                        <p id="save-progress-hint" class="hidden text-center text-xs text-slate-500 mt-1"></p>
                     </div>
                 </div>
 
                 <!-- CENTER: Defect Panel -->
                 <div class="col-span-1 lg:col-span-6 flex flex-col gap-4">
+
+                    <!-- Info completeness hint -->
+                    <div id="inspection-info-hint" class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-700 font-medium flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[16px]">info</span>
+                        Lengkapi Vendor, Component, Process, Qty Incoming, dan Tanggal untuk mulai inspeksi.
+                    </div>
 
                     <!-- Defect Input -->
                     <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
