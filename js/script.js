@@ -63,6 +63,7 @@ function saveToLocalStorage() {
             auditor: auditorSelect ? auditorSelect.value : '',
             modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
             styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
+            process: document.getElementById("process") ? document.getElementById("process").value : '',
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
             vendor: vendorSelect ? vendorSelect.value : '',
             component: componentSelect ? componentSelect.value : ''
@@ -95,6 +96,7 @@ function loadFromLocalStorage() {
             }
             if (document.getElementById("model-name")) document.getElementById("model-name").value = formData.modelName || '';
             if (document.getElementById("style-number")) document.getElementById("style-number").value = formData.styleNumber || '';
+            if (document.getElementById("process")) document.getElementById("process").value = formData.process || '';
             if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
             if (vendorSelect && formData.vendor) vendorSelect.value = formData.vendor;
             if (componentSelect && formData.component) componentSelect.value = formData.component;
@@ -533,6 +535,7 @@ async function saveData() {
         tanggalIncoming: document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value : '',
         vendor: document.getElementById("vendor") ? document.getElementById("vendor").value : '',
         component: document.getElementById("component") ? document.getElementById("component").value : '',
+        process: document.getElementById("process") ? document.getElementById("process").value : '',
         modelName: document.getElementById("model-name").value,
         styleNumber: document.getElementById("style-number").value,
         qtyInspect: totalInspected,
@@ -692,6 +695,8 @@ function resetAllFields() {
     // Reset new fields (except tanggal-incoming which resets to today)
     if (vendorSelect) vendorSelect.value = "";
     if (componentSelect) componentSelect.value = "";
+    const processEl = document.getElementById("process");
+    if (processEl) processEl.value = "";
     if (tanggalIncomingInput) tanggalIncomingInput.value = new Date().toISOString().split('T')[0];
     
     if (modelNameInput) {
