@@ -104,20 +104,44 @@ export async function dbGetComponents() {
     return unwrap(await db.from('components').select('*').order('id'), 'getComponents');
 }
 
-export async function dbInsertComponent({ name }) {
+export async function dbInsertComponent({ name, vendor_id }) {
     return unwrap(
-        await db.from('components').insert({ name }).select().single(),
+        await db.from('components').insert({ name, vendor_id: vendor_id || null }).select().single(),
         'insertComponent'
     );
 }
 
-export async function dbUpdateComponent(id, { name }) {
+export async function dbUpdateComponent(id, { name, vendor_id }) {
     return unwrap(
-        await db.from('components').update({ name }).eq('id', id).select().single(),
+        await db.from('components').update({ name, vendor_id: vendor_id || null }).eq('id', id).select().single(),
         'updateComponent'
     );
 }
 
 export async function dbDeleteComponent(id) {
     unwrap(await db.from('components').delete().eq('id', id), 'deleteComponent');
+}
+
+// ─── PROCESSES ──────────────────────────────────────────────
+
+export async function dbGetProcesses() {
+    return unwrap(await db.from('processes').select('*').order('id'), 'getProcesses');
+}
+
+export async function dbInsertProcess({ name, component_id }) {
+    return unwrap(
+        await db.from('processes').insert({ name, component_id: component_id || null }).select().single(),
+        'insertProcess'
+    );
+}
+
+export async function dbUpdateProcess(id, { name, component_id }) {
+    return unwrap(
+        await db.from('processes').update({ name, component_id: component_id || null }).eq('id', id).select().single(),
+        'updateProcess'
+    );
+}
+
+export async function dbDeleteProcess(id) {
+    unwrap(await db.from('processes').delete().eq('id', id), 'deleteProcess');
 }

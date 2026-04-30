@@ -157,3 +157,39 @@ CREATE POLICY "admin_write_app_users"  ON public.app_users
   WITH CHECK ((auth.jwt()->'user_metadata'->>'role') = 'admin');
 
 */
+
+-- ============================================================
+-- MIGRATION: Vendor → Component → Process Hierarchy
+-- Jalankan query ini di Supabase Dashboard → SQL Editor
+-- ============================================================
+
+-- 1. Tambahkan kolom vendor_id ke tabel components
+ALTER TABLE public.components
+  ADD COLUMN IF NOT EXISTS vendor_id BIGINT REFERENCES public.vendors(id) ON DELETE SET NULL;
+
+-- 2. Buat tabel processes
+CREATE TABLE IF NOT EXISTS public.processes (
+  id           BIGSERIAL    PRIMARY KEY,
+  name         TEXT         NOT NULL,
+  component_id BIGINT       REFERENCES public.components(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (name, component_id)
+);
+
+-- Enable RLS
+ALTER TABLE public.processes ENABLE ROW LEVEL SECURITY;
+
+-- Dev mode policy (hapus saat production)
+CREATE POLICY "dev_anon_processes" ON public.processes
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Production policies (uncomment saat production)
+/*
+CREATE POLICY "auth_read_processes" ON public.processes
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "admin_write_processes" ON public.processes
+  FOR ALL TO authenticated
+  USING     ((auth.jwt()->'user_metadata'->>'role') = 'admin')
+  WITH CHECK ((auth.jwt()->'user_metadata'->>'role') = 'admin');
+*/

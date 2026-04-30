@@ -6,7 +6,7 @@ import { styleModelDatabase } from './databasemodel.js';
 
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, renderComponentOptions, syncAllFromSupabase } from './admin.js';
+import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, renderComponentOptions, renderProcessOptions, syncAllFromSupabase } from './admin.js';
 
 let totalInspected = 0;
 let defectCounts = {}; 
@@ -40,6 +40,7 @@ let styleNumberInput;
 let tanggalIncomingInput;
 let vendorSelect;
 let componentSelect;
+let processSelect;
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -96,10 +97,16 @@ function loadFromLocalStorage() {
             }
             if (document.getElementById("model-name")) document.getElementById("model-name").value = formData.modelName || '';
             if (document.getElementById("style-number")) document.getElementById("style-number").value = formData.styleNumber || '';
-            if (document.getElementById("process")) document.getElementById("process").value = formData.process || '';
             if (tanggalIncomingInput && formData.tanggalIncoming) tanggalIncomingInput.value = formData.tanggalIncoming;
-            if (vendorSelect && formData.vendor) vendorSelect.value = formData.vendor;
-            if (componentSelect && formData.component) componentSelect.value = formData.component;
+            if (vendorSelect && formData.vendor) {
+                vendorSelect.value = formData.vendor;
+                if (componentSelect) renderComponentOptions(componentSelect, formData.vendor);
+            }
+            if (componentSelect && formData.component) {
+                componentSelect.value = formData.component;
+                if (processSelect) renderProcessOptions(processSelect, formData.component);
+            }
+            if (processSelect && formData.process) processSelect.value = formData.process;
         }
 
         const savedDefectCounts = localStorage.getItem(STORAGE_KEYS.DEFECT_COUNTS);
@@ -850,10 +857,13 @@ async function initApp() {
     tanggalIncomingInput = document.getElementById('tanggal-incoming');
     vendorSelect    = document.getElementById('vendor');
     componentSelect = document.getElementById('component');
+    processSelect   = document.getElementById('process');
     if (vendorSelect)    renderVendorOptions(vendorSelect);
-    if (componentSelect) renderComponentOptions(componentSelect);
+    if (componentSelect) renderComponentOptions(componentSelect, vendorSelect ? vendorSelect.value : '');
+    if (processSelect)   renderProcessOptions(processSelect, componentSelect ? componentSelect.value : '');
     window.__reattachVendorOptions    = () => { if (vendorSelect)    renderVendorOptions(vendorSelect); };
-    window.__reattachComponentOptions = () => { if (componentSelect) renderComponentOptions(componentSelect); };
+    window.__reattachComponentOptions = () => { if (componentSelect) renderComponentOptions(componentSelect, vendorSelect ? vendorSelect.value : ''); };
+    window.__reattachProcessOptions   = () => { if (processSelect)   renderProcessOptions(processSelect, componentSelect ? componentSelect.value : ''); };
 
     // --- AUTO-FILL AUDITOR FROM SESSION ---
     if (auditorSelect && user) {
@@ -883,8 +893,25 @@ async function initApp() {
     }
 
     if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', saveToLocalStorage);
-    if (vendorSelect) vendorSelect.addEventListener('change', saveToLocalStorage);
-    if (componentSelect) componentSelect.addEventListener('change', saveToLocalStorage);
+    if (vendorSelect) vendorSelect.addEventListener('change', () => {
+        if (componentSelect) {
+            renderComponentOptions(componentSelect, vendorSelect.value);
+            componentSelect.value = '';
+        }
+        if (processSelect) {
+            renderProcessOptions(processSelect, '');
+            processSelect.value = '';
+        }
+        saveToLocalStorage();
+    });
+    if (componentSelect) componentSelect.addEventListener('change', () => {
+        if (processSelect) {
+            renderProcessOptions(processSelect, componentSelect.value);
+            processSelect.value = '';
+        }
+        saveToLocalStorage();
+    });
+    if (processSelect) processSelect.addEventListener('change', saveToLocalStorage);
 
     function attachDefectListeners() {
         defectButtons = document.querySelectorAll('.defect-button');

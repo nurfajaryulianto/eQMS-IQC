@@ -8,12 +8,14 @@ import {
     dbGetAppUsers,  dbInsertAppUser,  dbUpdateAppUser,  dbDeleteAppUser,
     dbGetVendors,   dbInsertVendor,   dbUpdateVendor,   dbDeleteVendor,
     dbGetComponents,dbInsertComponent,dbUpdateComponent,dbDeleteComponent,
+    dbGetProcesses, dbInsertProcess,  dbUpdateProcess,  dbDeleteProcess,
 } from './db.js';
 
 export const DEFECTS_KEY    = 'eqms_defects_v1';
 export const USERS_KEY      = 'eqms_users_v1';
 export const VENDORS_KEY    = 'eqms_vendors_v1';
 export const COMPONENTS_KEY = 'eqms_components_v1';
+export const PROCESSES_KEY  = 'eqms_processes_v1';
 
 // ─── localStorage CACHE (dibaca oleh script.js secara sinkron) ───────────────
 // Supabase adalah sumber data utama.
@@ -67,22 +69,36 @@ export function saveComponents(components) {
     localStorage.setItem(COMPONENTS_KEY, JSON.stringify(components));
 }
 
+export function getProcesses() {
+    try {
+        const raw = localStorage.getItem(PROCESSES_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+}
+
+export function saveProcesses(processes) {
+    localStorage.setItem(PROCESSES_KEY, JSON.stringify(processes));
+}
+
 // ─── SUPABASE SYNC ───────────────────────────────────────────
 // Ambil semua data dari Supabase, perbarui localStorage cache.
 // Diekspor agar bisa dipanggil dari script.js saat startup.
 
 export async function syncAllFromSupabase() {
-    const [defects, users, vendors, components] = await Promise.all([
+    const [defects, users, vendors, components, processes] = await Promise.all([
         dbGetDefects(),
         dbGetAppUsers(),
         dbGetVendors(),
         dbGetComponents(),
+        dbGetProcesses(),
     ]);
     saveDefects(defects);
     saveUsers(users);
     saveVendors(vendors);
     saveComponents(components);
-    return { defects, users, vendors, components };
+    saveProcesses(processes);
+    return { defects, users, vendors, components, processes };
 }
 
 // ─── RENDER SELECT OPTIONS (used by script.js) ───────────────
@@ -100,17 +116,39 @@ export function renderVendorOptions(select) {
     if (current) select.value = current;
 }
 
-export function renderComponentOptions(select) {
+export function renderComponentOptions(select, vendorName = '') {
     const components = getComponents();
-    const current = select.value;
+    const vendors    = getVendors();
+    const current    = select.value;
     select.innerHTML = '<option value="">Pilih Component</option>';
-    components.forEach(c => {
+    let filtered = components;
+    if (vendorName) {
+        const vendor = vendors.find(v => v.name === vendorName);
+        filtered = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
+    }
+    filtered.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.name;
         opt.textContent = c.name;
         select.appendChild(opt);
     });
     if (current) select.value = current;
+}
+
+export function renderProcessOptions(select, componentName = '') {
+    const processes  = getProcesses();
+    const components = getComponents();
+    select.innerHTML = '<option value="">Pilih Process</option>';
+    if (!componentName) return;
+    const component = components.find(c => c.name === componentName);
+    if (!component) return;
+    const filtered = processes.filter(p => p.component_id === component.id);
+    filtered.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name;
+        select.appendChild(opt);
+    });
 }
 
 // ─── RENDER DEFECT BUTTONS (used by script.js) ───────────────
@@ -191,6 +229,7 @@ let editingDefectId    = null;
 let editingUserId      = null;
 let editingVendorId    = null;
 let editingComponentId = null;
+let editingProcessId   = null;
 
 export async function initAdminPanel() {
     if (adminPanelInitialized) return;
@@ -207,15 +246,18 @@ export async function initAdminPanel() {
     }
 
     setTabsLoading(false);
+    populateAdminFormSelects();
     renderDefectsTab();
     renderUsersTab();
     renderVendorsTab();
     renderComponentsTab();
+    renderProcessesTab();
 
     document.getElementById('admin-tab-defects').addEventListener('click',    () => switchAdminTab('defects'));
     document.getElementById('admin-tab-users').addEventListener('click',      () => switchAdminTab('users'));
     document.getElementById('admin-tab-vendors').addEventListener('click',    () => switchAdminTab('vendors'));
     document.getElementById('admin-tab-components').addEventListener('click', () => switchAdminTab('components'));
+    document.getElementById('admin-tab-processes').addEventListener('click',  () => switchAdminTab('processes'));
 
     document.getElementById('admin-defect-form').addEventListener('submit', handleDefectSubmit);
     document.getElementById('admin-defect-cancel').addEventListener('click', cancelDefectEdit);
@@ -228,10 +270,13 @@ export async function initAdminPanel() {
 
     document.getElementById('admin-component-form').addEventListener('submit', handleComponentSubmit);
     document.getElementById('admin-component-cancel').addEventListener('click', cancelComponentEdit);
+
+    document.getElementById('admin-process-form').addEventListener('submit', handleProcessSubmit);
+    document.getElementById('admin-process-cancel').addEventListener('click', cancelProcessEdit);
 }
 
 function switchAdminTab(tab) {
-    ['defects', 'users', 'vendors', 'components'].forEach(t => {
+    ['defects', 'users', 'vendors', 'components', 'processes'].forEach(t => {
         const isActive = t === tab;
         const btn   = document.getElementById(`admin-tab-${t}`);
         const panel = document.getElementById(`admin-panel-${t}`);
@@ -517,25 +562,31 @@ function cancelVendorEdit() {
 
 function renderComponentsTab() {
     const components = getComponents();
+    const vendors    = getVendors();
     const tbody = document.getElementById('admin-components-tbody');
     if (!tbody) return;
     const countEl = document.getElementById('admin-components-count');
     if (countEl) countEl.textContent = `${components.length} components`;
-    tbody.innerHTML = components.map(c => `
+    tbody.innerHTML = components.map(c => {
+        const vendor = vendors.find(v => v.id === c.vendor_id);
+        return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(c.name)}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-500">${vendor ? escHtml(vendor.name) : '\u2014'}</td>
             <td class="px-4 py-2.5">
                 <div class="flex gap-3">
                     <button onclick="window.__adminEditComponent(${c.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
                     <button onclick="window.__adminDeleteComponent(${c.id})" class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
                 </div>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 function handleComponentSubmit(e) {
     e.preventDefault();
-    const name = document.getElementById('component-input-name').value.trim();
+    const name     = document.getElementById('component-input-name').value.trim();
+    const vendorId = parseInt(document.getElementById('component-input-vendor').value, 10) || null;
     if (!name) return;
 
     const btn = e.target.querySelector('button[type="submit"]');
@@ -544,9 +595,9 @@ function handleComponentSubmit(e) {
     const finish = async () => {
         try {
             if (editingComponentId !== null) {
-                await dbUpdateComponent(editingComponentId, { name });
+                await dbUpdateComponent(editingComponentId, { name, vendor_id: vendorId });
             } else {
-                await dbInsertComponent({ name });
+                await dbInsertComponent({ name, vendor_id: vendorId });
             }
             const fresh = await dbGetComponents();
             saveComponents(fresh);
@@ -566,7 +617,8 @@ window.__adminEditComponent = function(id) {
     const comp = getComponents().find(c => c.id === id);
     if (!comp) return;
     editingComponentId = id;
-    document.getElementById('component-input-name').value = comp.name;
+    document.getElementById('component-input-vendor').value = comp.vendor_id ?? '';
+    document.getElementById('component-input-name').value   = comp.name;
     document.getElementById('admin-component-form-title').textContent = 'Edit Component';
     document.getElementById('admin-component-cancel').classList.remove('hidden');
     document.getElementById('component-input-name').focus();
@@ -618,7 +670,7 @@ function showAdminError(msg) {
 
 /** Tampilkan/sembunyikan skeleton loading di semua tab. */
 function setTabsLoading(loading) {
-    ['defects', 'users', 'vendors', 'components'].forEach(tab => {
+    ['defects', 'users', 'vendors', 'components', 'processes'].forEach(tab => {
         const tbody = document.getElementById(`admin-${tab}-tbody`);
         if (!tbody) return;
         if (loading) {
@@ -638,8 +690,130 @@ function refreshDefectButtonsInForm() {
     renderDefectLibrary();
 }
 
+function populateAdminFormSelects() {
+    // Vendor select in component form
+    const compVendorSel = document.getElementById('component-input-vendor');
+    if (compVendorSel) {
+        const vendors = getVendors();
+        const cur = compVendorSel.value;
+        compVendorSel.innerHTML = '<option value="">— No Vendor —</option>';
+        vendors.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.name;
+            compVendorSel.appendChild(opt);
+        });
+        if (cur) compVendorSel.value = cur;
+    }
+    // Component select in process form
+    const procCompSel = document.getElementById('process-input-component');
+    if (procCompSel) {
+        const components = getComponents();
+        const cur = procCompSel.value;
+        procCompSel.innerHTML = '<option value="">Pilih Component</option>';
+        components.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.name;
+            procCompSel.appendChild(opt);
+        });
+        if (cur) procCompSel.value = cur;
+    }
+}
+
 function refreshDropdownsInForm() {
     if (typeof window.__reattachVendorOptions === 'function') window.__reattachVendorOptions();
     if (typeof window.__reattachComponentOptions === 'function') window.__reattachComponentOptions();
+    if (typeof window.__reattachProcessOptions === 'function') window.__reattachProcessOptions();
+    populateAdminFormSelects();
+}
+
+// ─── PROCESSES TAB ───────────────────────────────────────────────
+
+function renderProcessesTab() {
+    const processes  = getProcesses();
+    const components = getComponents();
+    const vendors    = getVendors();
+    const tbody = document.getElementById('admin-processes-tbody');
+    if (!tbody) return;
+    const countEl = document.getElementById('admin-processes-count');
+    if (countEl) countEl.textContent = `${processes.length} processes`;
+    tbody.innerHTML = processes.map(p => {
+        const comp   = components.find(c => c.id === p.component_id);
+        const vendor = comp ? vendors.find(v => v.id === comp.vendor_id) : null;
+        return `
+        <tr class="border-b border-slate-100 hover:bg-slate-50">
+            <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(p.name)}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-500">${comp   ? escHtml(comp.name)   : '\u2014'}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-500">${vendor ? escHtml(vendor.name) : '\u2014'}</td>
+            <td class="px-4 py-2.5">
+                <div class="flex gap-3">
+                    <button onclick="window.__adminEditProcess(${p.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+                    <button onclick="window.__adminDeleteProcess(${p.id})" class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function handleProcessSubmit(e) {
+    e.preventDefault();
+    const name        = document.getElementById('process-input-name').value.trim();
+    const componentId = parseInt(document.getElementById('process-input-component').value, 10) || null;
+    if (!name || !componentId) { alert('Pilih component dan masukkan nama process.'); return; }
+
+    const btn = e.target.querySelector('button[type="submit"]');
+    setFormBusy(btn, true);
+
+    const finish = async () => {
+        try {
+            if (editingProcessId !== null) {
+                await dbUpdateProcess(editingProcessId, { name, component_id: componentId });
+            } else {
+                await dbInsertProcess({ name, component_id: componentId });
+            }
+            const fresh = await dbGetProcesses();
+            saveProcesses(fresh);
+            renderProcessesTab();
+            cancelProcessEdit();
+            refreshDropdownsInForm();
+        } catch (err) {
+            alert(`Gagal menyimpan process: ${err.message}`);
+        } finally {
+            setFormBusy(btn, false);
+        }
+    };
+    finish();
+}
+
+window.__adminEditProcess = function(id) {
+    const proc = getProcesses().find(p => p.id === id);
+    if (!proc) return;
+    editingProcessId = id;
+    document.getElementById('process-input-component').value = proc.component_id ?? '';
+    document.getElementById('process-input-name').value      = proc.name;
+    document.getElementById('admin-process-form-title').textContent = 'Edit Process';
+    document.getElementById('admin-process-cancel').classList.remove('hidden');
+    document.getElementById('process-input-name').focus();
+};
+
+window.__adminDeleteProcess = async function(id) {
+    if (!confirm('Hapus process ini?')) return;
+    try {
+        await dbDeleteProcess(id);
+        const fresh = await dbGetProcesses();
+        saveProcesses(fresh);
+        renderProcessesTab();
+        refreshDropdownsInForm();
+    } catch (err) {
+        alert(`Gagal menghapus process: ${err.message}`);
+    }
+};
+
+function cancelProcessEdit() {
+    editingProcessId = null;
+    document.getElementById('admin-process-form').reset();
+    document.getElementById('admin-process-form-title').textContent = 'Add Process';
+    document.getElementById('admin-process-cancel').classList.add('hidden');
 }
 

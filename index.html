@@ -254,8 +254,9 @@
                         </div>
                         <div>
                             <label for="process" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Process</label>
-                            <input type="text" id="process" placeholder="Enter process name"
-                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            <select id="process" class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                <option value="">Pilih Process</option>
+                            </select>
                         </div>
                         <div>
                             <label for="style-number" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Style Number</label>
@@ -651,6 +652,9 @@
                 <button id="admin-tab-components" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
                     <span class="material-symbols-outlined text-[16px] align-middle mr-1">construction</span>Components
                 </button>
+                <button id="admin-tab-processes" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
+                    <span class="material-symbols-outlined text-[16px] align-middle mr-1">account_tree</span>Processes
+                </button>
                 <button id="admin-tab-users" class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
                     <span class="material-symbols-outlined text-[16px] align-middle mr-1">group</span>Users
                 </button>
@@ -754,6 +758,7 @@
                             <table class="w-full">
                                 <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
                                     <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vendor</th>
                                     <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                                 </tr></thead>
                                 <tbody id="admin-components-tbody"></tbody>
@@ -764,12 +769,60 @@
                         <h3 id="admin-component-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add Component</h3>
                         <form id="admin-component-form" class="space-y-3">
                             <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
+                                <select id="component-input-vendor" class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">&mdash; No Vendor &mdash;</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component Name</label>
                                 <input id="component-input-name" type="text" placeholder="e.g. Upper" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                             </div>
                             <div class="flex gap-2 pt-1">
                                 <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
                                 <button type="button" id="admin-component-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROCESSES PANEL -->
+            <div id="admin-panel-processes" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div class="lg:col-span-3 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-900">Process List</h3>
+                            <span id="admin-processes-count" class="text-xs text-slate-400"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead><tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Process Name</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Component</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vendor</th>
+                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                </tr></thead>
+                                <tbody id="admin-processes-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm p-5">
+                        <h3 id="admin-process-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add Process</h3>
+                        <form id="admin-process-form" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component</label>
+                                <select id="process-input-component" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">Pilih Component</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Process Name</label>
+                                <input id="process-input-name" type="text" placeholder="e.g. Cementing" required class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            </div>
+                            <div class="flex gap-2 pt-1">
+                                <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+                                <button type="button" id="admin-process-cancel" class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
                             </div>
                         </form>
                     </div>
