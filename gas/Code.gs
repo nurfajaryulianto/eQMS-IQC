@@ -16,7 +16,7 @@
 
 // ── GANTI DENGAN ID SPREADSHEET ANDA ──────────────────────────
 // Buka spreadsheet → lihat URL: docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
-const SPREADSHEET_ID = 'PASTE_YOUR_SPREADSHEET_ID_HERE';
+const SPREADSHEET_ID = '1KLVddUlNGySE149gH9UD33DOjJMMCzcKHkvB0gZnqIc';
 // ──────────────────────────────────────────────────────────────
 
 // ── Header definisi — urutan ini menentukan kolom di sheet ────
