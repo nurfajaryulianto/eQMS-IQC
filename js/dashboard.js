@@ -151,29 +151,56 @@ async function fetchData() {
 
         if (data.error) throw new Error(data.error);
 
-        allInspections = data.inspections.map(item => ({
-            Timestamp: new Date(item.Timestamp),
-            Auditor: item.Auditor,
-            NCVS: item.NCVS,
-            Model: item.Model,
-            'Style Number': item['Style Number'],
-            Qty_Inspect: Number(item['Qty Inspect']) || 0,
-            FTT: Number(item.FTT) || 0,
-            Rework_Rate: Number(item['Rework Rate']) || 0,
-            A_Grade: Number(item['A-Grade']) || 0,
-            B_Grade: Number(item['B-Grade']) || 0,
-            C_Grade: Number(item['C-Grade']) || 0,
-            Rework_Kiri: Number(item['Rework Kiri']) || 0,
-            Rework_Kanan: Number(item['Rework Kanan']) || 0,
-            Rework_Pairs: Number(item['Rework Pairs']) || 0
+        // Mapping dari schema GAS baru (sessions + defects)
+        const rawSessions = data.sessions || data.inspections || [];
+        const rawDefects  = data.defects  || [];
+
+        allInspections = rawSessions.map(item => ({
+            Timestamp:       new Date(item.Timestamp    || item.Timestamp),
+            TanggalIncoming: item.TanggalIncoming || '',
+            MaterialType:    item.MaterialType    || '',
+            Auditor:         item.Auditor         || '',
+            Vendor:          item.Vendor          || '',
+            Component:       item.Component       || '',
+            Process:         item.Process         || '',
+            'Style Number':  item.StyleNumber     || item['Style Number'] || '',
+            Model:           item.ModelName       || item.Model           || '',
+            QtyIncoming:     Number(item.QtyIncoming)  || 0,
+            Qty_Inspect:     Number(item.QtyInspect || item.Qty_Inspect)  || 0,
+            Pass:            Number(item.Pass)          || 0,
+            Defect:          Number(item.Defect)        || 0,
+            FTT:             Number(item.FTT)           || 0,
+            Rework_Rate:     Number(item.DefectRate || item.Rework_Rate)  || 0,
+            SessionId:       item.SessionId       || '',
+            // Backward-compat fields (lama)
+            NCVS:            item.NCVS            || '',
+            A_Grade:         Number(item.A_Grade)  || 0,
+            B_Grade:         Number(item.B_Grade)  || 0,
+            C_Grade:         Number(item.C_Grade)  || 0,
         }));
-        allDefects = data.defects.map(item => ({ ...item, Timestamp: new Date(item.Timestamp) }));
+
+        allDefects = rawDefects.map(item => ({
+            ...item,
+            Timestamp:    new Date(item.Timestamp),
+            SessionId:    item.SessionId    || '',
+            Vendor:       item.Vendor       || '',
+            Component:    item.Component    || '',
+            Process:      item.Process      || '',
+            MaterialType: item.MaterialType || '',
+            DefectType:   item.DefectType   || item.Type || '',
+            Position:     item.Position     || '',
+            Level:        item.Level        || '',
+            Count:        Number(item.Count) || 0,
+        }));
 
         populateFilters({
-            auditors: data.filters?.auditors?.length ? data.filters.auditors : [...new Set(allInspections.map(i => i.Auditor).filter(Boolean))],
-            ncvs: data.filters?.ncvs?.length ? data.filters.ncvs : [...new Set(allInspections.map(i => i.NCVS).filter(Boolean))],
-            models: data.filters?.models?.length ? data.filters.models : [...new Set(allInspections.map(i => i.Model).filter(Boolean))],
-            styleNumbers: data.filters?.styleNumbers?.length ? data.filters.styleNumbers : [...new Set(allInspections.map(i => i['Style Number']).filter(Boolean))],
+            auditors:     [...new Set(allInspections.map(i => i.Auditor).filter(Boolean))],
+            vendors:      [...new Set(allInspections.map(i => i.Vendor).filter(Boolean))],
+            materialTypes:[...new Set(allInspections.map(i => i.MaterialType).filter(Boolean))],
+            models:       [...new Set(allInspections.map(i => i.Model).filter(Boolean))],
+            styleNumbers: [...new Set(allInspections.map(i => i['Style Number']).filter(Boolean))],
+            // backward-compat
+            ncvs:         [...new Set(allInspections.map(i => i.NCVS).filter(Boolean))],
         });
         updateDashboard();
 
