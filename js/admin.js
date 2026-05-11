@@ -5,7 +5,8 @@
 
 import {
     dbGetDefects,   dbInsertDefect,   dbUpdateDefect,   dbDeleteDefect,
-    dbGetAppUsers,  dbInsertAppUser,  dbUpdateAppUser,  dbDeleteAppUser,
+    dbGetAppUsers,
+    dbCreateAuthUser, dbUpdateAuthUser, dbDeleteAuthUser,
     dbGetVendors,   dbInsertVendor,   dbUpdateVendor,   dbDeleteVendor,
     dbGetComponents,dbInsertComponent,dbUpdateComponent,dbDeleteComponent,
     dbGetProcesses, dbInsertProcess,  dbUpdateProcess,  dbDeleteProcess,
@@ -401,18 +402,32 @@ function renderUsersTab() {
     const tbody = document.getElementById('admin-users-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = users.map(u => `
+    const countEl = document.getElementById('admin-users-count');
+    if (countEl) countEl.textContent = `${users.length} users`;
+
+    tbody.innerHTML = users.map(u => {
+        const hasAuth = Boolean(u.auth_user_id);
+        const authBadge = hasAuth
+            ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">\u2713 Can Login</span>'
+            : '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">No Auth</span>';
+        return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-mono text-slate-700 text-sm">${escHtml(u.nik)}</td>
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(u.display_name)}</td>
             <td class="px-4 py-2.5">
                 <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${roleBadge(u.role)} capitalize">${u.role}</span>
             </td>
+            <td class="px-4 py-2.5">${authBadge}</td>
             <td class="px-4 py-2.5 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString('id-ID')}</td>
             <td class="px-4 py-2.5">
                 <div class="flex gap-3">
                     <button onclick="window.__adminEditUser(${u.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
                     <button onclick="window.__adminDeleteUser(${u.id})" class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
                 </div>
             </td>
         </tr>`).join('');
@@ -424,13 +439,23 @@ function roleBadge(role) {
 
 function handleUserSubmit(e) {
     e.preventDefault();
-    const nik  = document.getElementById('user-input-nik').value.trim();
-    const name = document.getElementById('user-input-name').value.trim();
-    const role = document.getElementById('user-input-role').value;
+    const nik      = document.getElementById('user-input-nik').value.trim();
+    const name     = document.getElementById('user-input-name').value.trim();
+    const role     = document.getElementById('user-input-role').value;
+    const password = document.getElementById('user-input-password')?.value ?? '';
+
     if (!nik || !name || !role) return;
 
     if (!/^[a-zA-Z0-9]{1,20}$/.test(nik)) {
         showAlert('NIK hanya boleh alfanumerik, maks 20 karakter.', 'warning', 'Format NIK Tidak Valid');
+        return;
+    }
+    if (editingUserId === null && !password) {
+        showAlert('Password wajib diisi untuk user baru.', 'warning', 'Password Kosong');
+        return;
+    }
+    if (password && password.length < 6) {
+        showAlert('Password minimal 6 karakter.', 'warning', 'Password Terlalu Pendek');
         return;
     }
 
@@ -440,14 +465,18 @@ function handleUserSubmit(e) {
     const finish = async () => {
         try {
             if (editingUserId !== null) {
-                await dbUpdateAppUser(editingUserId, { nik, display_name: name, role });
+                await dbUpdateAuthUser(editingUserId, { display_name: name, role, password: password || undefined });
             } else {
-                await dbInsertAppUser({ nik, display_name: name, role });
+                await dbCreateAuthUser({ nik, display_name: name, role, password });
             }
             const fresh = await dbGetAppUsers();
             saveUsers(fresh);
             renderUsersTab();
             cancelUserEdit();
+            await showAlert(
+                editingUserId !== null ? `User "${name}" berhasil diperbarui.` : `User "${name}" berhasil dibuat. User sekarang bisa login dengan NIK: ${nik}`,
+                'success'
+            );
         } catch (err) {
             await showAlert(`Gagal menyimpan user: ${err.message}`, 'error');
         } finally {
@@ -461,21 +490,27 @@ window.__adminEditUser = function(id) {
     const user = getUsers().find(u => u.id === id);
     if (!user) return;
     editingUserId = id;
-    document.getElementById('user-input-nik').value  = user.nik;
+    const nikInput = document.getElementById('user-input-nik');
+    if (nikInput) { nikInput.value = user.nik; nikInput.disabled = true; }
     document.getElementById('user-input-name').value = user.display_name;
     document.getElementById('user-input-role').value = user.role;
+    // Password optional saat edit
+    const pwInput = document.getElementById('user-input-password');
+    const pwHint  = document.getElementById('user-password-hint');
+    if (pwInput) { pwInput.value = ''; pwInput.required = false; }
+    if (pwHint)  { pwHint.textContent = 'Kosongkan jika tidak ingin mengubah password.'; }
     document.getElementById('admin-user-form-title').textContent = 'Edit User';
     document.getElementById('admin-user-cancel').classList.remove('hidden');
-    document.getElementById('user-input-nik').focus();
+    document.getElementById('user-input-name').focus();
 };
 
 window.__adminDeleteUser = async function(id) {
     const user = getUsers().find(u => u.id === id);
     if (!user) return;
-    const confirmed = await showConfirm(`User "${user.display_name}" (${user.nik}) akan dihapus permanen.`, 'Hapus User?', 'Ya, Hapus', 'Batal');
+    const confirmed = await showConfirm(`User "${user.display_name}" (${user.nik}) akan dihapus permanen dari sistem dan tidak bisa login lagi.`, 'Hapus User?', 'Ya, Hapus', 'Batal');
     if (!confirmed) return;
     try {
-        await dbDeleteAppUser(id);
+        await dbDeleteAuthUser(id);
         const fresh = await dbGetAppUsers();
         saveUsers(fresh);
         renderUsersTab();
@@ -487,6 +522,12 @@ window.__adminDeleteUser = async function(id) {
 function cancelUserEdit() {
     editingUserId = null;
     document.getElementById('admin-user-form').reset();
+    const nikInput = document.getElementById('user-input-nik');
+    if (nikInput) nikInput.disabled = false;
+    const pwInput = document.getElementById('user-input-password');
+    const pwHint  = document.getElementById('user-password-hint');
+    if (pwInput) { pwInput.value = ''; pwInput.required = true; }
+    if (pwHint)  { pwHint.textContent = 'Minimal 6 karakter.'; }
     document.getElementById('admin-user-form-title').textContent = 'Add User';
     document.getElementById('admin-user-cancel').classList.add('hidden');
 }

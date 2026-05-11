@@ -51,8 +51,12 @@ CREATE TABLE IF NOT EXISTS public.app_users (
   nik          TEXT         NOT NULL UNIQUE CHECK (nik ~ '^[a-zA-Z0-9]{1,20}$'),
   display_name TEXT         NOT NULL,
   role         TEXT         NOT NULL CHECK (role IN ('admin', 'supervisor', 'auditor')),
+  auth_user_id UUID         UNIQUE,           -- FK ke auth.users.id (diisi oleh Vercel API)
   created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Jika tabel sudah ada sebelumnya, jalankan migrasi berikut:
+-- ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS auth_user_id UUID UNIQUE;
 
 -- Seed data user default
 INSERT INTO public.app_users (nik, display_name, role) VALUES

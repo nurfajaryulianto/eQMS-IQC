@@ -56,20 +56,69 @@ export async function dbGetAppUsers() {
     return unwrap(await db.from('app_users').select('*').order('id'), 'getAppUsers');
 }
 
+// ─── Helper: ambil JWT sesi aktif ─────────────────────────────────────────────
+async function getAccessToken() {
+    const { data: { session } } = await db.auth.getSession();
+    return session?.access_token ?? null;
+}
+
+// ─── Helper: panggil admin API endpoint (Vercel functions) ────────────────────
+async function callAdminApi(endpoint, method, body) {
+    const token = await getAccessToken();
+    if (!token) throw new Error('Tidak ada sesi aktif. Silakan login ulang.');
+    const res = await fetch(endpoint, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `Server error (${res.status})`);
+    return json;
+}
+
+/**
+ * Buat user baru di Supabase Auth + app_users via Vercel API.
+ * Menggantikan dbInsertAppUser untuk pembuatan user yang bisa login.
+ */
+export async function dbCreateAuthUser({ nik, display_name, role, password }) {
+    return callAdminApi('/api/create-user', 'POST', { nik, display_name, role, password });
+}
+
+/**
+ * Perbarui display_name, role (+ opsional reset password) di auth + app_users.
+ * @param {number} app_user_id — id dari tabel app_users
+ */
+export async function dbUpdateAuthUser(app_user_id, { display_name, role, password }) {
+    return callAdminApi('/api/update-user', 'PATCH', { app_user_id, display_name, role, password });
+}
+
+/**
+ * Hapus user dari Supabase Auth + app_users via Vercel API.
+ * @param {number} app_user_id — id dari tabel app_users
+ */
+export async function dbDeleteAuthUser(app_user_id) {
+    return callAdminApi('/api/delete-user', 'DELETE', { app_user_id });
+}
+
+// ─── Legacy stubs (tidak digunakan untuk user baru, tetap ada agar tidak break) ─
+/** @deprecated Gunakan dbCreateAuthUser */
 export async function dbInsertAppUser({ nik, display_name, role }) {
     return unwrap(
         await db.from('app_users').insert({ nik, display_name, role }).select().single(),
         'insertAppUser'
     );
 }
-
+/** @deprecated Gunakan dbUpdateAuthUser */
 export async function dbUpdateAppUser(id, { nik, display_name, role }) {
     return unwrap(
         await db.from('app_users').update({ nik, display_name, role }).eq('id', id).select().single(),
         'updateAppUser'
     );
 }
-
+/** @deprecated Gunakan dbDeleteAuthUser */
 export async function dbDeleteAppUser(id) {
     unwrap(await db.from('app_users').delete().eq('id', id), 'deleteAppUser');
 }
