@@ -364,15 +364,14 @@ function toggleButtonGroup(buttons, enable) {
 function updateSaveButtonState() {
     const saveButton = document.querySelector('.save-button');
     if (!saveButton) return;
-    const minInspected = currentInspectionLimit > 0 ? Math.ceil(currentInspectionLimit * 0.1) : 1;
-    const ready = currentInspectionLimit > 0 && totalInspected >= minInspected;
+    const ready = currentInspectionLimit > 0 && totalInspected === currentInspectionLimit && isInfoComplete();
     saveButton.disabled = !ready;
     saveButton.classList.toggle('opacity-50', !ready);
     saveButton.classList.toggle('cursor-not-allowed', !ready);
     const hint = document.getElementById('save-progress-hint');
     if (hint) {
         if (currentInspectionLimit > 0) {
-            hint.textContent = `Terinsepksi: ${totalInspected} / ${minInspected} min (10% dari ${currentInspectionLimit})`;
+            hint.textContent = `Terinspeksi: ${totalInspected} / ${currentInspectionLimit}`;
             hint.classList.toggle('hidden', ready);
         } else {
             hint.classList.add('hidden');
@@ -403,7 +402,10 @@ function updateButtonStatesBasedOnLimit() {
 // ===========================================
 function initButtonStates() {
     if (!defectButtons) return;
-    const complete = isInfoComplete();
+    const toggleDefectInput = document.getElementById('toggle-defect-input');
+    const isToggledActive = toggleDefectInput ? toggleDefectInput.checked : true;
+    
+    const complete = isInfoComplete() && isToggledActive;
     toggleButtonGroup(defectButtons, complete);
     syncDefectButtonActiveStates();
 }
@@ -543,20 +545,20 @@ function updateDefectSummaryDisplay() {
                     if (defectCounts[defectType][position][displayGrade] && defectCounts[defectType][position][displayGrade] > 0) {
                         const count = defectCounts[defectType][position][displayGrade];
                         const item = document.createElement('div');
-                        item.className = 'summary-item flex items-center justify-between p-3 border-b border-slate-100 gap-2';
+                        item.className = 'summary-item flex items-center justify-between p-3 border-b border-slate-100 gap-3';
                         item.innerHTML = `
                             <div class="flex-1 min-w-0">
-                                <p class="text-xs font-semibold text-slate-800 truncate">${defectType}</p>
-                                <p class="text-[10px] text-slate-400 font-medium">${position}</p>
+                                <p class="text-sm font-semibold text-slate-800 break-words">${defectType}</p>
+                                <p class="text-xs text-slate-400 font-medium">${position}</p>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-2">
                                 <input type="number" min="1" 
-                                    class="w-16 px-1.5 py-1 text-xs text-center border border-slate-300 rounded font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                    class="w-20 px-2 py-2 text-sm text-center border border-slate-300 rounded-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100" 
                                     value="${count}" 
                                     onchange="window.__updateDefectCount('${defectType}', '${position}', '${displayGrade}', this.value)">
                                 <button onclick="window.__removeDefect('${defectType}', '${position}', '${displayGrade}')" 
-                                    class="p-1 text-slate-400 hover:text-red-500 rounded transition-colors flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    class="p-2.5 text-slate-500 bg-slate-50 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] shadow-sm cursor-pointer">
+                                    <span class="material-symbols-outlined text-[20px]">delete</span>
                                 </button>
                             </div>
                         `;
@@ -927,6 +929,13 @@ function resetAllFields() {
     }
     currentInspectionLimit = 0;
 
+    const toggleDefectInput = document.getElementById('toggle-defect-input');
+    if (toggleDefectInput) {
+        toggleDefectInput.checked = true;
+        const label = document.getElementById('toggle-defect-label');
+        if (label) label.textContent = 'Aktif';
+    }
+
     updateAllDisplays();
     if (summaryContainer) summaryContainer.innerHTML = "";
     checkInfoCompleteAndLockButtons();
@@ -1055,6 +1064,16 @@ async function initApp() {
 
     defectButtons = document.querySelectorAll('.defect-button');
     gradeInputButtons = document.querySelectorAll('.input-button');
+
+    const toggleDefectInput = document.getElementById('toggle-defect-input');
+    if (toggleDefectInput) {
+        toggleDefectInput.addEventListener('change', () => {
+            const active = toggleDefectInput.checked;
+            const label = document.getElementById('toggle-defect-label');
+            if (label) label.textContent = active ? 'Aktif' : 'Terkunci';
+            initButtonStates();
+        });
+    }
 
     auditorSelect = document.getElementById('auditor');
     modelNameInput = document.getElementById("model-name");

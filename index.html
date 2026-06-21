@@ -318,10 +318,19 @@
                     </div>
 
                     <!-- Defect Input -->
-                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
-                        <h3 class="text-base font-semibold text-slate-900 mb-3">Defect Input</h3>
-                        <div id="defect-buttons-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                            <!-- Populated dynamically by admin.js -->
+                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-slate-900">Defect Input</h3>
+                            <label class="relative inline-flex items-center cursor-pointer select-none">
+                                <input type="checkbox" id="toggle-defect-input" class="sr-only peer" checked>
+                                <div class="relative w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span id="toggle-defect-label" class="ml-2 text-xs font-semibold text-slate-600">Aktif</span>
+                            </label>
+                        </div>
+                        <div class="p-4">
+                            <div id="defect-buttons-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                <!-- Populated dynamically by admin.js -->
+                            </div>
                         </div>
                     </div>
 
