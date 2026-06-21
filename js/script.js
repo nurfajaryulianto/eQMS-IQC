@@ -402,10 +402,7 @@ function updateButtonStatesBasedOnLimit() {
 // ===========================================
 function initButtonStates() {
     if (!defectButtons) return;
-    const toggleDefectInput = document.getElementById('toggle-defect-input');
-    const isToggledActive = toggleDefectInput ? toggleDefectInput.checked : true;
-    
-    const complete = isInfoComplete() && isToggledActive;
+    const complete = isInfoComplete();
     toggleButtonGroup(defectButtons, complete);
     syncDefectButtonActiveStates();
 }
@@ -593,10 +590,14 @@ function handleDefectClick(button) {
     const grade = 'defect';
 
     if (!defectCounts[defectType]) {
-        defectCounts[defectType] = { "LEFT": {}, "PAIRS": {}, "RIGHT": {} };
+        defectCounts[defectType] = {};
+    }
+    if (!defectCounts[defectType][position]) {
+        defectCounts[defectType][position] = {};
     }
     
-    if (defectCounts[defectType][position] && defectCounts[defectType][position][grade]) {
+    if (defectCounts[defectType][position][grade]) {
+        // Jika sudah ada, hapus (fungsi toggle)
         delete defectCounts[defectType][position][grade];
         if (Object.keys(defectCounts[defectType][position]).length === 0) {
             delete defectCounts[defectType][position];
@@ -605,6 +606,7 @@ function handleDefectClick(button) {
             delete defectCounts[defectType];
         }
     } else {
+        // Jika belum ada, tambahkan dengan jumlah default 1
         defectCounts[defectType][position][grade] = 1;
     }
 
@@ -928,14 +930,6 @@ function resetAllFields() {
         localStorage.setItem('qtySampleSet', 0);
     }
     currentInspectionLimit = 0;
-
-    const toggleDefectInput = document.getElementById('toggle-defect-input');
-    if (toggleDefectInput) {
-        toggleDefectInput.checked = true;
-        const label = document.getElementById('toggle-defect-label');
-        if (label) label.textContent = 'Aktif';
-    }
-
     updateAllDisplays();
     if (summaryContainer) summaryContainer.innerHTML = "";
     checkInfoCompleteAndLockButtons();
@@ -1064,16 +1058,6 @@ async function initApp() {
 
     defectButtons = document.querySelectorAll('.defect-button');
     gradeInputButtons = document.querySelectorAll('.input-button');
-
-    const toggleDefectInput = document.getElementById('toggle-defect-input');
-    if (toggleDefectInput) {
-        toggleDefectInput.addEventListener('change', () => {
-            const active = toggleDefectInput.checked;
-            const label = document.getElementById('toggle-defect-label');
-            if (label) label.textContent = active ? 'Aktif' : 'Terkunci';
-            initButtonStates();
-        });
-    }
 
     auditorSelect = document.getElementById('auditor');
     modelNameInput = document.getElementById("model-name");
