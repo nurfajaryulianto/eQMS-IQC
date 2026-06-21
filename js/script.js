@@ -395,41 +395,17 @@ function updateAGradeButtonState() {
 // FUNGSI BARU: Mengatur Status Tombol Berdasarkan Qty Sample Set Limit
 // ===========================================
 function updateButtonStatesBasedOnLimit() {
-    const hasReachedLimit = totalInspected >= currentInspectionLimit && currentInspectionLimit > 0;
-    if (hasReachedLimit) {
-        toggleButtonGroup(defectButtons, false);
-        toggleButtonGroup(gradeInputButtons, false);
-        defectButtons.forEach(btn => btn.classList.remove('active'));
-        gradeInputButtons.forEach(btn => btn.classList.remove('active'));
-    } else if (currentInspectionLimit > 0) {
-        if (selectedDefects.length === 0 && currentInspectionPairs.length === 0) {
-            initButtonStates();
-        }
-    }
+    initButtonStates();
 }
 
 // ===========================================
 // 4. Fungsi Utama: Inisialisasi Status Tombol
 // ===========================================
 function initButtonStates() {
-    // Reset variabel state untuk siklus baru
-    selectedDefects = [];
-    currentInspectionPairs = [];
-
-    // Reset tampilan visual tombol
-    defectButtons.forEach(btn => btn.classList.remove('active'));
-    
-    // Aktifkan semua tombol defect
-    toggleButtonGroup(defectButtons, true);
-
-    updateAGradeButtonState();
-    updateQtySectionState();
-    
-    // Cek batas inspeksi
-    if (totalInspected >= currentInspectionLimit && currentInspectionLimit > 0) {
-        toggleButtonGroup(defectButtons, false);
-        toggleButtonGroup(gradeInputButtons, false);
-    }
+    if (!defectButtons) return;
+    const complete = isInfoComplete();
+    toggleButtonGroup(defectButtons, complete);
+    syncDefectButtonActiveStates();
 }
 
 // ===========================================
@@ -464,7 +440,6 @@ function updateRedoRate() {
 // FUNGSI PEMBANTU BARU: Memproses & Memisahkan Tipe Rework (REVISI TOTAL)
 // ===========================================
 function getProcessedReworkCounts() {
-    // All rework items default to 'PAIRS' position
     const finalReworkPairs = reworkLog.length;
     return {
         finalReworkPairs,
@@ -475,58 +450,83 @@ function getProcessedReworkCounts() {
 }
 
 // ===========================================
-// 7. Update Total Qty Inspect (termasuk FTT dan Redo Rate) (Perbaikan)
+// 7. Update Total Qty Inspect (termasuk FTT dan Redo Rate)
 // ===========================================
 function updateTotalQtyInspect() {
-    let total = 0;
-    for (const category in qtyInspectOutputs) {
-        total += qtyInspectOutputs[category];
+    const passInput = document.getElementById('pass-counter');
+    if (passInput) {
+        qtyInspectOutputs['pass'] = parseInt(passInput.value, 10) || 0;
     }
+
+    let defectSum = 0;
+    for (const defectType in defectCounts) {
+        for (const position in defectCounts[defectType]) {
+            for (const grade in defectCounts[defectType][position]) {
+                defectSum += defectCounts[defectType][position][grade] || 0;
+            }
+        }
+    }
+    qtyInspectOutputs['defect'] = defectSum;
+
+    const defectDisplay = document.getElementById('defect-counter');
+    if (defectDisplay) {
+        defectDisplay.textContent = defectSum;
+    }
+
+    let total = qtyInspectOutputs['pass'] + qtyInspectOutputs['defect'];
     if (qtyInspectOutput) {
         qtyInspectOutput.textContent = total;
     }
     totalInspected = total;
+
     updateFTT();
     updateRedoRate();
     saveToLocalStorage();
     updateSaveButtonState();
-
-    // Gunakan fungsi baru untuk mengecek limit
     updateButtonStatesBasedOnLimit();
 }
 
 // ===========================================
-// 8. Menambahkan Defect ke Summary List (Logika Baru)
+// 8. Menampilkan Summary Defect dan Event Handlers
 // ===========================================
-function addAllDefectsToSummary(finalGrade) {
-    if (currentInspectionPairs.length === 0 || !finalGrade) {
-        console.warn("addDefectsToSummary: Tidak ada pasangan defect/posisi untuk dicatat.");
-        return;
-    }
 
-    currentInspectionPairs.forEach(pair => {
-        const { type, position } = pair;
-
-        if (!defectCounts[type]) {
-            defectCounts[type] = { "LEFT": {}, "PAIRS": {}, "RIGHT": {} };
-        }
-        if (!defectCounts[type][position]) {
-            defectCounts[type][position] = {};
-        }
-        if (!defectCounts[type][position][finalGrade]) {
-            defectCounts[type][position][finalGrade] = 0;
-        }
-
-        defectCounts[type][position][finalGrade]++;
+function syncDefectButtonActiveStates() {
+    if (!defectButtons) return;
+    defectButtons.forEach(button => {
+        const defectType = button.dataset.defect || button.textContent.trim();
+        const hasDefect = defectCounts[defectType] && 
+                          defectCounts[defectType]['PAIRS'] && 
+                          defectCounts[defectType]['PAIRS']['defect'] > 0;
+        button.classList.toggle('active', hasDefect);
     });
-
-    console.log("defectCounts diupdate:", JSON.stringify(defectCounts));
-    saveToLocalStorage();
 }
 
-// ===========================================
-// 9. Menampilkan Summary Defect
-// ===========================================
+window.__updateDefectCount = function(defectType, position, grade, newValue) {
+    const val = parseInt(newValue, 10);
+    if (isNaN(val) || val < 1) {
+        defectCounts[defectType][position][grade] = 1;
+    } else {
+        defectCounts[defectType][position][grade] = val;
+    }
+    saveToLocalStorage();
+    updateTotalQtyInspect();
+};
+
+window.__removeDefect = function(defectType, position, grade) {
+    if (defectCounts[defectType] && defectCounts[defectType][position]) {
+        delete defectCounts[defectType][position][grade];
+        if (Object.keys(defectCounts[defectType][position]).length === 0) {
+            delete defectCounts[defectType][position];
+        }
+        if (Object.keys(defectCounts[defectType]).length === 0) {
+            delete defectCounts[defectType];
+        }
+    }
+    saveToLocalStorage();
+    updateTotalQtyInspect();
+    updateDefectSummaryDisplay();
+};
+
 function updateDefectSummaryDisplay() {
     if (!summaryContainer) return;
 
@@ -543,11 +543,22 @@ function updateDefectSummaryDisplay() {
                     if (defectCounts[defectType][position][displayGrade] && defectCounts[defectType][position][displayGrade] > 0) {
                         const count = defectCounts[defectType][position][displayGrade];
                         const item = document.createElement('div');
-                        item.className = 'summary-item';
+                        item.className = 'summary-item flex items-center justify-between p-3 border-b border-slate-100 gap-2';
                         item.innerHTML = `
-                            <div class="defect-col">${defectType}</div>
-                            <div class="position-col">${position}</div>
-                            <div class="level-col"><span class="count">${count}</span></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-semibold text-slate-800 truncate">${defectType}</p>
+                                <p class="text-[10px] text-slate-400 font-medium">${position}</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" min="1" 
+                                    class="w-16 px-1.5 py-1 text-xs text-center border border-slate-300 rounded font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" 
+                                    value="${count}" 
+                                    onchange="window.__updateDefectCount('${defectType}', '${position}', '${displayGrade}', this.value)">
+                                <button onclick="window.__removeDefect('${defectType}', '${position}', '${displayGrade}')" 
+                                    class="p-1 text-slate-400 hover:text-red-500 rounded transition-colors flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                            </div>
                         `;
                         summaryItems.push({
                             defectType,
@@ -570,45 +581,36 @@ function updateDefectSummaryDisplay() {
     summaryItems.forEach(itemData => {
         summaryContainer.appendChild(itemData.element);
     });
+
+    syncDefectButtonActiveStates();
 }
 
-// ===========================================
-// 10. Event Handlers untuk Tombol (LOGIKA INTI BARU)
-// ===========================================
-
-// --- FUNGSI PEMBANTU UNTUK MENGONTROL QTY SECTION ---
-// Grade buttons (except A) are enabled when defects are selected
-function updateQtySectionState() {
-    // Enable Defect button only when defects are selected
-    const enable = selectedDefects.length > 0;
-    gradeInputButtons.forEach(btn => {
-        if (!btn.classList.contains('pass')) {
-            btn.disabled = !enable;
-            btn.classList.toggle('inactive', !enable);
-        }
-    });
-}
-
-// Handler untuk klik tombol Defect Menu Item
 function handleDefectClick(button) {
-    const defectName = button.dataset.defect || button.textContent.trim();
-    const index = selectedDefects.indexOf(defectName);
+    const defectType = button.dataset.defect || button.textContent.trim();
+    const position = 'PAIRS';
+    const grade = 'defect';
 
-    if (index > -1) {
-        selectedDefects.splice(index, 1);
-        button.classList.remove('active');
+    if (!defectCounts[defectType]) {
+        defectCounts[defectType] = { "LEFT": {}, "PAIRS": {}, "RIGHT": {} };
+    }
+    
+    if (defectCounts[defectType][position] && defectCounts[defectType][position][grade]) {
+        delete defectCounts[defectType][position][grade];
+        if (Object.keys(defectCounts[defectType][position]).length === 0) {
+            delete defectCounts[defectType][position];
+        }
+        if (Object.keys(defectCounts[defectType]).length === 0) {
+            delete defectCounts[defectType];
+        }
     } else {
-        selectedDefects.push(defectName);
-        button.classList.add('active');
+        defectCounts[defectType][position][grade] = 1;
     }
 
-    // Grade buttons (except A) become available once defects are selected
-    updateQtySectionState();
-    updateAGradeButtonState();
     saveToLocalStorage();
+    updateTotalQtyInspect();
+    updateDefectSummaryDisplay();
 }
 
-// Handler untuk klik tombol Qty Section (Pass / Defect)
 function handleGradeClick(button) {
     const gradeCategory = Array.from(button.classList).find(cls => cls === 'pass' || cls === 'defect');
     if (!gradeCategory) return;
@@ -1113,6 +1115,16 @@ async function initApp() {
 
     if (modelNameInput) {
         modelNameInput.addEventListener('input', saveToLocalStorage);
+    }
+
+    const passInput = document.getElementById('pass-counter');
+    if (passInput) {
+        passInput.addEventListener('input', () => {
+            let val = parseInt(passInput.value, 10);
+            if (isNaN(val) || val < 0) val = 0;
+            qtyInspectOutputs['pass'] = val;
+            updateTotalQtyInspect();
+        });
     }
     
     if (styleNumberInput) {

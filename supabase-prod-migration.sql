@@ -47,6 +47,21 @@ CREATE POLICY "admin_write_app_users"  ON public.app_users
   USING     ((auth.jwt()->'user_metadata'->>'role') = 'admin')
   WITH CHECK ((auth.jwt()->'user_metadata'->>'role') = 'admin');
 
+-- ─── STEP 4: Perbaikan Unique Constraint untuk Components ───
+-- Mengubah unique constraint komponen dari global (hanya nama) menjadi composite (nama, vendor_id).
+
+-- 1. Tambahkan kolom vendor_id jika belum ada
+ALTER TABLE public.components
+  ADD COLUMN IF NOT EXISTS vendor_id BIGINT REFERENCES public.vendors(id) ON DELETE SET NULL;
+
+-- 2. Hapus unique constraint lama pada kolom name
+ALTER TABLE public.components DROP CONSTRAINT IF EXISTS components_name_key;
+
+-- 3. Tambahkan composite unique constraint pada (name, vendor_id) dengan NULLS NOT DISTINCT
+ALTER TABLE public.components 
+  ADD CONSTRAINT components_name_vendor_id_key UNIQUE NULLS NOT DISTINCT (name, vendor_id);
+
+
 -- ─── VERIFIKASI (jalankan terpisah, hanya untuk cek) ─────────
 -- SELECT schemaname, tablename, policyname, roles, cmd
 -- FROM pg_policies
