@@ -451,12 +451,9 @@ function getProcessedReworkCounts() {
 // ===========================================
 // 7. Update Total Qty Inspect (termasuk FTT dan Redo Rate)
 // ===========================================
-function updateTotalQtyInspect() {
+function updateTotalQtyInspect(isManualPassChange = false) {
     const passInput = document.getElementById('pass-counter');
-    if (passInput) {
-        qtyInspectOutputs['pass'] = parseInt(passInput.value, 10) || 0;
-    }
-
+    
     let defectSum = 0;
     for (const defectType in defectCounts) {
         for (const position in defectCounts[defectType]) {
@@ -466,6 +463,16 @@ function updateTotalQtyInspect() {
         }
     }
     qtyInspectOutputs['defect'] = defectSum;
+
+    if (passInput) {
+        if (isManualPassChange) {
+            qtyInspectOutputs['pass'] = parseInt(passInput.value, 10) || 0;
+        } else {
+            const calculatedPass = currentInspectionLimit > 0 ? Math.max(0, currentInspectionLimit - defectSum) : 0;
+            qtyInspectOutputs['pass'] = calculatedPass;
+            passInput.value = calculatedPass;
+        }
+    }
 
     const defectDisplay = document.getElementById('defect-counter');
     if (defectDisplay) {
@@ -1123,10 +1130,7 @@ async function initApp() {
     const passInput = document.getElementById('pass-counter');
     if (passInput) {
         passInput.addEventListener('input', () => {
-            let val = parseInt(passInput.value, 10);
-            if (isNaN(val) || val < 0) val = 0;
-            qtyInspectOutputs['pass'] = val;
-            updateTotalQtyInspect();
+            updateTotalQtyInspect(true);
         });
     }
     
@@ -1190,8 +1194,8 @@ async function initApp() {
                 return;
             }
             
-            if (newQty < totalInspected) {
-                showAlert(`Qty Sample Set tidak bisa lebih rendah dari Qty Inspect saat ini (${totalInspected}).`, 'warning', 'Input Tidak Valid');
+            if (newQty < qtyInspectOutputs['defect']) {
+                showAlert(`Qty Sample Set tidak bisa lebih rendah dari jumlah defect saat ini (${qtyInspectOutputs['defect']}).`, 'warning', 'Input Tidak Valid');
                 qtySampleSetInput.value = currentInspectionLimit;
                 return;
             }
@@ -1199,10 +1203,8 @@ async function initApp() {
             currentInspectionLimit = newQty;
             localStorage.setItem('qtySampleSet', newQty);
             
-            updateButtonStatesBasedOnLimit();
+            updateTotalQtyInspect();
             checkInfoCompleteAndLockButtons();
-            updateSaveButtonState();
-            saveToLocalStorage();
             
             console.log(`Qty Sample Set diubah menjadi: ${currentInspectionLimit}`);
         });
