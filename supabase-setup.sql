@@ -85,15 +85,17 @@ ON CONFLICT (name) DO NOTHING;
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.components (
   id         BIGSERIAL    PRIMARY KEY,
-  name       TEXT         NOT NULL UNIQUE,
-  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  name       TEXT         NOT NULL,
+  vendor_id  BIGINT       REFERENCES public.vendors(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  CONSTRAINT components_name_vendor_id_key UNIQUE NULLS NOT DISTINCT (name, vendor_id)
 );
 
 -- Seed data component default
 INSERT INTO public.components (name) VALUES
   ('Upper'), ('Outsole'), ('Midsole'), ('Insole'), ('Lining'),
   ('Heel Counter'), ('Box Toe'), ('Sockliner'), ('Laces'), ('Hardware')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (name, vendor_id) DO NOTHING;
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
@@ -167,9 +169,15 @@ CREATE POLICY "admin_write_app_users"  ON public.app_users
 -- Jalankan query ini di Supabase Dashboard → SQL Editor
 -- ============================================================
 
--- 1. Tambahkan kolom vendor_id ke tabel components
+-- 1. Tambahkan kolom vendor_id ke tabel components dan atur unique constraint
 ALTER TABLE public.components
   ADD COLUMN IF NOT EXISTS vendor_id BIGINT REFERENCES public.vendors(id) ON DELETE SET NULL;
+
+ALTER TABLE public.components
+  DROP CONSTRAINT IF EXISTS components_name_key;
+
+ALTER TABLE public.components
+  ADD CONSTRAINT components_name_vendor_id_key UNIQUE NULLS NOT DISTINCT (name, vendor_id);
 
 -- 2. Tambahkan kolom material_type ke tabel vendors
 ALTER TABLE public.vendors
