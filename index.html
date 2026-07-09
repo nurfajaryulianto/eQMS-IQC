@@ -1676,46 +1676,47 @@
                                 </form>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- SPREADSHEET PANEL -->
-                        <div id="admin-panel-spreadsheet" class="hidden">
-                            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-6 max-w-2xl">
-                                <h3 class="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-emerald-600">grid_on</span>
-                                    Google Spreadsheet Integration
-                                </h3>
-                                <p class="text-sm text-slate-500 mb-6 font-normal">
-                                    eQMS uses Google Spreadsheet as a backend transaction database. Here, you can
-                                    directly create and initialize a new spreadsheet to store your data (which sets up
-                                    Sessions, DefectDetails, and PivotReady sheets with proper headers).
-                                </p>
+                    <!-- SPREADSHEET PANEL -->
+                    <div id="admin-panel-spreadsheet" class="hidden">
+                        <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-6 max-w-2xl">
+                            <h3 class="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-emerald-600">grid_on</span>
+                                Google Spreadsheet Integration
+                            </h3>
+                            <p class="text-sm text-slate-500 mb-6 font-normal">
+                                eQMS uses Google Spreadsheet as a backend transaction database. Here, you can
+                                directly create and initialize a new spreadsheet to store your data (which sets up
+                                Sessions, DefectDetails, and PivotReady sheets with proper headers).
+                            </p>
 
-                                <div class="space-y-4">
-                                    <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                                        <span
-                                            class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Active
-                                            Spreadsheet Status</span>
-                                        <div id="admin-spreadsheet-info" class="text-sm font-medium text-slate-700">
-                                            Connecting to Google Apps Script...
-                                        </div>
+                            <div class="space-y-4">
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                    <span
+                                        class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Active
+                                        Spreadsheet Status</span>
+                                    <div id="admin-spreadsheet-info" class="text-sm font-medium text-slate-700">
+                                        Connecting to Google Apps Script...
                                     </div>
+                                </div>
 
-                                    <div class="flex flex-wrap gap-3">
-                                        <button id="admin-create-spreadsheet-btn"
-                                            class="flex items-center gap-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                            <span class="material-symbols-outlined text-[18px]">add_circle</span>
-                                            <span>Create New Spreadsheet</span>
-                                        </button>
+                                <div class="flex flex-wrap gap-3">
+                                    <button id="admin-create-spreadsheet-btn"
+                                        class="flex items-center gap-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                                        <span>Create New Spreadsheet</span>
+                                    </button>
 
-                                        <a id="admin-open-spreadsheet-btn" target="_blank" href="#"
-                                            class="hidden flex items-center gap-2 py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg shadow-sm border border-slate-200 transition-colors cursor-pointer">
-                                            <span class="material-symbols-outlined text-[18px]">open_in_new</span>
-                                            <span>Open Active Spreadsheet</span>
-                                        </a>
-                                    </div>
+                                    <a id="admin-open-spreadsheet-btn" target="_blank" href="#"
+                                        class="hidden flex items-center gap-2 py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg shadow-sm border border-slate-200 transition-colors cursor-pointer">
+                                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                                        <span>Open Active Spreadsheet</span>
+                                    </a>
                                 </div>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
 

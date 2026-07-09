@@ -51,6 +51,18 @@ export async function initDashboard() {
         });
     }
 
+    // Set default date filters to today in local time
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    const startDateEl = document.getElementById('startDate');
+    const endDateEl = document.getElementById('endDate');
+    if (startDateEl) startDateEl.value = todayStr;
+    if (endDateEl) endDateEl.value = todayStr;
+
     fetchData();
     document.getElementById('applyFilter').addEventListener('click', updateDashboard);
     document.getElementById('resetFilter').addEventListener('click', resetFilters);
@@ -247,8 +259,17 @@ function populateFilters(filters) {
 }
 
 function resetFilters() {
-    document.getElementById('startDate').value = '';
-    document.getElementById('endDate').value = '';
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    const startDateEl = document.getElementById('startDate');
+    const endDateEl = document.getElementById('endDate');
+    if (startDateEl) startDateEl.value = todayStr;
+    if (endDateEl) endDateEl.value = todayStr;
+
     document.getElementById('auditorFilter').value = '';
     const vf = document.getElementById('vendorFilter');       if (vf) vf.value = '';
     const mf = document.getElementById('materialTypeFilter'); if (mf) mf.value = '';
@@ -257,9 +278,15 @@ function resetFilters() {
 }
 
 function updateDashboard() {
+    const parseLocalDate = (dateStr) => {
+        if (!dateStr) return null;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    };
+
     const filters = {
-        startDate:    document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null,
-        endDate:      document.getElementById('endDate').value   ? new Date(document.getElementById('endDate').value)   : null,
+        startDate:    parseLocalDate(document.getElementById('startDate').value),
+        endDate:      parseLocalDate(document.getElementById('endDate').value),
         auditor:      document.getElementById('auditorFilter').value,
         vendor:       document.getElementById('vendorFilter')?.value       || '',
         materialType: document.getElementById('materialTypeFilter')?.value || '',
