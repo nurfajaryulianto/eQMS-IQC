@@ -499,14 +499,13 @@ function updateNcvsFttChart(data, sortOrder) {
             borderRadius: 4,
         }]
     }, {
-        indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toFixed(2)}%` } }
+            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)}%` } }
         },
         scales: {
-            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }

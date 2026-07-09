@@ -19,6 +19,42 @@
 const SPREADSHEET_ID = '1KLVddUlNGySE149gH9UD33DOjJMMCzcKHkvB0gZnqIc';
 // ──────────────────────────────────────────────────────────────
 
+// ── AMBIL ID SPREADSHEET DARI PROPERTIES SERVICE ATAU FALLBACK ─
+function getActiveSpreadsheetId() {
+  const propertyId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (propertyId) {
+    return propertyId;
+  }
+  return SPREADSHEET_ID;
+}
+
+// ── BUAT SPREADSHEET BARU DAN INISIALISASI STRUKTURNYA ────────
+function createAndInitializeSpreadsheet() {
+  try {
+    const newSs = SpreadsheetApp.create('eQMS-IQC-Database');
+    const newId = newSs.getId();
+    
+    PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', newId);
+    
+    getOrCreateSheet(newSs, 'Sessions',      SESSIONS_HEADERS);
+    getOrCreateSheet(newSs, 'DefectDetails', DEFECT_HEADERS);
+    getOrCreateSheet(newSs, 'PivotReady',     PIVOT_HEADERS);
+    
+    return {
+      status: 'ok',
+      message: 'Spreadsheet baru berhasil dibuat dan diatur sebagai database aktif!',
+      spreadsheetId: newId,
+      spreadsheetUrl: newSs.getUrl(),
+      spreadsheetName: newSs.getName()
+    };
+  } catch (err) {
+    return {
+      status: 'error',
+      message: 'Gagal membuat spreadsheet: ' + err.message
+    };
+  }
+}
+
 // ── Header definisi — urutan ini menentukan kolom di sheet ────
 const SESSIONS_HEADERS = [
   'SessionId',
@@ -65,7 +101,14 @@ const PIVOT_HEADERS = [
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
-    const ss   = SpreadsheetApp.openById(SPREADSHEET_ID);
+    
+    // Cek jika ada action createSpreadsheet dari POST
+    if (data && data.action === 'createSpreadsheet') {
+      const result = createAndInitializeSpreadsheet();
+      return jsonResponse(result);
+    }
+
+    const ss   = SpreadsheetApp.openById(getActiveSpreadsheetId());
 
     const sessionSheet = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
@@ -132,7 +175,30 @@ function doPost(e) {
 // ─────────────────────────────────────────────────────────────
 function doGet(e) {
   try {
-    const ss             = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const activeId = getActiveSpreadsheetId();
+    
+    // Jika ada request status spreadsheet saja
+    if (e && e.parameter && e.parameter.action === 'getStatus') {
+      let name = 'eQMS IQC Database';
+      let url = '';
+      let isAvailable = true;
+      try {
+        const ss = SpreadsheetApp.openById(activeId);
+        name = ss.getName();
+        url = ss.getUrl();
+      } catch (err) {
+        isAvailable = false;
+      }
+      return jsonResponse({
+        status: 'ok',
+        isAvailable: isAvailable,
+        spreadsheetId: activeId,
+        spreadsheetName: name,
+        spreadsheetUrl: url
+      });
+    }
+
+    const ss             = SpreadsheetApp.openById(activeId);
     const sessionSheet   = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet    = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
 
@@ -146,7 +212,14 @@ function doGet(e) {
       DefectRate: s.QtyInspect > 0 ? s.Defect / s.QtyInspect : 0,
     }));
 
-    return jsonResponse({ status: 'ok', sessions: sessionsWithFtt, defects });
+    return jsonResponse({
+      status: 'ok',
+      sessions: sessionsWithFtt,
+      defects,
+      spreadsheetId: activeId,
+      spreadsheetUrl: ss.getUrl(),
+      spreadsheetName: ss.getName()
+    });
 
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.message });

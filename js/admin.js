@@ -18,6 +18,7 @@ export const USERS_KEY      = 'eqms_users_v1';
 export const VENDORS_KEY    = 'eqms_vendors_v1';
 export const COMPONENTS_KEY = 'eqms_components_v1';
 export const PROCESSES_KEY  = 'eqms_processes_v1';
+const SCRIPT_URL            = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 
 // ─── localStorage CACHE (dibaca oleh script.js secara sinkron) ───────────────
 // Supabase adalah sumber data utama.
@@ -260,6 +261,12 @@ export async function initAdminPanel() {
     document.getElementById('admin-tab-vendors').addEventListener('click',    () => switchAdminTab('vendors'));
     document.getElementById('admin-tab-components').addEventListener('click', () => switchAdminTab('components'));
     document.getElementById('admin-tab-processes').addEventListener('click',  () => switchAdminTab('processes'));
+    document.getElementById('admin-tab-spreadsheet').addEventListener('click',() => switchAdminTab('spreadsheet'));
+
+    const createSpreadsheetBtn = document.getElementById('admin-create-spreadsheet-btn');
+    if (createSpreadsheetBtn) {
+        createSpreadsheetBtn.addEventListener('click', handleCreateSpreadsheet);
+    }
 
     document.getElementById('admin-defect-form').addEventListener('submit', handleDefectSubmit);
     document.getElementById('admin-defect-cancel').addEventListener('click', cancelDefectEdit);
@@ -287,7 +294,7 @@ export async function initAdminPanel() {
 }
 
 function switchAdminTab(tab) {
-    ['defects', 'users', 'vendors', 'components', 'processes'].forEach(t => {
+    ['defects', 'users', 'vendors', 'components', 'processes', 'spreadsheet'].forEach(t => {
         const isActive = t === tab;
         const btn   = document.getElementById(`admin-tab-${t}`);
         const panel = document.getElementById(`admin-panel-${t}`);
@@ -299,6 +306,10 @@ function switchAdminTab(tab) {
         btn.classList.toggle('text-slate-500',  !isActive);
         panel.classList.toggle('hidden', !isActive);
     });
+
+    if (tab === 'spreadsheet') {
+        loadSpreadsheetStatus();
+    }
 }
 
 // ─── DEFECTS TAB ─────────────────────────────────────────────
@@ -906,5 +917,87 @@ function cancelProcessEdit() {
     _populateProcessFormComponent('');
     document.getElementById('admin-process-form-title').textContent = 'Add Process';
     document.getElementById('admin-process-cancel').classList.add('hidden');
+}
+
+// ─── SPREADSHEET INTEGRATION ──────────────────────────────────
+
+async function loadSpreadsheetStatus() {
+    const infoContainer = document.getElementById('admin-spreadsheet-info');
+    const openBtn = document.getElementById('admin-open-spreadsheet-btn');
+    if (!infoContainer) return;
+
+    infoContainer.innerHTML = '<div class="flex items-center gap-2 text-slate-500"><span class="animate-spin text-sm">⏳</span><span>Loading spreadsheet status...</span></div>';
+    if (openBtn) openBtn.classList.add('hidden');
+
+    try {
+        const res = await fetch(`${SCRIPT_URL}?action=getStatus`);
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        const data = await res.json();
+        
+        if (data.status === 'ok') {
+            infoContainer.innerHTML = `
+                <div class="flex flex-col gap-1">
+                    <span class="text-slate-800 font-semibold">${data.spreadsheetName || 'eQMS IQC Database'}</span>
+                    <span class="text-xs text-slate-500 break-all font-mono">ID: ${data.spreadsheetId}</span>
+                </div>
+            `;
+            if (openBtn && data.spreadsheetUrl) {
+                openBtn.href = data.spreadsheetUrl;
+                openBtn.classList.remove('hidden');
+            }
+        } else {
+            throw new Error(data.message || 'Failed to load spreadsheet status');
+        }
+    } catch (err) {
+        console.error(err);
+        infoContainer.innerHTML = `<span class="text-red-500 font-medium text-xs">Failed to load status: ${err.message}. Make sure Google Apps Script Web App is deployed.</span>`;
+    }
+}
+
+async function handleCreateSpreadsheet() {
+    const confirmed = await showConfirm(
+        'Are you sure you want to create a new Google Spreadsheet as the eQMS database?\n\nA new spreadsheet will be created in the Google account that deployed the Web App, and all new transactions will be saved there.',
+        'Create Spreadsheet'
+    );
+    if (!confirmed) return;
+
+    const infoContainer = document.getElementById('admin-spreadsheet-info');
+    const createBtn = document.getElementById('admin-create-spreadsheet-btn');
+    const openBtn = document.getElementById('admin-open-spreadsheet-btn');
+    
+    if (createBtn) createBtn.disabled = true;
+    infoContainer.innerHTML = '<div class="flex items-center gap-2 text-slate-600"><span class="animate-spin text-lg">⏳</span><span>Creating and initializing new spreadsheet...</span></div>';
+    
+    try {
+        const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'createSpreadsheet' })
+        });
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        const data = await res.json();
+        
+        if (data.status === 'ok') {
+            await showAlert(`New Spreadsheet successfully created!\n\nName: ${data.spreadsheetName || 'eQMS-IQC-Database'}\n\nAll subsequent new entries will be saved directly to this spreadsheet.`, 'success', 'Success');
+            
+            infoContainer.innerHTML = `
+                <div class="flex flex-col gap-1 text-emerald-800">
+                    <span class="font-semibold">Active: ${data.spreadsheetName || 'eQMS-IQC-Database'}</span>
+                    <span class="text-xs break-all text-slate-500 font-mono">ID: ${data.spreadsheetId}</span>
+                </div>
+            `;
+            if (openBtn && data.spreadsheetUrl) {
+                openBtn.href = data.spreadsheetUrl;
+                openBtn.classList.remove('hidden');
+            }
+        } else {
+            throw new Error(data.message || 'Failed to create spreadsheet');
+        }
+    } catch (err) {
+        console.error(err);
+        await showAlert(`Failed to create spreadsheet: ${err.message}`, 'error', 'Error');
+        await loadSpreadsheetStatus(); // Restore original status
+    } finally {
+        if (createBtn) createBtn.disabled = false;
+    }
 }
 
