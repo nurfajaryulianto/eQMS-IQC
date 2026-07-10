@@ -960,6 +960,8 @@ function renderInspectedItems() {
 }
 
 // Modal Form State Variables
+let modalComponent = '';
+let modalProcess = '';
 let modalSelectedComponent = '';
 let modalSelectedProcess = '';
 let modalItemDefects = {}; 
