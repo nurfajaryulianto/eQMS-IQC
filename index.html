@@ -691,15 +691,49 @@
                                         <label for="qty-sample-set"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty
                                             Incoming</label>
-                                        <input type="number" id="qty-sample-set" value="0"
-                                            placeholder="Masukkan jumlah sampel"
+                                        <input type="number" id="qty-sample-set" value="0" min="0"
+                                            placeholder="Masukkan jumlah incoming"
                                             class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label for="qty-inspect-mode"
+                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Inspect Mode</label>
+                                            <select id="qty-inspect-mode"
+                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-1.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                                <option value="manual">Manual</option>
+                                                <option value="percentage">10%</option>
+                                                <option value="percent_1">1%</option>
+                                                <option value="percent_5">5%</option>
+                                                <option value="percent_20">20%</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="qty-inspect-input"
+                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect</label>
+                                            <input type="number" id="qty-inspect-input" value="0" min="0"
+                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-1.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                        </div>
                                     </div>
                                     <div>
                                         <label for="tanggal-incoming"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal
                                             Incoming</label>
                                         <input type="date" id="tanggal-incoming"
+                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label for="tanggal-inspection"
+                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal
+                                            Inspection</label>
+                                        <input type="date" id="tanggal-inspection"
+                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label for="tanggal-bucket"
+                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Bucket
+                                            Date</label>
+                                        <input type="date" id="tanggal-bucket"
                                             class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                     </div>
                                     <div>
@@ -746,9 +780,9 @@
                             <!-- Context Selection card -->
                             <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
                                 <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                                    <h3 class="text-base font-semibold text-slate-900">Context Selection</h3>
+                                    <h3 class="text-base font-semibold text-slate-900">Context Selection & Items</h3>
                                     <button id="reset-selection-btn"
-                                        class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors">Reset</button>
+                                        class="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors">Reset All</button>
                                 </div>
                                 <div class="p-4 space-y-4">
 
@@ -762,25 +796,36 @@
                                         </div>
                                     </div>
 
-                                    <!-- Component -->
-                                    <div>
-                                        <p
-                                            class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-                                            Component</p>
-                                        <div id="component-btn-container" class="flex flex-wrap gap-2">
-                                            <span class="text-xs text-slate-400 italic">— Pilih vendor terlebih dahulu
-                                                —</span>
+                                    <!-- Inspected Items List -->
+                                    <div class="border-t border-slate-100 pt-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">
+                                                Inspected Components & Processes</p>
+                                            <button type="button" id="add-item-btn" disabled
+                                                class="flex items-center gap-1 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed text-blue-600 text-xs font-bold rounded-lg border border-blue-200 shadow-xs transition-all cursor-pointer">
+                                                <span class="material-symbols-outlined text-[14px]">add</span>
+                                                <span>Tambah Item</span>
+                                            </button>
                                         </div>
-                                    </div>
-
-                                    <!-- Process -->
-                                    <div>
-                                        <p
-                                            class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
-                                            Process</p>
-                                        <div id="process-btn-container" class="flex flex-wrap gap-2">
-                                            <span class="text-xs text-slate-400 italic">— Pilih component terlebih
-                                                dahulu —</span>
+                                        
+                                        <!-- Table of added items -->
+                                        <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-xs">
+                                            <table class="w-full text-left text-xs">
+                                                <thead>
+                                                    <tr class="bg-slate-100 border-b border-slate-200 text-slate-600">
+                                                        <th class="px-3 py-2 font-semibold">Component</th>
+                                                        <th class="px-3 py-2 font-semibold">Process</th>
+                                                        <th class="px-3 py-2 font-semibold text-right">Inspect</th>
+                                                        <th class="px-3 py-2 font-semibold text-right">Defect</th>
+                                                        <th class="px-3 py-2 font-semibold text-center">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="inspected-items-tbody">
+                                                    <tr>
+                                                        <td colspan="5" class="px-3 py-4 text-center text-slate-400 italic">Belum ada item inspeksi. Silakan pilih Vendor lalu klik "Tambah Item".</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
 
@@ -791,29 +836,19 @@
                             <div id="inspection-info-hint"
                                 class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-700 font-medium flex items-center gap-2">
                                 <span class="material-symbols-outlined text-[16px]">info</span>
-                                Lengkapi Vendor, Component, Process, Qty Incoming, dan Tanggal untuk mulai inspeksi.
-                            </div>
-
-                            <!-- Defect Input -->
-                            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
-                                <h3 class="text-base font-semibold text-slate-900 mb-3">Defect Input</h3>
-                                <div id="defect-buttons-container" class="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                    <!-- Populated dynamically by admin.js -->
-                                </div>
+                                Lengkapi Vendor, Tambahkan minimal 1 Item Inspeksi, dan isi Qty Incoming & Tanggal untuk menyimpan.
                             </div>
 
                             <!-- Grade Summary -->
                             <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
-                                <h3 class="text-base font-semibold text-slate-900 mb-3">Grade Summary</h3>
+                                <h3 class="text-base font-semibold text-slate-900 mb-3">Grade Summary (Total)</h3>
                                 <div class="grid grid-cols-2 gap-3">
-                                    <div class="flex flex-col items-center gap-1">
-                                        <button
-                                            class="input-button pass w-full bg-green-100 hover:bg-green-200 border border-green-300 text-green-800 text-xs font-semibold rounded-lg py-2 transition-colors">Pass</button>
+                                    <div class="flex flex-col items-center gap-1 p-2 bg-green-50/50 border border-green-100 rounded-lg">
+                                        <span class="text-xs font-semibold text-green-700">Pass</span>
                                         <div id="pass-counter" class="text-2xl font-bold text-green-700">0</div>
                                     </div>
-                                    <div class="flex flex-col items-center gap-1">
-                                        <button
-                                            class="input-button defect w-full bg-red-100 hover:bg-red-200 border border-red-300 text-red-800 text-xs font-semibold rounded-lg py-2 transition-colors">Defect</button>
+                                    <div class="flex flex-col items-center gap-1 p-2 bg-red-50/50 border border-red-100 rounded-lg">
+                                        <span class="text-xs font-semibold text-red-700">Defect</span>
                                         <div id="defect-counter" class="text-2xl font-bold text-red-600">0</div>
                                     </div>
                                 </div>
@@ -1102,6 +1137,12 @@
                                         <th
                                             class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                                             Tgl Incoming</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                                            Tgl Inspect</th>
+                                        <th
+                                            class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                                            Bucket</th>
                                         <th
                                             class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                                             Auditor</th>
@@ -1815,6 +1856,105 @@
         }
         window.showView = showView;
     </script>
+    <!-- ====== MODAL: ADD/EDIT INSPECTION ITEM ====== -->
+    <div id="inspection-item-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h3 id="modal-item-title" class="text-base font-bold text-slate-900">Tambah Item Inspeksi</h3>
+                <button type="button" id="modal-close-btn" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            
+            <!-- Body -->
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <!-- Component Selection -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Component</label>
+                    <div id="modal-component-container" class="flex flex-wrap gap-1.5">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Process Selection -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Process</label>
+                    <div id="modal-process-container" class="flex flex-wrap gap-1.5">
+                        <span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>
+                    </div>
+                </div>
+
+                <!-- Quantities for this specific item -->
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <div>
+                        <label for="modal-qty-incoming" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Incoming</label>
+                        <input type="number" id="modal-qty-incoming" min="0" value="0"
+                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                    </div>
+                    <div>
+                        <label for="modal-qty-inspect-mode" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect Mode</label>
+                        <select id="modal-qty-inspect-mode"
+                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            <option value="manual">Manual</option>
+                            <option value="percentage">Percentage (10%)</option>
+                            <option value="percent_1">Percentage (1%)</option>
+                            <option value="percent_5">Percentage (5%)</option>
+                            <option value="percent_20">Percentage (20%)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="modal-qty-inspect" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect</label>
+                        <input type="number" id="modal-qty-inspect" min="0" value="0"
+                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none font-medium text-slate-900">
+                    </div>
+                </div>
+
+                <!-- Pass/Defect Grade Summary for this item -->
+                <div class="pt-2">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Grade Summary</label>
+                    <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="flex flex-col items-center gap-1">
+                            <button type="button" id="modal-pass-inc-btn"
+                                class="w-full bg-green-100 hover:bg-green-200 border border-green-300 text-green-800 text-xs font-semibold rounded-lg py-1.5 transition-colors cursor-pointer">Pass (+1)</button>
+                            <div id="modal-pass-counter" class="text-xl font-bold text-green-700">0</div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1">
+                            <button type="button" id="modal-defect-inc-btn"
+                                class="w-full bg-red-100 hover:bg-red-200 border border-red-300 text-red-800 text-xs font-semibold rounded-lg py-1.5 transition-colors cursor-pointer">Defect (+1)</button>
+                            <div id="modal-defect-counter" class="text-xl font-bold text-red-600">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Defect Logging for this item -->
+                <div class="pt-2">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Defect Catalog</label>
+                    <div id="modal-defect-buttons" class="grid grid-cols-3 gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Logged Defects List for this item -->
+                <div class="pt-2">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Logged Defects</label>
+                    <div id="modal-logged-defects" class="text-xs text-slate-500 border border-slate-100 rounded-lg p-2 bg-slate-50 min-h-[50px] divide-y divide-slate-200">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
+                <button type="button" id="modal-cancel-btn" class="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">Batal</button>
+                <button type="button" id="modal-save-item-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer">Simpan Item</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/script.js" type="module"></script>
 </body>
 

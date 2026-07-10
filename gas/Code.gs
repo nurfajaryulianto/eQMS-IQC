@@ -71,6 +71,8 @@ const SESSIONS_HEADERS = [
   'QtyInspect',
   'Pass',
   'Defect',
+  'TanggalInspection',
+  'Bucket',
 ];
 
 const DEFECT_HEADERS = [
@@ -115,55 +117,110 @@ function doPost(e) {
     const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',     PIVOT_HEADERS);
 
     // Buat sessionId unik: tanggal + random 4 karakter
-    const sessionId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
+    const baseSessionId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
       + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
 
-    // Tulis satu baris ke Sessions
-    const sessionRow = [
-      sessionId,
-      data.timestamp        || '',
-      data.tanggalIncoming  || '',
-      data.materialType     || '',
-      data.auditor          || '',
-      data.vendor           || '',
-      data.component        || '',
-      data.process          || '',
-      data.styleNumber      || '',
-      data.modelName        || '',
-      data.qtyIncoming      || 0,
-      data.qtyInspect       || 0,
-      data.pass             || 0,
-      data.defect           || 0,
-    ];
-    sessionSheet.appendRow(sessionRow);
-
-    // Tulis baris per defect ke DefectDetails (slim — 6 kolom)
-    if (Array.isArray(data.defects) && data.defects.length > 0) {
-      data.defects.forEach(d => {
-        defectSheet.appendRow([
+    if (Array.isArray(data.items) && data.items.length > 0) {
+      // Loop untuk setiap item inspeksi
+      data.items.forEach((item, index) => {
+        const sessionId = baseSessionId + '-' + (index + 1);
+        
+        const sessionRow = [
           sessionId,
-          data.tanggalIncoming || '',
-          data.vendor          || '',
-          data.component       || '',
-          d.type  || '',
-          d.count || 0,
-        ]);
+          data.timestamp            || '',
+          data.tanggalIncoming      || '',
+          data.materialType         || '',
+          data.auditor              || '',
+          data.vendor               || '',
+          item.component            || '',
+          item.process              || '',
+          data.styleNumber          || '',
+          data.modelName            || '',
+          item.qtyIncoming          || 0,
+          item.qtyInspect           || 0,
+          item.pass                 || 0,
+          item.defect               || 0,
+          data.tanggalInspection    || '',
+          data.tanggalBucket        || '',
+        ];
+        sessionSheet.appendRow(sessionRow);
 
-        // Tulis juga ke PivotReady — flat join lengkap untuk pivot table
-        pivotSheet.appendRow([
-          data.tanggalIncoming || '',
-          data.materialType    || '',
-          data.auditor         || '',
-          data.vendor          || '',
-          data.component       || '',
-          data.process         || '',
-          d.type  || '',
-          d.count || 0,
-        ]);
+        // Tulis baris per defect ke DefectDetails & PivotReady
+        if (Array.isArray(item.defects) && item.defects.length > 0) {
+          item.defects.forEach(d => {
+            defectSheet.appendRow([
+              sessionId,
+              data.tanggalIncoming || '',
+              data.vendor          || '',
+              item.component       || '',
+              d.type  || '',
+              d.count || 0,
+            ]);
+
+            pivotSheet.appendRow([
+              data.tanggalIncoming || '',
+              data.materialType    || '',
+              data.auditor         || '',
+              data.vendor          || '',
+              item.component       || '',
+              item.process         || '',
+              d.type  || '',
+              d.count || 0,
+            ]);
+          });
+        }
       });
-    }
 
-    return jsonResponse({ status: 'ok', message: 'Data berhasil disimpan!', sessionId });
+      return jsonResponse({ status: 'ok', message: 'Semua data item inspeksi berhasil disimpan!', sessionId: baseSessionId });
+    } else {
+      // Backward compatibility flow (single session)
+      const sessionId = baseSessionId;
+      const sessionRow = [
+        sessionId,
+        data.timestamp            || '',
+        data.tanggalIncoming      || '',
+        data.materialType         || '',
+        data.auditor              || '',
+        data.vendor               || '',
+        data.component            || '',
+        data.process              || '',
+        data.styleNumber          || '',
+        data.modelName            || '',
+        data.qtyIncoming          || 0,
+        data.qtyInspect           || 0,
+        data.pass                 || 0,
+        data.defect               || 0,
+        data.tanggalInspection    || '',
+        data.tanggalBucket        || '',
+      ];
+      sessionSheet.appendRow(sessionRow);
+
+      if (Array.isArray(data.defects) && data.defects.length > 0) {
+        data.defects.forEach(d => {
+          defectSheet.appendRow([
+            sessionId,
+            data.tanggalIncoming || '',
+            data.vendor          || '',
+            data.component       || '',
+            d.type  || '',
+            d.count || 0,
+          ]);
+
+          pivotSheet.appendRow([
+            data.tanggalIncoming || '',
+            data.materialType    || '',
+            data.auditor         || '',
+            data.vendor          || '',
+            data.component       || '',
+            data.process         || '',
+            d.type  || '',
+            d.count || 0,
+          ]);
+        });
+      }
+
+      return jsonResponse({ status: 'ok', message: 'Data berhasil disimpan!', sessionId });
+    }
 
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.message });

@@ -179,6 +179,8 @@ async function fetchData() {
             return {
                 Timestamp:       new Date(item.Timestamp || item.timeStamp),
                 TanggalIncoming: item.TanggalIncoming || item.Date        || '',
+                TanggalInspection: item.TanggalInspection || item['Tanggal Inspection'] || '',
+                Bucket:          item.Bucket          || '',
                 MaterialType:    item.MaterialType    || item['Material Type'] || '',
                 Auditor:         item.Auditor         || item['User Login'] || '',
                 Vendor:          item.Vendor          || '',
@@ -601,6 +603,8 @@ function updateInspectionTable(data) {
         row.innerHTML = `
             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${item.Timestamp.toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalIncoming || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalInspection || '—'}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.Bucket || '—'}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${item.Auditor}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">${item.Vendor || '—'}</td>
             <td class="px-4 py-3 whitespace-nowrap">${materialBadge}</td>

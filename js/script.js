@@ -21,6 +21,10 @@ let currentInspectionPairs = [];
 let reworkLog = [];
 // ---------------------------------------------
 
+// --- STATE UNTUK MULTI ITEM KOMPONEN & PROSES ---
+let inspectionItems = []; 
+let editingItemIndex = null; 
+
 const qtyInspectOutputs = {
     'pass': 0,
     'defect': 0
@@ -33,6 +37,12 @@ let qtyInspectOutput;
 let summaryContainer;
 let redoRateOutput;
 let qtySampleSetInput;
+let qtyInspectModeSelect;
+let qtyInspectInput;
+let tanggalInspectionInput;
+let tanggalBucketInput;
+let addItemBtn;
+let inspectedItemsTbody;
 let defectButtons;
 let gradeInputButtons;
 let auditorSelect;
@@ -53,11 +63,9 @@ const STORAGE_KEYS = {
     QTY_SAMPLE_SET: 'qtySampleSet'
 };
 
-// ─── Vendor / Component / Process Button-Selection ──────────────────────────
-// State: single selection for vendor, multi for component & process
+// ─── Vendor Button-Selection ──────────────────────────
+// State: single selection for vendor
 let selectedVendor    = '';
-let selectedComponents = [];  // array of names
-let selectedProcesses  = [];  // array of names
 let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 
 const VENDOR_BTN_CLS    = 'vendor-sel-btn';
@@ -88,11 +96,14 @@ function renderVendorButtons() {
         if (selectedVendor === v.name) applyVendorActive(btn);
         btn.addEventListener('click', () => {
             selectedVendor = (selectedVendor === v.name) ? '' : v.name;
-            selectedComponents = [];
-            selectedProcesses  = [];
+            if (addItemBtn) {
+                addItemBtn.disabled = !selectedVendor;
+            }
+            // Clear items when vendor changes
+            inspectionItems = [];
+            renderInspectedItems();
+            
             refreshVendorButtons();
-            renderComponentButtons(selectedVendor);
-            renderProcessButtons([]);
             checkInfoCompleteAndLockButtons();
             saveToLocalStorage();
         });
@@ -116,12 +127,14 @@ function applyVendorInactive(btn) {
         bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
 }
 
-function renderComponentButtons(vendorName) {
-    const container  = document.getElementById('component-btn-container');
+// ─── Modal Component / Process Selection ──────────────────────────
+
+function renderModalComponentButtons(vendorName) {
+    const container = document.getElementById('modal-component-container');
     if (!container) return;
     container.innerHTML = '';
     if (!vendorName) {
-        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih vendor terlebih dahulu —</span>';
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih vendor di halaman utama terlebih dahulu —</span>';
         return;
     }
     const components = getComponents();
@@ -137,96 +150,75 @@ function renderComponentButtons(vendorName) {
         btn.type = 'button';
         btn.textContent = c.name;
         btn.dataset.value = c.name;
-        btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-            bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
-        if (selectedComponents.includes(c.name)) applyComponentActive(btn);
+        btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+        
+        if (modalComponent === c.name) {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+        }
+        
         btn.addEventListener('click', () => {
-            const idx = selectedComponents.indexOf(c.name);
-            if (idx > -1) selectedComponents.splice(idx, 1);
-            else selectedComponents.push(c.name);
-            refreshComponentButtons();
-            rebuildProcessButtons();
-            checkInfoCompleteAndLockButtons();
-            saveToLocalStorage();
+            modalComponent = c.name;
+            modalProcess = ''; // Reset process selection
+            updateModalComponentButtonsActiveState();
+            renderModalProcessButtons(modalComponent);
         });
         container.appendChild(btn);
     });
 }
 
-function refreshComponentButtons() {
-    document.querySelectorAll(`.${COMPONENT_BTN_CLS}`).forEach(btn => {
-        if (selectedComponents.includes(btn.dataset.value)) applyComponentActive(btn);
-        else applyComponentInactive(btn);
+function updateModalComponentButtonsActiveState() {
+    document.querySelectorAll('.modal-comp-btn').forEach(btn => {
+        if (btn.dataset.value === modalComponent) {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+        } else {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+        }
     });
 }
 
-function applyComponentActive(btn) {
-    btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-        bg-blue-600 border-blue-600 text-white shadow-sm`;
-}
-function applyComponentInactive(btn) {
-    btn.className = `${COMPONENT_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-        bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
-}
-
-function rebuildProcessButtons() {
-    renderProcessButtons(selectedComponents);
-    // Remove any selected processes no longer in the new list
-    const processes  = getProcesses();
-    const components = getComponents();
-    const compIds    = components.filter(c => selectedComponents.includes(c.name)).map(c => c.id);
-    const available  = [...new Set(processes.filter(p => compIds.includes(p.component_id)).map(p => p.name))];
-    selectedProcesses = selectedProcesses.filter(p => available.includes(p));
-}
-
-function renderProcessButtons(componentNames) {
-    const processes  = getProcesses();
-    const components = getComponents();
-    const container  = document.getElementById('process-btn-container');
+function renderModalProcessButtons(componentName) {
+    const container = document.getElementById('modal-process-container');
     if (!container) return;
     container.innerHTML = '';
-    const compIds  = components.filter(c => componentNames.includes(c.name)).map(c => c.id);
-    const filtered = [...new Set(processes.filter(p => compIds.includes(p.component_id)).map(p => p.name))];
-    if (!filtered.length) {
-        container.innerHTML = componentNames.length
-            ? '<span class="text-xs text-slate-400 italic">— Tidak ada process —</span>'
-            : '<span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>';
+    if (!componentName) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>';
         return;
     }
-    filtered.forEach(name => {
+    const processes  = getProcesses();
+    const components = getComponents();
+    const comp       = components.find(c => c.name === componentName);
+    const filtered   = comp ? processes.filter(p => p.component_id === comp.id) : [];
+    if (!filtered.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada process untuk component ini —</span>';
+        return;
+    }
+    filtered.forEach(p => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = name;
-        btn.dataset.value = name;
-        btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-            bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
-        if (selectedProcesses.includes(name)) applyProcessActive(btn);
+        btn.textContent = p.name;
+        btn.dataset.value = p.name;
+        btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+        
+        if (modalProcess === p.name) {
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+        }
+        
         btn.addEventListener('click', () => {
-            const idx = selectedProcesses.indexOf(name);
-            if (idx > -1) selectedProcesses.splice(idx, 1);
-            else selectedProcesses.push(name);
-            refreshProcessButtons();
-            checkInfoCompleteAndLockButtons();
-            saveToLocalStorage();
+            modalProcess = p.name;
+            updateModalProcessButtonsActiveState();
         });
         container.appendChild(btn);
     });
 }
 
-function refreshProcessButtons() {
-    document.querySelectorAll(`.${PROCESS_BTN_CLS}`).forEach(btn => {
-        if (selectedProcesses.includes(btn.dataset.value)) applyProcessActive(btn);
-        else applyProcessInactive(btn);
+function updateModalProcessButtonsActiveState() {
+    document.querySelectorAll('.modal-proc-btn').forEach(btn => {
+        if (btn.dataset.value === modalProcess) {
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+        } else {
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+        }
     });
-}
-
-function applyProcessActive(btn) {
-    btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-        bg-blue-600 border-blue-600 text-white shadow-sm`;
-}
-function applyProcessInactive(btn) {
-    btn.className = `${PROCESS_BTN_CLS} px-4 py-2 rounded-full border font-body-md text-body-md text-sm transition-colors 
-        bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300`;
 }
 
 /**
@@ -236,12 +228,58 @@ function resetContextSelection() {
     selectedMaterialType = '';
     const mtSelectEl = document.getElementById('material-type');
     if (mtSelectEl) mtSelectEl.value = '';
-    selectedVendor    = '';
-    selectedComponents = [];
-    selectedProcesses  = [];
+    selectedVendor = '';
+    inspectionItems = [];
+    editingItemIndex = null;
     renderVendorButtons();
-    renderComponentButtons('');
-    renderProcessButtons([]);
+    renderInspectedItems();
+    if (addItemBtn) {
+        addItemBtn.disabled = true;
+    }
+    checkInfoCompleteAndLockButtons();
+    saveToLocalStorage();
+}
+
+function resetAllFields() {
+    const mtSelectEl = document.getElementById("material-type");
+    if (mtSelectEl) mtSelectEl.value = '';
+    selectedMaterialType = '';
+    selectedVendor = '';
+    inspectionItems = [];
+    editingItemIndex = null;
+    
+    // Reset datepickers
+    const today = new Date().toISOString().split('T')[0];
+    if (tanggalIncomingInput) tanggalIncomingInput.value = today;
+    if (tanggalInspectionInput) tanggalInspectionInput.value = today;
+    if (tanggalBucketInput) tanggalBucketInput.value = today;
+    
+    // Reset texts
+    if (styleNumberInput) styleNumberInput.value = '';
+    if (modelNameInput) modelNameInput.value = '';
+    
+    // Reset quantities
+    if (qtySampleSetInput) qtySampleSetInput.value = 0;
+    if (qtyInspectModeSelect) qtyInspectModeSelect.value = 'manual';
+    if (qtyInspectInput) {
+        qtyInspectInput.value = 0;
+        qtyInspectInput.readOnly = false;
+    }
+    
+    // Reset overall counters
+    totalInspected = 0;
+    defectCounts = {};
+    qtyInspectOutputs['pass'] = 0;
+    qtyInspectOutputs['defect'] = 0;
+    
+    // Render
+    renderVendorButtons();
+    renderInspectedItems();
+    
+    if (addItemBtn) {
+        addItemBtn.disabled = true;
+    }
+    
     checkInfoCompleteAndLockButtons();
     saveToLocalStorage();
 }
@@ -252,7 +290,9 @@ function resetContextSelection() {
 function isInfoComplete() {
     const qty = parseInt(qtySampleSetInput ? qtySampleSetInput.value : '0', 10);
     const tanggal = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
-    return qty > 0 && tanggal && selectedVendor && selectedComponents.length > 0 && selectedProcesses.length > 0;
+    const style = styleNumberInput ? styleNumberInput.value.trim() : '';
+    const model = modelNameInput ? modelNameInput.value.trim() : '';
+    return qty > 0 && tanggal && selectedVendor && style && model && inspectionItems.length > 0;
 }
 
 /**
@@ -264,18 +304,7 @@ function checkInfoCompleteAndLockButtons() {
     const hint = document.getElementById('inspection-info-hint');
     if (hint) hint.classList.toggle('hidden', complete);
 
-    if (!complete) {
-        toggleButtonGroup(defectButtons, false);
-        toggleButtonGroup(gradeInputButtons, false);
-    } else {
-        // Re-evaluate based on limit
-        updateButtonStatesBasedOnLimit();
-        if (currentInspectionLimit > 0 && totalInspected < currentInspectionLimit) {
-            if (selectedDefects.length === 0 && currentInspectionPairs.length === 0) {
-                initButtonStates();
-            }
-        }
-    }
+    updateSaveButtonState();
 }
 
 // ===========================================
@@ -289,10 +318,11 @@ function saveToLocalStorage() {
             modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
             styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
+            tanggalInspection: tanggalInspectionInput ? tanggalInspectionInput.value : '',
+            tanggalBucket: tanggalBucketInput ? tanggalBucketInput.value : '',
             materialType: selectedMaterialType,
             vendor: selectedVendor,
-            component: selectedComponents,
-            process: selectedProcesses
+            inspectionItems: inspectionItems
         };
         localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
         localStorage.setItem(STORAGE_KEYS.DEFECT_COUNTS, JSON.stringify(defectCounts));
@@ -364,18 +394,14 @@ function toggleButtonGroup(buttons, enable) {
 function updateSaveButtonState() {
     const saveButton = document.querySelector('.save-button');
     if (!saveButton) return;
-    const ready = currentInspectionLimit > 0 && totalInspected === currentInspectionLimit && isInfoComplete();
+    const ready = isInfoComplete();
     saveButton.disabled = !ready;
     saveButton.classList.toggle('opacity-50', !ready);
     saveButton.classList.toggle('cursor-not-allowed', !ready);
     const hint = document.getElementById('save-progress-hint');
     if (hint) {
-        if (currentInspectionLimit > 0) {
-            hint.textContent = `Terinspeksi: ${totalInspected} / ${currentInspectionLimit}`;
-            hint.classList.toggle('hidden', ready);
-        } else {
-            hint.classList.add('hidden');
-        }
+        hint.textContent = `Total item inspeksi: ${inspectionItems.length}`;
+        hint.classList.toggle('hidden', !ready);
     }
 }
 
@@ -452,44 +478,55 @@ function getProcessedReworkCounts() {
 // 7. Update Total Qty Inspect (termasuk FTT dan Redo Rate)
 // ===========================================
 function updateTotalQtyInspect(isManualPassChange = false) {
-    const passInput = document.getElementById('pass-counter');
+    let totalPass = 0;
+    let totalDefect = 0;
+    let totalInspect = 0;
     
-    let defectSum = 0;
-    for (const defectType in defectCounts) {
-        for (const position in defectCounts[defectType]) {
-            for (const grade in defectCounts[defectType][position]) {
-                defectSum += defectCounts[defectType][position][grade] || 0;
-            }
+    // Aggregation
+    defectCounts = {};
+    inspectionItems.forEach(item => {
+        totalPass += item.pass || 0;
+        totalDefect += item.defect || 0;
+        totalInspect += item.qtyInspect || 0;
+        
+        if (Array.isArray(item.defects)) {
+            item.defects.forEach(d => {
+                const type = d.type;
+                if (!defectCounts[type]) {
+                    defectCounts[type] = {
+                        'PAIRS': {
+                            'defect': 0
+                        }
+                    };
+                }
+                defectCounts[type]['PAIRS']['defect'] += d.count || 0;
+            });
         }
+    });
+    
+    qtyInspectOutputs['pass'] = totalPass;
+    qtyInspectOutputs['defect'] = totalDefect;
+    totalInspected = totalInspect;
+    
+    const passDisplay = document.getElementById('pass-counter');
+    if (passDisplay) {
+        passDisplay.textContent = totalPass;
     }
-    qtyInspectOutputs['defect'] = defectSum;
-
-    if (passInput) {
-        if (isManualPassChange) {
-            qtyInspectOutputs['pass'] = parseInt(passInput.value, 10) || 0;
-        } else {
-            const calculatedPass = currentInspectionLimit > 0 ? Math.max(0, currentInspectionLimit - defectSum) : 0;
-            qtyInspectOutputs['pass'] = calculatedPass;
-            passInput.value = calculatedPass;
-        }
-    }
-
+    
     const defectDisplay = document.getElementById('defect-counter');
     if (defectDisplay) {
-        defectDisplay.textContent = defectSum;
+        defectDisplay.textContent = totalDefect;
     }
-
-    let total = qtyInspectOutputs['pass'] + qtyInspectOutputs['defect'];
+    
     if (qtyInspectOutput) {
-        qtyInspectOutput.textContent = total;
+        qtyInspectOutput.textContent = totalInspected;
     }
-    totalInspected = total;
-
+    
     updateFTT();
     updateRedoRate();
+    updateDefectSummaryDisplay();
     saveToLocalStorage();
     updateSaveButtonState();
-    updateButtonStatesBasedOnLimit();
 }
 
 // ===========================================
@@ -544,7 +581,7 @@ function updateDefectSummaryDisplay() {
 
     for (const defectType in defectCounts) {
         for (const position of positionOrder) {
-            if (defectCounts[defectType][position]) {
+            if (defectCounts[defectType] && defectCounts[defectType][position]) {
                 for (const displayGrade of gradeOrder) {
                     if (defectCounts[defectType][position][displayGrade] && defectCounts[defectType][position][displayGrade] > 0) {
                         const count = defectCounts[defectType][position][displayGrade];
@@ -556,14 +593,9 @@ function updateDefectSummaryDisplay() {
                                 <p class="text-xs text-slate-400 font-medium">${position}</p>
                             </div>
                             <div class="flex items-center gap-2">
-                                <input type="number" min="1" 
-                                    class="w-20 px-2 py-2 text-sm text-center border border-slate-300 rounded-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100" 
-                                    value="${count}" 
-                                    onchange="window.__updateDefectCount('${defectType}', '${position}', '${displayGrade}', this.value)">
-                                <button onclick="window.__removeDefect('${defectType}', '${position}', '${displayGrade}')" 
-                                    class="p-2.5 text-slate-500 bg-slate-50 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg transition-colors flex items-center justify-center min-w-[40px] min-h-[40px] shadow-sm cursor-pointer">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                                </button>
+                                <div class="px-3 py-1 bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-800 text-sm text-center min-w-[50px]">
+                                    ${count}
+                                </div>
                             </div>
                         `;
                         summaryItems.push({
@@ -587,8 +619,6 @@ function updateDefectSummaryDisplay() {
     summaryItems.forEach(itemData => {
         summaryContainer.appendChild(itemData.element);
     });
-
-    syncDefectButtonActiveStates();
 }
 
 function handleDefectClick(button) {
@@ -716,31 +746,16 @@ async function saveData() {
     const redoRateValueText = redoRateOutput ? redoRateOutput.innerText.replace("%", "").trim() : "0";
     const finalRedoRate = parseFloat(redoRateValueText) / 100;
 
-    const defectsToSend = [];
-    for (const defectType in defectCounts) {
-        for (const position in defectCounts[defectType]) {
-            for (const grade in defectCounts[defectType][position]) {
-                const count = defectCounts[defectType][position][grade];
-                if (count > 0) {
-                    defectsToSend.push({
-                        type: defectType,
-                        position: position,
-                        level: grade,
-                        count: count
-                    });
-                }
-            }
-        }
-    }
-
     const dataToSend = {
         timestamp: new Date().toISOString(),
         auditor: document.getElementById("auditor").value,
         tanggalIncoming: document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value : '',
+        tanggalInspection: document.getElementById("tanggal-inspection") ? document.getElementById("tanggal-inspection").value : '',
+        tanggalBucket: document.getElementById("tanggal-bucket") ? document.getElementById("tanggal-bucket").value : '',
         materialType: selectedMaterialType || '',
         vendor: selectedVendor,
-        component: selectedComponents.join(', '),
-        process: selectedProcesses.join(', '),
+        component: inspectionItems.map(item => item.component).join(', '),
+        process: inspectionItems.map(item => item.process).join(', '),
         modelName: document.getElementById("model-name").value,
         styleNumber: document.getElementById("style-number").value,
         qtyIncoming: qtySampleSetInput ? parseInt(qtySampleSetInput.value, 10) || 0 : 0,
@@ -749,7 +764,7 @@ async function saveData() {
         redoRate: finalRedoRate,
         "pass": qtyInspectOutputs['pass'],
         "defect": qtyInspectOutputs['defect'],
-        defects: defectsToSend,
+        items: inspectionItems
     };
 
     console.log("Data yang akan dikirim (setelah diproses):", JSON.stringify(dataToSend, null, 2));
@@ -824,12 +839,8 @@ function validateInputs() {
         showAlert('Harap pilih Vendor sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
-    if (!selectedComponents.length) {
-        showAlert('Harap pilih Component sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
-        return false;
-    }
-    if (!selectedProcesses.length) {
-        showAlert('Harap pilih Process sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
+    if (!inspectionItems.length) {
+        showAlert('Harap tambahkan minimal 1 Item Inspeksi sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
     if (!modelName || !styleNumber) {
@@ -876,17 +887,15 @@ function validateQtySampleSet() {
         return false;
     }
 
-    const qtySampleSetValue = parseInt(qtySampleSetInput.value, 10);
-
-    if (isNaN(qtySampleSetValue) || qtySampleSetValue <= 0) {
-        showAlert('Harap masukkan Jumlah Qty Sample Set yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
+    const qtyIncomingVal = parseInt(qtySampleSetInput.value, 10);
+    if (isNaN(qtyIncomingVal) || qtyIncomingVal <= 0) {
+        showAlert('Harap masukkan Jumlah Qty Incoming yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
         return false;
     }
 
-    const currentTotalInspect = totalInspected;
-
-    if (currentTotalInspect !== qtySampleSetValue) {
-        showAlert(`Jumlah total Qty Inspect (${currentTotalInspect}) harus sama dengan Qty Sample Set (${qtySampleSetValue}).`, 'warning', 'Qty Tidak Sesuai');
+    const qtyInspectVal = parseInt(qtyInspectInput.value, 10);
+    if (isNaN(qtyInspectVal) || qtyInspectVal <= 0) {
+        showAlert('Harap masukkan Jumlah Qty Inspect yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
         return false;
     }
 
@@ -896,52 +905,325 @@ function validateQtySampleSet() {
 // ===========================================
 // 15. Reset Semua Field Setelah Simpan (Modifikasi)
 // ===========================================
-function resetAllFields() {
-    // Restore auditor from session (readonly field stays unchanged)
-    document.getElementById("model-name").value = "";
-    const styleNumberEl = document.getElementById("style-number");
-    if (styleNumberEl) {
-        styleNumberEl.value = "";
-        styleNumberEl.classList.remove('invalid-input');
-    }
-    // Reset new fields (except tanggal-incoming which resets to today)
-    if (vendorSelect) vendorSelect.value = "";
-    selectedMaterialType = '';
-    const mtSelectEl = document.getElementById('material-type');
-    if (mtSelectEl) mtSelectEl.value = '';
-    selectedVendor = '';
-    selectedComponents = [];
-    selectedProcesses  = [];
-    renderVendorButtons();
-    renderComponentButtons('');
-    renderProcessButtons([]);
-    if (tanggalIncomingInput) tanggalIncomingInput.value = new Date().toISOString().split('T')[0];
-    
-    if (modelNameInput) {
-        modelNameInput.value = "";
-        modelNameInput.disabled = false;
-    }
+// ===========================================
+// MULTI-ITEM INSPECTION LOGIC (TAMBAHAN)
+// ===========================================
 
-    for (const categoryKey in qtyInspectOutputs) {
-        qtyInspectOutputs[categoryKey] = 0;
-    }
-    defectCounts = {};
-    totalInspected = 0;
-    selectedDefects = [];
-    currentInspectionPairs = [];
-    reworkLog = [];
+function renderInspectedItems() {
+    const tbody = document.getElementById('inspected-items-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
     
-    // Reset Qty Incoming ke 0 setelah simpan
-    if (qtySampleSetInput) {
-        qtySampleSetInput.value = 0;
-        localStorage.setItem('qtySampleSet', 0);
+    if (inspectionItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-3 py-4 text-center text-slate-400 italic">Belum ada item inspeksi. Silakan pilih Vendor lalu klik "Tambah Item".</td>
+            </tr>
+        `;
+        return;
     }
-    currentInspectionLimit = 0;
-    updateAllDisplays();
-    if (summaryContainer) summaryContainer.innerHTML = "";
+    
+    inspectionItems.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-150 hover:bg-slate-100/50 transition-colors';
+        tr.innerHTML = `
+            <td class="px-3 py-2.5 font-medium text-slate-800">${item.component}</td>
+            <td class="px-3 py-2.5 text-slate-600">${item.process}</td>
+            <td class="px-3 py-2.5 text-right font-semibold text-slate-800">${item.qtyInspect}</td>
+            <td class="px-3 py-2.5 text-right font-semibold text-red-600">${item.defect}</td>
+            <td class="px-3 py-2.5 text-center flex items-center justify-center gap-1.5">
+                <button type="button" class="edit-item-btn p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" data-index="${index}">
+                    <span class="material-symbols-outlined text-[16px]">edit</span>
+                </button>
+                <button type="button" class="delete-item-btn p-1 text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer" data-index="${index}">
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+            </td>
+        `;
+        
+        tr.querySelector('.edit-item-btn').addEventListener('click', () => {
+            openInspectionItemModal(index);
+        });
+        
+        tr.querySelector('.delete-item-btn').addEventListener('click', async () => {
+            const yes = await showConfirm(`Apakah Anda yakin ingin menghapus item inspeksi ${item.component} - ${item.process}?`, 'Hapus Item', 'Ya, Hapus', 'Batal');
+            if (yes) {
+                inspectionItems.splice(index, 1);
+                renderInspectedItems();
+                updateTotalQtyInspect();
+                checkInfoCompleteAndLockButtons();
+            }
+        });
+        
+        tbody.appendChild(tr);
+    });
+}
+
+// Modal Form State Variables
+let modalSelectedComponent = '';
+let modalSelectedProcess = '';
+let modalItemDefects = {}; 
+let modalPassVal = 0;
+let modalDefectVal = 0;
+let modalQtyIncomingVal = 0;
+let modalQtyInspectVal = 0;
+
+function openInspectionItemModal(index = null) {
+    const modal = document.getElementById('inspection-item-modal');
+    if (!modal) return;
+    
+    editingItemIndex = index;
+    
+    // Clear / Init Modal fields
+    const modalTitle = document.getElementById('modal-item-title');
+    if (index === null) {
+        modalTitle.textContent = 'Tambah Item Inspeksi';
+        modalSelectedComponent = '';
+        modalSelectedProcess = '';
+        modalItemDefects = {};
+        modalPassVal = 0;
+        modalDefectVal = 0;
+        
+        // Default quantities from parent session details
+        modalQtyIncomingVal = parseInt(qtySampleSetInput ? qtySampleSetInput.value : '0', 10) || 0;
+        modalQtyInspectVal = parseInt(qtyInspectInput ? qtyInspectInput.value : '0', 10) || 0;
+        
+        // Synchronize Inspect Mode inside the modal with the main form setting
+        const mainMode = qtyInspectModeSelect ? qtyInspectModeSelect.value : 'manual';
+        const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
+        if (modalModeSelect) modalModeSelect.value = mainMode;
+    } else {
+        modalTitle.textContent = 'Edit Item Inspeksi';
+        const item = inspectionItems[index];
+        modalSelectedComponent = item.component;
+        modalSelectedProcess = item.process;
+        modalQtyIncomingVal = item.qtyIncoming || 0;
+        modalQtyInspectVal = item.qtyInspect || 0;
+        modalPassVal = item.pass || 0;
+        modalDefectVal = item.defect || 0;
+        
+        // Re-construct modalItemDefects map
+        modalItemDefects = {};
+        if (Array.isArray(item.defects)) {
+            item.defects.forEach(d => {
+                modalItemDefects[d.type] = d.count;
+            });
+        }
+        
+        const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
+        if (modalModeSelect) modalModeSelect.value = 'manual'; // Always default to manual edit mode for previously saved items
+    }
+    
+    // Set inputs values
+    const incomingInput = document.getElementById('modal-qty-incoming');
+    if (incomingInput) incomingInput.value = modalQtyIncomingVal;
+    
+    const inspectInput = document.getElementById('modal-qty-inspect');
+    if (inspectInput) inspectInput.value = modalQtyInspectVal;
+    
+    // Handle calculations inside modal
+    const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
+    const updateModalQtyInspect = () => {
+        if (!modalModeSelect || !incomingInput || !inspectInput) return;
+        const mode = modalModeSelect.value;
+        const incoming = parseInt(incomingInput.value, 10) || 0;
+        
+        if (mode === 'manual') {
+            inspectInput.readOnly = false;
+        } else {
+            inspectInput.readOnly = true;
+            let pct = 0.10;
+            if (mode === 'percent_1') pct = 0.01;
+            else if (mode === 'percent_5') pct = 0.05;
+            else if (mode === 'percent_20') pct = 0.20;
+            inspectInput.value = Math.round(incoming * pct);
+        }
+        modalQtyIncomingVal = incoming;
+        modalQtyInspectVal = parseInt(inspectInput.value, 10) || 0;
+        updateModalGradeState();
+    };
+    
+    if (modalModeSelect) {
+        modalModeSelect.onchange = updateModalQtyInspect;
+    }
+    if (incomingInput) {
+        incomingInput.oninput = updateModalQtyInspect;
+    }
+    if (inspectInput) {
+        inspectInput.oninput = () => {
+            modalQtyInspectVal = parseInt(inspectInput.value, 10) || 0;
+            updateModalGradeState();
+        };
+    }
+    
+    // Render Modal Components Buttons
+    modalComponent = modalSelectedComponent;
+    modalProcess = modalSelectedProcess;
+    renderModalComponentButtons(selectedVendor);
+    renderModalProcessButtons(modalComponent);
+    
+    // Render modal defect buttons dynamically
+    const modalDefectsContainer = document.getElementById('modal-defect-buttons');
+    if (modalDefectsContainer) {
+        renderDefectButtons(modalDefectsContainer);
+        // Bind click event for modal defects catalog
+        const modalButtons = modalDefectsContainer.querySelectorAll('.defect-button');
+        modalButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const defectType = button.dataset.defect || button.textContent.trim();
+                window.handleModalDefectClick(defectType);
+                button.classList.add('active-feedback');
+                setTimeout(() => button.classList.remove('active-feedback'), 200);
+            });
+        });
+    }
+    
+    // Render logged defects and update numbers
+    updateModalGradeState();
+    
+    // Show Modal
+    modal.classList.remove('hidden');
+}
+
+function updateModalGradeState() {
+    let defectSum = 0;
+    for (const type in modalItemDefects) {
+        defectSum += modalItemDefects[type] || 0;
+    }
+    modalDefectVal = defectSum;
+    
+    modalPassVal = Math.max(0, modalQtyInspectVal - modalDefectVal);
+    
+    const passCounter = document.getElementById('modal-pass-counter');
+    if (passCounter) passCounter.textContent = modalPassVal;
+    
+    const defectCounter = document.getElementById('modal-defect-counter');
+    if (defectCounter) defectCounter.textContent = modalDefectVal;
+    
+    const inspectInput = document.getElementById('modal-qty-inspect');
+    if (inspectInput) inspectInput.value = modalQtyInspectVal;
+    
+    renderModalLoggedDefects();
+}
+
+function renderModalLoggedDefects() {
+    const container = document.getElementById('modal-logged-defects');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let hasDefects = false;
+    for (const type in modalItemDefects) {
+        const count = modalItemDefects[type] || 0;
+        if (count > 0) {
+            hasDefects = true;
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between py-1 text-xs text-slate-700';
+            div.innerHTML = `
+                <span class="font-medium">${type}</span>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold rounded hover:bg-slate-200 cursor-pointer" onclick="window.adjustModalDefect('${type}', -1)">-1</button>
+                    <span class="font-bold text-slate-800 min-w-[20px] text-center">${count}</span>
+                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold rounded hover:bg-slate-200 cursor-pointer" onclick="window.adjustModalDefect('${type}', 1)">+1</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+    }
+    
+    if (!hasDefects) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">Belum ada defect yang tercatat.</span>';
+    }
+}
+
+window.adjustModalDefect = function(defectType, amount) {
+    if (!modalItemDefects[defectType]) modalItemDefects[defectType] = 0;
+    
+    const currentCount = modalItemDefects[defectType];
+    const newCount = Math.max(0, currentCount + amount);
+    
+    if (newCount === 0) {
+        delete modalItemDefects[defectType];
+    } else {
+        modalItemDefects[defectType] = newCount;
+    }
+    
+    let defectSum = 0;
+    for (const type in modalItemDefects) {
+        defectSum += modalItemDefects[type] || 0;
+    }
+    if (defectSum > modalQtyInspectVal) {
+        modalQtyInspectVal = defectSum;
+    }
+    
+    updateModalGradeState();
+};
+
+window.handleModalDefectClick = function(defectType) {
+    window.adjustModalDefect(defectType, 1);
+};
+
+function closeInspectionItemModal() {
+    const modal = document.getElementById('inspection-item-modal');
+    if (modal) modal.classList.add('hidden');
+    editingItemIndex = null;
+}
+
+function saveInspectionItem() {
+    if (!modalComponent) {
+        showAlert('Silakan pilih Component terlebih dahulu.', 'warning', 'Peringatan');
+        return;
+    }
+    if (!modalProcess) {
+        showAlert('Silakan pilih Process terlebih dahulu.', 'warning', 'Peringatan');
+        return;
+    }
+    if (modalQtyIncomingVal <= 0) {
+        showAlert('Qty Incoming harus lebih besar dari 0.', 'warning', 'Peringatan');
+        return;
+    }
+    if (modalQtyInspectVal <= 0) {
+        showAlert('Qty Inspect harus lebih besar dari 0.', 'warning', 'Peringatan');
+        return;
+    }
+    
+    const defectsArray = [];
+    for (const type in modalItemDefects) {
+        defectsArray.push({
+            type,
+            count: modalItemDefects[type]
+        });
+    }
+    
+    const itemData = {
+        component: modalComponent,
+        process: modalProcess,
+        qtyIncoming: modalQtyIncomingVal,
+        qtyInspect: modalQtyInspectVal,
+        pass: modalPassVal,
+        defect: modalDefectVal,
+        defects: defectsArray
+    };
+    
+    if (editingItemIndex === null) {
+        const duplicate = inspectionItems.some(item => item.component === modalComponent && item.process === modalProcess);
+        if (duplicate) {
+            showAlert(`Kombinasi Component (${modalComponent}) dan Process (${modalProcess}) sudah ada di daftar. Silakan edit item yang ada.`, 'warning', 'Kombinasi Duplikat');
+            return;
+        }
+        inspectionItems.push(itemData);
+    } else {
+        const duplicate = inspectionItems.some((item, index) => index !== editingItemIndex && item.component === modalComponent && item.process === modalProcess);
+        if (duplicate) {
+            showAlert(`Kombinasi Component (${modalComponent}) dan Process (${modalProcess}) sudah ada di daftar.`, 'warning', 'Kombinasi Duplikat');
+            return;
+        }
+        inspectionItems[editingItemIndex] = itemData;
+    }
+    
+    closeInspectionItemModal();
+    renderInspectedItems();
+    updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
-    updateSaveButtonState();
-    clearLocalStorageExceptQtySampleSet();
 }
 
 // ===========================================
@@ -1050,13 +1332,19 @@ async function initApp() {
     summaryContainer = document.getElementById('summary-list');
     redoRateOutput = document.getElementById('redoRateOutput');
     qtySampleSetInput = document.getElementById('qty-sample-set');
+    
+    // Bind new DOM references
+    qtyInspectModeSelect = document.getElementById('qty-inspect-mode');
+    qtyInspectInput = document.getElementById('qty-inspect-input');
+    tanggalInspectionInput = document.getElementById('tanggal-inspection');
+    tanggalBucketInput = document.getElementById('tanggal-bucket');
+    addItemBtn = document.getElementById('add-item-btn');
+    inspectedItemsTbody = document.getElementById('inspected-items-tbody');
 
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
 
-    // Render defect buttons dynamically from admin-managed catalog
-    const defectContainer = document.getElementById('defect-buttons-container');
-    if (defectContainer) renderDefectButtons(defectContainer);
+    // Render defect buttons dynamically from admin-managed catalog (not rendering flat defect buttons anymore)
     renderDefectLibrary();
     // Show admin nav items for admin role
     if (userRole === ROLES.ADMIN) {
@@ -1072,13 +1360,13 @@ async function initApp() {
     tanggalIncomingInput = document.getElementById('tanggal-incoming');
     vendorSelect    = document.getElementById('vendor');
     if (vendorSelect) renderVendorOptions(vendorSelect);
+    
     // Render new button-based selectors
     renderVendorButtons();
-    renderComponentButtons(selectedVendor);
-    renderProcessButtons(selectedComponents);
+    
     window.__reattachVendorOptions    = () => { renderVendorButtons(); };
-    window.__reattachComponentOptions = () => { renderComponentButtons(selectedVendor); };
-    window.__reattachProcessOptions   = () => { rebuildProcessButtons(); };
+    window.__reattachComponentOptions = () => { };
+    window.__reattachProcessOptions   = () => { };
 
     // Wire Reset button in Context Selection card
     const resetSelectionBtn = document.getElementById('reset-selection-btn');
@@ -1089,16 +1377,15 @@ async function initApp() {
     if (materialTypeSelect) {
         materialTypeSelect.addEventListener('change', () => {
             selectedMaterialType = materialTypeSelect.value;
-            // If current vendor no longer matches the new filter, clear the cascade
+            // If current vendor no longer matches the new filter, clear vendor selection
             if (selectedVendor) {
                 const vendors = getVendors();
                 const vendor  = vendors.find(v => v.name === selectedVendor);
                 if (!vendor || (selectedMaterialType && vendor.material_type !== selectedMaterialType)) {
                     selectedVendor     = '';
-                    selectedComponents = [];
-                    selectedProcesses  = [];
-                    renderComponentButtons('');
-                    renderProcessButtons([]);
+                    inspectionItems = [];
+                    renderInspectedItems();
+                    if (addItemBtn) addItemBtn.disabled = true;
                 }
             }
             renderVendorButtons();
@@ -1118,20 +1405,20 @@ async function initApp() {
         }
     }
 
-    // Set default tanggal-incoming to today
+    // Set default dates to today
+    const todayStr = new Date().toISOString().split('T')[0];
     if (tanggalIncomingInput && !tanggalIncomingInput.value) {
-        tanggalIncomingInput.value = new Date().toISOString().split('T')[0];
+        tanggalIncomingInput.value = todayStr;
+    }
+    if (tanggalInspectionInput && !tanggalInspectionInput.value) {
+        tanggalInspectionInput.value = todayStr;
+    }
+    if (tanggalBucketInput && !tanggalBucketInput.value) {
+        tanggalBucketInput.value = todayStr;
     }
 
     if (modelNameInput) {
         modelNameInput.addEventListener('input', saveToLocalStorage);
-    }
-
-    const passInput = document.getElementById('pass-counter');
-    if (passInput) {
-        passInput.addEventListener('input', () => {
-            updateTotalQtyInspect(true);
-        });
     }
     
     if (styleNumberInput) {
@@ -1145,27 +1432,71 @@ async function initApp() {
         saveToLocalStorage();
         checkInfoCompleteAndLockButtons();
     });
+    if (tanggalInspectionInput) tanggalInspectionInput.addEventListener('change', saveToLocalStorage);
+    if (tanggalBucketInput) tanggalBucketInput.addEventListener('change', saveToLocalStorage);
 
-    function attachDefectListeners() {
-        defectButtons = document.querySelectorAll('.defect-button');
-        defectButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                handleDefectClick(button);
-                button.classList.add('active-feedback');
-                setTimeout(() => button.classList.remove('active-feedback'), 200);
-            });
+    // Qty auto-calculation logic setup
+    function handleQtyCalculation() {
+        if (!qtySampleSetInput || !qtyInspectModeSelect || !qtyInspectInput) return;
+        const mode = qtyInspectModeSelect.value;
+        const incoming = parseInt(qtySampleSetInput.value, 10) || 0;
+        
+        if (mode === 'manual') {
+            qtyInspectInput.readOnly = false;
+        } else {
+            qtyInspectInput.readOnly = true;
+            let pct = 0.10;
+            if (mode === 'percent_1') pct = 0.01;
+            else if (mode === 'percent_5') pct = 0.05;
+            else if (mode === 'percent_20') pct = 0.20;
+            
+            qtyInspectInput.value = Math.round(incoming * pct);
+        }
+        currentInspectionLimit = parseInt(qtyInspectInput.value, 10) || 0;
+        updateTotalQtyInspect();
+        checkInfoCompleteAndLockButtons();
+    }
+    
+    if (qtyInspectModeSelect) qtyInspectModeSelect.addEventListener('change', handleQtyCalculation);
+    if (qtySampleSetInput) qtySampleSetInput.addEventListener('input', handleQtyCalculation);
+    if (qtyInspectInput) {
+        qtyInspectInput.addEventListener('input', () => {
+            currentInspectionLimit = parseInt(qtyInspectInput.value, 10) || 0;
+            updateTotalQtyInspect();
+            checkInfoCompleteAndLockButtons();
         });
     }
-    attachDefectListeners();
-    window.__reattachDefectListeners = attachDefectListeners;
 
-    gradeInputButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            handleGradeClick(button);
-            button.classList.add('active-feedback');
-            setTimeout(() => button.classList.remove('active-feedback'), 200);
+    // Bind Add Item action
+    if (addItemBtn) {
+        addItemBtn.addEventListener('click', () => {
+            openInspectionItemModal();
         });
-    });
+    }
+
+    // Modal buttons bindings
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeInspectionItemModal);
+    
+    const modalCancelBtn = document.getElementById('modal-cancel-btn');
+    if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeInspectionItemModal);
+    
+    const modalSaveItemBtn = document.getElementById('modal-save-item-btn');
+    if (modalSaveItemBtn) modalSaveItemBtn.addEventListener('click', saveInspectionItem);
+    
+    const modalPassIncBtn = document.getElementById('modal-pass-inc-btn');
+    if (modalPassIncBtn) {
+        modalPassIncBtn.addEventListener('click', () => {
+            modalQtyInspectVal += 1;
+            updateModalGradeState();
+        });
+    }
+    const modalDefectIncBtn = document.getElementById('modal-defect-inc-btn');
+    if (modalDefectIncBtn) {
+        modalDefectIncBtn.addEventListener('click', () => {
+            showAlert('Silakan klik jenis defect di katalog untuk mencatat defect.', 'info', 'Petunjuk');
+        });
+    }
 
     const saveButton = document.querySelector(".save-button");
     if (saveButton) {
@@ -1174,44 +1505,19 @@ async function initApp() {
 
     if (qtySampleSetInput) {
         let storedQty = localStorage.getItem('qtySampleSet');
-        let qtySampleSetValue;
-
-        if (storedQty && !isNaN(parseInt(storedQty, 10)) && parseInt(storedQty, 10) >= 0) {
-            qtySampleSetValue = parseInt(storedQty, 10);
-        } else {
-            qtySampleSetValue = 0;
-        }
-
+        let qtySampleSetValue = (storedQty && !isNaN(parseInt(storedQty, 10))) ? parseInt(storedQty, 10) : 0;
         qtySampleSetInput.value = qtySampleSetValue;
-        currentInspectionLimit = qtySampleSetValue;
-
-        qtySampleSetInput.addEventListener('change', () => {
-            let newQty = parseInt(qtySampleSetInput.value, 10);
-            
-            if (isNaN(newQty) || newQty < 0) {
-                showAlert('Qty Sample Set tidak boleh kurang dari 0.', 'warning', 'Input Tidak Valid');
-                qtySampleSetInput.value = currentInspectionLimit;
-                return;
-            }
-            
-            if (newQty < qtyInspectOutputs['defect']) {
-                showAlert(`Qty Sample Set tidak bisa lebih rendah dari jumlah defect saat ini (${qtyInspectOutputs['defect']}).`, 'warning', 'Input Tidak Valid');
-                qtySampleSetInput.value = currentInspectionLimit;
-                return;
-            }
-            
-            currentInspectionLimit = newQty;
-            localStorage.setItem('qtySampleSet', newQty);
-            
-            updateTotalQtyInspect();
-            checkInfoCompleteAndLockButtons();
-            
-            console.log(`Qty Sample Set diubah menjadi: ${currentInspectionLimit}`);
-        });
+        
+        if (qtyInspectModeSelect) {
+            qtyInspectModeSelect.value = 'manual';
+        }
+        if (qtyInspectInput) {
+            qtyInspectInput.value = 0;
+        }
+        handleQtyCalculation();
     }
 
     const statisticButton = document.querySelector('.statistic-button');
-
     if (statisticButton) {
         statisticButton.addEventListener('click', () => {
             if (typeof window.showView === 'function') {
@@ -1222,10 +1528,9 @@ async function initApp() {
         });
     }
 
-    initButtonStates();
-    updateAllDisplays();
-    checkInfoCompleteAndLockButtons();
+    renderInspectedItems();
     updateTotalQtyInspect();
+    checkInfoCompleteAndLockButtons();
 
     console.log("Aplikasi berhasil diinisialisasi.");
 }
