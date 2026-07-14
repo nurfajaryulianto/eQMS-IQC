@@ -2,7 +2,7 @@
 // js/material/dashboard.js — IQC Material: Dashboard KPI Logic
 // ============================================================
 
-import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from '../auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
@@ -35,7 +35,7 @@ function generateMockData() {
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireRole([ROLES.SUPERVISOR, ROLES.ADMIN]);
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN]);
     if (!currentUser) return;
 
     setupNavbar(currentUser);
@@ -46,10 +46,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupNavbar(user) {
     const el = document.getElementById('nav-user-name');
-    if (el) el.textContent = user.user_metadata?.display_name || user.user_metadata?.nik || 'User';
+    if (el) el.textContent = user.name || user.nik || 'User';
 
-    const role = user.user_metadata?.role;
-    if (role === ROLES.ADMIN) {
+    const role = user.role;
+    if (role === MATERIAL_ROLES.ADMIN) {
         const adminLink = document.getElementById('nav-admin-link');
         if (adminLink) adminLink.style.display = 'flex';
     }
@@ -59,9 +59,7 @@ function setupLogout() {
     const btn = document.getElementById('nav-logout-btn');
     if (btn) btn.addEventListener('click', async () => {
         if (confirm('Yakin ingin logout?')) {
-            await signOut();
-            sessionStorage.removeItem('app_target');
-            window.location.replace('../home.html');
+            await materialLogout();
         }
     });
 }
@@ -82,7 +80,7 @@ async function fetchData() {
     if (overlay) overlay.classList.add('visible');
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             allInspections = generateMockData().map(d => ({
                 ...d,
                 inspection_date: new Date(d.inspection_date),
@@ -258,10 +256,10 @@ function renderVendorChart() {
             scales: {
                 y: {
                     beginAtZero: true,
-                    ticks: { callback: v => v + '%', font: { size: 11 } },
-                    grid: { color: '#f1f5f9' },
+                    ticks: { callback: v => v + '%', color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } },
+                    grid: { color: 'rgba(255, 255, 255, 0.08)' },
                 },
-                x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+                x: { ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } }, grid: { display: false } },
             },
         },
     });
@@ -293,11 +291,11 @@ function renderFTTTrendChart() {
             labels,
             datasets: [{
                 data: ftts,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37,99,235,0.08)',
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
                 fill: true,
                 tension: 0.4,
-                pointBackgroundColor: '#2563eb',
+                pointBackgroundColor: '#10b981',
                 pointRadius: 4,
                 borderWidth: 2,
             }],
@@ -308,10 +306,10 @@ function renderFTTTrendChart() {
             scales: {
                 y: {
                     min: 0, max: 100,
-                    ticks: { callback: v => v + '%', font: { size: 11 } },
-                    grid: { color: '#f1f5f9' },
+                    ticks: { callback: v => v + '%', color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } },
+                    grid: { color: 'rgba(255, 255, 255, 0.08)' },
                 },
-                x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+                x: { ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } }, grid: { display: false } },
             },
         },
     });

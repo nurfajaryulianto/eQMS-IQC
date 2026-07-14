@@ -12,6 +12,7 @@ var SHEET = {
   VENDORS:      'vendors',
   MASTER_DATA:  'master_data',
   INSPECTIONS:  'inspections',
+  USERS:        'users',
   SETTINGS:     'settings',
 };
 
@@ -40,13 +41,9 @@ function doPost(e) {
     return jsonResponse({ error: 'Invalid JSON payload' });
   }
 
-  // Verifikasi token Supabase (opsional tapi direkomendasikan)
-  // var token = payload.access_token;
-  // var verified = verifySupabaseToken(token);
-  // if (!verified) return jsonResponse({ error: 'Unauthorized' });
-
   var action = payload.action || '';
   try {
+    if (action === 'login')              return jsonResponse(login(payload));
     if (action === 'submitInspection')   return jsonResponse(submitInspection(payload));
     if (action === 'bulkUpsertMasterData') return jsonResponse(bulkUpsertMasterData(payload));
     if (action === 'passAll')            return jsonResponse(passAll(payload));
@@ -54,6 +51,64 @@ function doPost(e) {
   } catch (err) {
     return jsonResponse({ error: err.message });
   }
+}
+
+// ─── LOGIN HANDLER ────────────────────────────────────────────
+
+function login(payload) {
+  var nik = String(payload.nik || '').trim();
+  var password = String(payload.password || '');
+  if (!nik || !password) throw new Error('NIK dan password harus diisi');
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(SHEET.USERS);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET.USERS);
+    sheet.getRange(1, 1, 1, 5).setValues([['nik', 'password', 'name', 'role', 'created_at']]);
+    sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#e2e8f0');
+  }
+
+  var data = sheet.getDataRange().getValues();
+  
+  // Seed default admin if sheet only has headers
+  if (data.length < 2) {
+    var now = new Date().toISOString();
+    sheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
+    data = sheet.getDataRange().getValues();
+  }
+
+  var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+  var nikCol = headers.indexOf('nik');
+  var passCol = headers.indexOf('password');
+  var nameCol = headers.indexOf('name');
+  var roleCol = headers.indexOf('role');
+
+  if (nikCol < 0 || passCol < 0 || roleCol < 0) {
+    throw new Error('Struktur sheet "users" tidak valid. Kolom nik, password, atau role tidak ditemukan.');
+  }
+
+  for (var i = 1; i < data.length; i++) {
+    var rowNik = String(data[i][nikCol]).trim();
+    var rowPass = String(data[i][passCol]).trim();
+    if (rowNik.toLowerCase() === nik.toLowerCase() && rowPass === password) {
+      var nameVal = nameCol >= 0 ? String(data[i][nameCol]) : rowNik;
+      var roleVal = String(data[i][roleCol]).toLowerCase().trim();
+      
+      var expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 8); // 8 jam expiry
+
+      return {
+        nik: rowNik,
+        name: nameVal,
+        role: roleVal,
+        token: 'token_' + Utilities.getUuid(),
+        expires_at: expiresAt.toISOString()
+      };
+    }
+  }
+
+  throw new Error('NIK atau password salah.');
 }
 
 // ─── GET MASTER DATA ──────────────────────────────────────────
@@ -393,8 +448,20 @@ function setupSpreadsheetHeaders() {
     inspSheet.getRange(1, 1, 1, inspHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
   }
 
+  // users
+  var uSheet = ss.getSheetByName(SHEET.USERS) || ss.insertSheet(SHEET.USERS);
+  if (uSheet.getLastRow() === 0) {
+    var uHeaders = ['nik', 'password', 'name', 'role', 'created_at'];
+    uSheet.getRange(1, 1, 1, uHeaders.length).setValues([uHeaders]);
+    uSheet.getRange(1, 1, 1, uHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
+    
+    // Seed default admin user
+    var now = new Date().toISOString();
+    uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
+  }
+
   SpreadsheetApp.flush();
-  Logger.log('Setup selesai! Sheets tersedia: vendors, master_data, inspections');
+  Logger.log('Setup selesai! Sheets tersedia: vendors, master_data, inspections, users');
 }
 
 // ─── HELPER ───────────────────────────────────────────────────

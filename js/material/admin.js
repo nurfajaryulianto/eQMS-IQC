@@ -2,7 +2,7 @@
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
-import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from '../auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
@@ -24,7 +24,7 @@ const MOCK_MASTER_DATA = [
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireRole([ROLES.ADMIN]);
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN]);
     if (!currentUser) return;
 
     setupNavbar(currentUser);
@@ -34,16 +34,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function setupNavbar(user) {
     const el = document.getElementById('nav-user-name');
-    if (el) el.textContent = user.user_metadata?.display_name || user.user_metadata?.nik || 'Admin';
+    if (el) el.textContent = user.name || user.nik || 'Admin';
 }
 
 function setupLogout() {
     const btn = document.getElementById('nav-logout-btn');
     if (btn) btn.addEventListener('click', async () => {
         if (confirm('Yakin ingin logout?')) {
-            await signOut();
-            sessionStorage.removeItem('app_target');
-            window.location.replace('../home.html');
+            await materialLogout();
         }
     });
 }
@@ -55,7 +53,7 @@ window.loadMasterData = async function () {
     if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data...</td></tr>`;
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
             const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData&status=all`);
@@ -223,7 +221,7 @@ window.confirmUpload = async function () {
     setLoading(true, `Mengupload ${parsedFileData.length} baris...`);
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             await delay(1500);
             // Simulate adding to allMasterData
             parsedFileData.forEach(row => {
@@ -244,7 +242,7 @@ window.confirmUpload = async function () {
         const payload = {
             action: 'bulkUpsertMasterData',
             rows: parsedFileData,
-            uploader_nik: currentUser?.user_metadata?.nik || '',
+            uploader_nik: currentUser?.nik || 'admin',
         };
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
@@ -298,7 +296,7 @@ window.confirmPassAll = async function () {
     setLoading(true, `Memproses ${pending.length} item...`);
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             await delay(2000);
             allMasterData.forEach(d => { if (d.status === 'pending') d.status = 'done'; });
             setLoading(false);
@@ -310,7 +308,7 @@ window.confirmPassAll = async function () {
 
         const payload = {
             action: 'passAll',
-            admin_nik: currentUser?.user_metadata?.nik || 'admin',
+            admin_nik: currentUser?.nik || 'admin',
         };
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();

@@ -453,7 +453,7 @@
         function goToApp(appTarget, event) {
             event.preventDefault();
 
-            // Store the chosen app so login.html knows where to redirect after login
+            // Store the chosen app target
             sessionStorage.setItem('app_target', appTarget);
 
             // Add loading state to clicked card
@@ -461,9 +461,13 @@
             card.style.pointerEvents = 'none';
             card.style.opacity = '0.7';
 
-            // Navigate to login
+            // Navigate to the respective login page
             setTimeout(() => {
-                window.location.href = 'login.html';
+                if (appTarget === 'material') {
+                    window.location.href = 'material/login.html';
+                } else {
+                    window.location.href = 'login.html';
+                }
             }, 200);
         }
     </script>

@@ -2,7 +2,7 @@
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
-import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from '../auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
 
 // ─── CONFIG ──────────────────────────────────────────────────
 // Ganti dengan URL Web App GAS Material Anda setelah di-deploy
@@ -14,7 +14,7 @@ let filteredPO = [];      // setelah filter/search
 let selectedPO = null;    // PO yang sedang dipilih user
 let currentUser = null;   // user yang sedang login
 
-// ─── MOCK DATA (UI_TEST_MODE) ─────────────────────────────────
+// ─── MOCK DATA (MATERIAL_TEST_MODE) ─────────────────────────
 const MOCK_MASTER_DATA = [
     {
         po_number: 'PO-2025-001',
@@ -76,8 +76,8 @@ const MOCK_MASTER_DATA = [
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireRole([ROLES.AUDITOR, ROLES.SUPERVISOR, ROLES.ADMIN]);
-    if (!currentUser) return; // requireRole handles redirect
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.INSPECTOR]);
+    if (!currentUser) return; // requireMaterialRole handles redirect
 
     setupNavbar(currentUser);
     setupValidationDialog();
@@ -91,28 +91,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupNavbar(user) {
     const nameEl = document.getElementById('nav-user-name');
     if (nameEl) {
-        nameEl.textContent = user.user_metadata?.display_name || user.user_metadata?.nik || 'User';
+        nameEl.textContent = user.name || user.nik || 'User';
     }
 
-    const role = user.user_metadata?.role;
+    const role = user.role;
 
-    // Show admin & dashboard links for admin/supervisor
-    if ([ROLES.ADMIN, ROLES.SUPERVISOR].includes(role)) {
+    // Show admin & dashboard links for admin
+    if (role === MATERIAL_ROLES.ADMIN) {
         const dashLink = document.getElementById('nav-dashboard-link');
         const adminLink = document.getElementById('nav-admin-link');
         if (dashLink) dashLink.style.display = 'flex';
-        if (adminLink) adminLink.style.display = (role === ROLES.ADMIN) ? 'flex' : 'none';
+        if (adminLink) adminLink.style.display = 'flex';
     }
 }
+
+// ─── LOGOUT ──────────────────────────────────────────────────
 
 function setupLogout() {
     const btn = document.getElementById('nav-logout-btn');
     if (btn) {
         btn.addEventListener('click', async () => {
             if (confirm('Yakin ingin logout?')) {
-                await signOut();
-                sessionStorage.removeItem('app_target');
-                window.location.replace('../home.html');
+                await materialLogout();
             }
         });
     }
@@ -124,7 +124,7 @@ async function fetchMasterData() {
     const syncEl = document.getElementById('sync-status-text');
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             allPOData = MOCK_MASTER_DATA;
             setSyncStatus('Data mock aktif', 'ok');
             renderPOList(allPOData);
@@ -406,7 +406,7 @@ async function submitInspection() {
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
-    const inspectorNik = currentUser?.user_metadata?.nik || currentUser?.email || '';
+    const inspectorNik = currentUser?.nik || '';
 
     const payload = {
         action: 'submitInspection',
@@ -421,7 +421,7 @@ async function submitInspection() {
     };
 
     try {
-        if (UI_TEST_MODE) {
+        if (MATERIAL_TEST_MODE) {
             console.log('[TEST MODE] Payload:', JSON.stringify(payload, null, 2));
             await delay(1000);
             // Mark PO as done in local mock
