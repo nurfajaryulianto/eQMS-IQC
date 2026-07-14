@@ -88,7 +88,20 @@ export function saveProcesses(processes) {
 // Ambil semua data dari Supabase, perbarui localStorage cache.
 // Diekspor agar bisa dipanggil dari script.js saat startup.
 
+import { UI_TEST_MODE } from './auth.js';
+
 export async function syncAllFromSupabase() {
+    if (UI_TEST_MODE) {
+        console.log("[TEST MODE] Skipping Supabase catalog sync, using local mock cache.");
+        return {
+            defects: getDefects(),
+            users: getUsers(),
+            vendors: getVendors(),
+            components: getComponents(),
+            processes: getProcesses()
+        };
+    }
+
     const [defects, users, vendors, components, processes] = await Promise.all([
         dbGetDefects(),
         dbGetAppUsers(),

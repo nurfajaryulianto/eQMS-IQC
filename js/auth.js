@@ -65,6 +65,28 @@ export function setMockSession(userData) {
         expiresAt: Date.now() + SESSION_DURATION_MS,
     };
     localStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(payload));
+
+    // Seed mock data for local testing
+    localStorage.setItem('eqms_vendors_v1', JSON.stringify([
+        { id: 1, name: 'Vendor A', material_type: 'upper' },
+        { id: 2, name: 'Vendor B', material_type: 'bottom' }
+    ]));
+    localStorage.setItem('eqms_components_v1', JSON.stringify([
+        { id: 10, name: 'Foxing', vendor_id: 1 },
+        { id: 11, name: 'Tongue', vendor_id: 1 },
+        { id: 12, name: 'Mudguard', vendor_id: 2 }
+    ]));
+    localStorage.setItem('eqms_processes_v1', JSON.stringify([
+        { id: 20, name: 'Stitching', component_id: 10 },
+        { id: 21, name: 'Cutting', component_id: 10 },
+        { id: 22, name: 'Stitching', component_id: 11 },
+        { id: 23, name: 'Buffing', component_id: 12 }
+    ]));
+    localStorage.setItem('eqms_defects_v1', JSON.stringify([
+        { id: 30, name: 'Damage', label: 'Damage', category: 'major' },
+        { id: 31, name: 'Stain', label: 'Stain', category: 'minor' },
+        { id: 32, name: 'Tearing', label: 'Tearing', category: 'critical' }
+    ]));
 }
 
 /** Cek apakah mock session ada DAN belum kadaluarsa. */

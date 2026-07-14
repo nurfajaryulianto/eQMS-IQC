@@ -236,6 +236,7 @@ function resetContextSelection() {
     if (addItemBtn) {
         addItemBtn.disabled = true;
     }
+    updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
     saveToLocalStorage();
 }
@@ -280,6 +281,7 @@ function resetAllFields() {
         addItemBtn.disabled = true;
     }
     
+    updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
     saveToLocalStorage();
 }
@@ -288,11 +290,10 @@ function resetAllFields() {
  * Returns true when all required info is filled so defect/grade buttons can be used.
  */
 function isInfoComplete() {
-    const qty = parseInt(qtySampleSetInput ? qtySampleSetInput.value : '0', 10);
     const tanggal = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
     const style = styleNumberInput ? styleNumberInput.value.trim() : '';
     const model = modelNameInput ? modelNameInput.value.trim() : '';
-    return qty > 0 && tanggal && selectedVendor && style && model && inspectionItems.length > 0;
+    return tanggal && selectedVendor && style && model && inspectionItems.length > 0;
 }
 
 /**
@@ -392,17 +393,18 @@ function toggleButtonGroup(buttons, enable) {
 // FUNGSI BARU: Update Save Button (≥10% Qty Incoming)
 // ===========================================
 function updateSaveButtonState() {
-    const saveButton = document.querySelector('.save-button');
-    if (!saveButton) return;
+    const saveButtons = document.querySelectorAll('.save-button');
     const ready = isInfoComplete();
-    saveButton.disabled = !ready;
-    saveButton.classList.toggle('opacity-50', !ready);
-    saveButton.classList.toggle('cursor-not-allowed', !ready);
-    const hint = document.getElementById('save-progress-hint');
-    if (hint) {
+    saveButtons.forEach(btn => {
+        btn.disabled = !ready;
+        btn.classList.toggle('opacity-50', !ready);
+        btn.classList.toggle('cursor-not-allowed', !ready);
+    });
+    const hints = document.querySelectorAll('.save-progress-hint');
+    hints.forEach(hint => {
         hint.textContent = `Total item inspeksi: ${inspectionItems.length}`;
         hint.classList.toggle('hidden', !ready);
-    }
+    });
 }
 
 // ===========================================
@@ -758,7 +760,7 @@ async function saveData() {
         process: inspectionItems.map(item => item.process).join(', '),
         modelName: document.getElementById("model-name").value,
         styleNumber: document.getElementById("style-number").value,
-        qtyIncoming: qtySampleSetInput ? parseInt(qtySampleSetInput.value, 10) || 0 : 0,
+        qtyIncoming: inspectionItems.reduce((sum, item) => sum + (item.qtyIncoming || 0), 0),
         qtyInspect: totalInspected,
         ftt: finalFtt,
         redoRate: finalRedoRate,
@@ -769,9 +771,11 @@ async function saveData() {
 
     console.log("Data yang akan dikirim (setelah diproses):", JSON.stringify(dataToSend, null, 2));
 
-    const saveButton = document.querySelector(".save-button");
-    saveButton.disabled = true;
-    saveButton.textContent = "MENYIMPAN...";
+    const saveButtons = document.querySelectorAll(".save-button");
+    saveButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.textContent = "MENYIMPAN...";
+    });
 
     if (loadingOverlay) {
         loadingOverlay.classList.add('visible');
@@ -812,7 +816,9 @@ async function saveData() {
             loadingOverlay.classList.remove('visible');
         }
 
-        saveButton.textContent = "SIMPAN";
+        saveButtons.forEach(btn => {
+            btn.textContent = "SIMPAN";
+        });
         updateSaveButtonState();
     }
 }
@@ -882,23 +888,16 @@ function validateDefects() {
 // 14. Validasi Qty Sample Set
 // ===========================================
 function validateQtySampleSet() {
-    if (!qtySampleSetInput) {
-        console.error("Elemen qty-sample-set tidak ditemukan!");
+    if (inspectionItems.length === 0) {
+        showAlert('Harap tambahkan minimal 1 Item Inspeksi sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
-
-    const qtyIncomingVal = parseInt(qtySampleSetInput.value, 10);
-    if (isNaN(qtyIncomingVal) || qtyIncomingVal <= 0) {
-        showAlert('Harap masukkan Jumlah Qty Incoming yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
-        return false;
+    for (const item of inspectionItems) {
+        if (item.qtyIncoming <= 0 || item.qtyInspect <= 0) {
+            showAlert(`Item ${item.component} - ${item.process} memiliki Qty Incoming atau Qty Inspect yang tidak valid (harus lebih dari 0).`, 'warning', 'Data Tidak Valid');
+            return false;
+        }
     }
-
-    const qtyInspectVal = parseInt(qtyInspectInput.value, 10);
-    if (isNaN(qtyInspectVal) || qtyInspectVal <= 0) {
-        showAlert('Harap masukkan Jumlah Qty Inspect yang valid dan lebih dari 0.', 'warning', 'Input Tidak Valid');
-        return false;
-    }
-
     return true;
 }
 
@@ -986,14 +985,12 @@ function openInspectionItemModal(index = null) {
         modalPassVal = 0;
         modalDefectVal = 0;
         
-        // Default quantities from parent session details
-        modalQtyIncomingVal = parseInt(qtySampleSetInput ? qtySampleSetInput.value : '0', 10) || 0;
-        modalQtyInspectVal = parseInt(qtyInspectInput ? qtyInspectInput.value : '0', 10) || 0;
+        // Default quantities
+        modalQtyIncomingVal = 0;
+        modalQtyInspectVal = 0;
         
-        // Synchronize Inspect Mode inside the modal with the main form setting
-        const mainMode = qtyInspectModeSelect ? qtyInspectModeSelect.value : 'manual';
         const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
-        if (modalModeSelect) modalModeSelect.value = mainMode;
+        if (modalModeSelect) modalModeSelect.value = 'manual';
     } else {
         modalTitle.textContent = 'Edit Item Inspeksi';
         const item = inspectionItems[index];
@@ -1437,38 +1434,6 @@ async function initApp() {
     if (tanggalInspectionInput) tanggalInspectionInput.addEventListener('change', saveToLocalStorage);
     if (tanggalBucketInput) tanggalBucketInput.addEventListener('change', saveToLocalStorage);
 
-    // Qty auto-calculation logic setup
-    function handleQtyCalculation() {
-        if (!qtySampleSetInput || !qtyInspectModeSelect || !qtyInspectInput) return;
-        const mode = qtyInspectModeSelect.value;
-        const incoming = parseInt(qtySampleSetInput.value, 10) || 0;
-        
-        if (mode === 'manual') {
-            qtyInspectInput.readOnly = false;
-        } else {
-            qtyInspectInput.readOnly = true;
-            let pct = 0.10;
-            if (mode === 'percent_1') pct = 0.01;
-            else if (mode === 'percent_5') pct = 0.05;
-            else if (mode === 'percent_20') pct = 0.20;
-            
-            qtyInspectInput.value = Math.round(incoming * pct);
-        }
-        currentInspectionLimit = parseInt(qtyInspectInput.value, 10) || 0;
-        updateTotalQtyInspect();
-        checkInfoCompleteAndLockButtons();
-    }
-    
-    if (qtyInspectModeSelect) qtyInspectModeSelect.addEventListener('change', handleQtyCalculation);
-    if (qtySampleSetInput) qtySampleSetInput.addEventListener('input', handleQtyCalculation);
-    if (qtyInspectInput) {
-        qtyInspectInput.addEventListener('input', () => {
-            currentInspectionLimit = parseInt(qtyInspectInput.value, 10) || 0;
-            updateTotalQtyInspect();
-            checkInfoCompleteAndLockButtons();
-        });
-    }
-
     // Bind Add Item action
     if (addItemBtn) {
         addItemBtn.addEventListener('click', () => {
@@ -1500,24 +1465,10 @@ async function initApp() {
         });
     }
 
-    const saveButton = document.querySelector(".save-button");
-    if (saveButton) {
-        saveButton.addEventListener("click", saveData);
-    }
-
-    if (qtySampleSetInput) {
-        let storedQty = localStorage.getItem('qtySampleSet');
-        let qtySampleSetValue = (storedQty && !isNaN(parseInt(storedQty, 10))) ? parseInt(storedQty, 10) : 0;
-        qtySampleSetInput.value = qtySampleSetValue;
-        
-        if (qtyInspectModeSelect) {
-            qtyInspectModeSelect.value = 'manual';
-        }
-        if (qtyInspectInput) {
-            qtyInspectInput.value = 0;
-        }
-        handleQtyCalculation();
-    }
+    const saveButtons = document.querySelectorAll(".save-button");
+    saveButtons.forEach(btn => {
+        btn.addEventListener("click", saveData);
+    });
 
     const statisticButton = document.querySelector('.statistic-button');
     if (statisticButton) {

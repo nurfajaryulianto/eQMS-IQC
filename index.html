@@ -688,34 +688,6 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label for="qty-sample-set"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty
-                                            Incoming</label>
-                                        <input type="number" id="qty-sample-set" value="0" min="0"
-                                            placeholder="Masukkan jumlah incoming"
-                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label for="qty-inspect-mode"
-                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Inspect Mode</label>
-                                            <select id="qty-inspect-mode"
-                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-1.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                                <option value="manual">Manual</option>
-                                                <option value="percentage">10%</option>
-                                                <option value="percent_1">1%</option>
-                                                <option value="percent_5">5%</option>
-                                                <option value="percent_20">20%</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label for="qty-inspect-input"
-                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect</label>
-                                            <input type="number" id="qty-inspect-input" value="0" min="0"
-                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-1.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                        </div>
-                                    </div>
-                                    <div>
                                         <label for="tanggal-incoming"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal
                                             Incoming</label>
@@ -762,12 +734,12 @@
                                             class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm px-3 py-2 focus:outline-none cursor-default">
                                     </div>
                                 </div>
-                                <div class="px-4 py-3 border-t border-slate-200">
+                                <div class="hidden lg:block px-4 py-3 border-t border-slate-200">
                                     <button
                                         class="save-button w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
                                         Simpan
                                     </button>
-                                    <p id="save-progress-hint" class="hidden text-center text-xs text-slate-500 mt-1">
+                                    <p class="save-progress-hint hidden text-center text-xs text-slate-500 mt-1">
                                     </p>
                                 </div>
                             </div>
@@ -865,6 +837,16 @@
                             <div id="summary-list" class="flex-1 overflow-y-auto thin-scroll divide-y divide-slate-100">
                                 <!-- Populated by JS -->
                             </div>
+                        </div>
+
+                        <!-- MOBILE SAVE BUTTON CARD -->
+                        <div class="col-span-1 lg:hidden bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-2">
+                            <button
+                                class="save-button w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                                Simpan
+                            </button>
+                            <p class="save-progress-hint hidden text-center text-xs text-slate-500 mt-1">
+                            </p>
                         </div>
 
                     </div><!-- end grid -->
