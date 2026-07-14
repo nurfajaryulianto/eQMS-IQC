@@ -19,7 +19,7 @@ let currentLimitView = 'today'; // Default tampilan awal tabel adalah 'today'
 let currentAuditorTableFilter = 'all'; // Default auditor untuk tabel adalah 'all'
 
 // Auditor mappings for plants
-const plant1Auditors = ['Badrowi', 'Sopan Sopian', 'Elita', 'Puji', 'Muadaroh', 'Yaffie', 'Anin'];  
+const plant1Auditors = ['Badrowi', 'Sopan Sopian', 'Elita', 'Puji', 'Muadaroh', 'Yaffie', 'Anin'];
 const plant2Auditors = ['Iksan', 'Inda', 'Inggit', 'Yusuf', 'Anin'];
 
 
@@ -106,7 +106,7 @@ export async function initDashboard() {
     });
 
     // New event listener for the Limit View filter
-// NEW: Event listener for Auditor Table Filter dropdown
+    // NEW: Event listener for Auditor Table Filter dropdown
     document.getElementById('auditorTableFilter').addEventListener('change', (e) => {
         currentAuditorTableFilter = e.target.value;
         updateDashboard(); // Panggil updateDashboard saat filter auditor tabel berubah
@@ -167,54 +167,54 @@ async function fetchData() {
 
         // Mapping dari schema GAS baru (sessions + defects)
         const rawSessions = data.sessions || data.inspections || [];
-        const rawDefects  = data.defects  || [];
+        const rawDefects = data.defects || [];
 
         allInspections = rawSessions.map(item => {
             // Support both new schema (camelCase) and old schema (spaced headers)
             const qtyInspect = Number(item.QtyInspect || item.Qty_Inspect || item['Qty Inspect']) || 0;
-            const pass       = Number(item.Pass   || item['Qty Pass'])   || 0;
-            const defect     = Number(item.Defect || item['Qty Defect']) || 0;
-            const ftt        = qtyInspect > 0 ? pass   / qtyInspect : 0;
+            const pass = Number(item.Pass || item['Qty Pass']) || 0;
+            const defect = Number(item.Defect || item['Qty Defect']) || 0;
+            const ftt = qtyInspect > 0 ? pass / qtyInspect : 0;
             const defectRate = qtyInspect > 0 ? defect / qtyInspect : 0;
             return {
-                Timestamp:       new Date(item.Timestamp || item.timeStamp),
-                TanggalIncoming: item.TanggalIncoming || item.Date        || '',
+                Timestamp: new Date(item.Timestamp || item.timeStamp),
+                TanggalIncoming: item.TanggalIncoming || item.Date || '',
                 TanggalInspection: item.TanggalInspection || item['Tanggal Inspection'] || '',
-                Bucket:          item.Bucket          || '',
-                MaterialType:    item.MaterialType    || item['Material Type'] || '',
-                Auditor:         item.Auditor         || item['User Login'] || '',
-                Vendor:          item.Vendor          || '',
-                Component:       item.Component       || '',
-                Process:         item.Process         || '',
-                'Style Number':  item.StyleNumber     || item['Style Number'] || '',
-                Model:           item.ModelName       || item.Model           || '',
-                QtyIncoming:     Number(item.QtyIncoming || item['Qty Incoming']) || 0,
-                Qty_Inspect:     qtyInspect,
-                Pass:            pass,
-                Defect:          defect,
-                FTT:             ftt,
-                Rework_Rate:     defectRate,
-                SessionId:       item.SessionId || item.SessionID || '',
+                Bucket: item.Bucket || '',
+                MaterialType: item.MaterialType || item['Material Type'] || '',
+                Auditor: item.Auditor || item['User Login'] || '',
+                Vendor: item.Vendor || '',
+                Component: item.Component || '',
+                Process: item.Process || '',
+                'Style Number': item.StyleNumber || item['Style Number'] || '',
+                Model: item.ModelName || item.Model || '',
+                QtyIncoming: Number(item.QtyIncoming || item['Qty Incoming']) || 0,
+                Qty_Inspect: qtyInspect,
+                Pass: pass,
+                Defect: defect,
+                FTT: ftt,
+                Rework_Rate: defectRate,
+                SessionId: item.SessionId || item.SessionID || '',
             };
         });
 
         allDefects = rawDefects.map(item => ({
-            SessionId:       item.SessionId       || item.SessionID      || '',
-            TanggalIncoming: item.TanggalIncoming || item.Date           || '',
-            Vendor:          item.Vendor          || '',
-            Component:       item.Component       || '',
-            DefectType:      item.DefectType      || item['Issue Findings'] || item.Type || '',
-            Count:           Number(item.Count)   || 0,
+            SessionId: item.SessionId || item.SessionID || '',
+            TanggalIncoming: item.TanggalIncoming || item.Date || '',
+            Vendor: item.Vendor || '',
+            Component: item.Component || '',
+            DefectType: item.DefectType || item['Issue Findings'] || item.Type || '',
+            Count: Number(item.Count) || 0,
         }));
 
         populateFilters({
-            auditors:     [...new Set(allInspections.map(i => i.Auditor).filter(Boolean))],
-            vendors:      [...new Set(allInspections.map(i => i.Vendor).filter(Boolean))],
-            materialTypes:[...new Set(allInspections.map(i => i.MaterialType).filter(Boolean))],
-            models:       [...new Set(allInspections.map(i => i.Model).filter(Boolean))],
+            auditors: [...new Set(allInspections.map(i => i.Auditor).filter(Boolean))],
+            vendors: [...new Set(allInspections.map(i => i.Vendor).filter(Boolean))],
+            materialTypes: [...new Set(allInspections.map(i => i.MaterialType).filter(Boolean))],
+            models: [...new Set(allInspections.map(i => i.Model).filter(Boolean))],
             styleNumbers: [...new Set(allInspections.map(i => i['Style Number']).filter(Boolean))],
             // backward-compat
-            ncvs:         [...new Set(allInspections.map(i => i.NCVS).filter(Boolean))],
+            ncvs: [...new Set(allInspections.map(i => i.NCVS).filter(Boolean))],
         });
         updateDashboard();
 
@@ -225,6 +225,7 @@ async function fetchData() {
     } finally {
         loadingOverlay.style.display = 'none';
     }
+} // end fetchData
 
 function populateFilters(filters) {
     const populate = (elementId, options) => {
@@ -240,8 +241,8 @@ function populateFilters(filters) {
         if (currentVal) select.value = currentVal;
     };
     populate('auditorFilter', (filters.auditors || []).sort());
-    populate('vendorFilter',  (filters.vendors  || []).sort());
-    populate('modelFilter',   (filters.models   || []).sort());
+    populate('vendorFilter', (filters.vendors || []).sort());
+    populate('modelFilter', (filters.models || []).sort());
 
     // Populate the table auditor filter dynamically from actual data
     const auditorTableSelect = document.getElementById('auditorTableFilter');
@@ -273,7 +274,7 @@ function resetFilters() {
     if (endDateEl) endDateEl.value = todayStr;
 
     document.getElementById('auditorFilter').value = '';
-    const vf = document.getElementById('vendorFilter');       if (vf) vf.value = '';
+    const vf = document.getElementById('vendorFilter'); if (vf) vf.value = '';
     const mf = document.getElementById('materialTypeFilter'); if (mf) mf.value = '';
     document.getElementById('modelFilter').value = '';
     updateDashboard();
@@ -287,24 +288,24 @@ function updateDashboard() {
     };
 
     const filters = {
-        startDate:    parseLocalDate(document.getElementById('startDate').value),
-        endDate:      parseLocalDate(document.getElementById('endDate').value),
-        auditor:      document.getElementById('auditorFilter').value,
-        vendor:       document.getElementById('vendorFilter')?.value       || '',
+        startDate: parseLocalDate(document.getElementById('startDate').value),
+        endDate: parseLocalDate(document.getElementById('endDate').value),
+        auditor: document.getElementById('auditorFilter').value,
+        vendor: document.getElementById('vendorFilter')?.value || '',
         materialType: document.getElementById('materialTypeFilter')?.value || '',
-        model:        document.getElementById('modelFilter').value,
+        model: document.getElementById('modelFilter').value,
     };
 
     if (filters.endDate) filters.endDate.setHours(23, 59, 59, 999);
 
     const filteredInspections = allInspections.filter(item => {
         const d = item.Timestamp;
-        return (!filters.startDate    || d >= filters.startDate) &&
-               (!filters.endDate      || d <= filters.endDate) &&
-               (!filters.auditor      || item.Auditor      === filters.auditor) &&
-               (!filters.vendor       || item.Vendor       === filters.vendor) &&
-               (!filters.materialType || item.MaterialType === filters.materialType) &&
-               (!filters.model        || item.Model        === filters.model);
+        return (!filters.startDate || d >= filters.startDate) &&
+            (!filters.endDate || d <= filters.endDate) &&
+            (!filters.auditor || item.Auditor === filters.auditor) &&
+            (!filters.vendor || item.Vendor === filters.vendor) &&
+            (!filters.materialType || item.MaterialType === filters.materialType) &&
+            (!filters.model || item.Model === filters.model);
     });
 
     // Match defects by SessionId from filtered sessions
@@ -314,9 +315,9 @@ function updateDashboard() {
         : allDefects.filter(d => {
             const dt = d.TanggalIncoming ? new Date(d.TanggalIncoming) : null;
             return (!filters.startDate || !dt || dt >= filters.startDate) &&
-                   (!filters.endDate   || !dt || dt <= filters.endDate) &&
-                   (!filters.vendor    || d.Vendor === filters.vendor);
-          });
+                (!filters.endDate || !dt || dt <= filters.endDate) &&
+                (!filters.vendor || d.Vendor === filters.vendor);
+        });
 
     updateMetrics(filteredInspections);
     updateFttChart(filteredInspections, currentFttPeriod);
@@ -328,14 +329,14 @@ function updateDashboard() {
 
 function updateMetrics(data) {
     const totalQtyInspect = data.reduce((sum, item) => sum + item.Qty_Inspect, 0);
-    const totalPass       = data.reduce((sum, item) => sum + item.Pass,        0);
-    const totalDefect     = data.reduce((sum, item) => sum + item.Defect,      0);
+    const totalPass = data.reduce((sum, item) => sum + item.Pass, 0);
+    const totalDefect = data.reduce((sum, item) => sum + item.Defect, 0);
 
-    const fttPct        = totalQtyInspect > 0 ? (totalPass   / totalQtyInspect) * 100 : 0;
+    const fttPct = totalQtyInspect > 0 ? (totalPass / totalQtyInspect) * 100 : 0;
     const defectRatePct = totalQtyInspect > 0 ? (totalDefect / totalQtyInspect) * 100 : 0;
 
     document.getElementById('analytics-fttOutput').textContent = `${fttPct.toFixed(2)}%`;
-    document.getElementById('reworkRateOutput').textContent    = `${defectRatePct.toFixed(2)}%`;
+    document.getElementById('reworkRateOutput').textContent = `${defectRatePct.toFixed(2)}%`;
     const totalEl = document.getElementById('totalInspectedOutput');
     if (totalEl) totalEl.textContent = totalQtyInspect.toLocaleString('id-ID');
 
@@ -422,7 +423,7 @@ function updateFttChart(data, period) {
         plugins: {
             tooltip: {
                 callbacks: {
-                    label: function(context) {
+                    label: function (context) {
                         let label = context.dataset.label || '';
                         if (label) {
                             label += ': ';
@@ -473,7 +474,7 @@ function updateDefectChart(data) {
 
 function updateGradePieChart(data) {
     const ctx = document.getElementById('gradePieChart').getContext('2d');
-    const totalPass   = data.reduce((sum, item) => sum + item.Pass,   0);
+    const totalPass = data.reduce((sum, item) => sum + item.Pass, 0);
     const totalDefect = data.reduce((sum, item) => sum + item.Defect, 0);
 
     renderChart(ctx, 'doughnut', {
@@ -489,7 +490,7 @@ function updateGradePieChart(data) {
             legend: { position: 'bottom' },
             tooltip: {
                 callbacks: {
-                    label: function(context) {
+                    label: function (context) {
                         const total = totalPass + totalDefect;
                         const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
                         return ` ${context.label}: ${context.parsed} (${pct}%)`;
@@ -508,7 +509,7 @@ function updateNcvsFttChart(data, sortOrder) {
         const vendor = item.Vendor;
         if (!vendor) return;
         if (!vendorData[vendor]) vendorData[vendor] = { passSum: 0, inspectSum: 0 };
-        vendorData[vendor].passSum    += item.Pass;
+        vendorData[vendor].passSum += item.Pass;
         vendorData[vendor].inspectSum += item.Qty_Inspect;
     });
 
@@ -596,12 +597,12 @@ function updateInspectionTable(data) {
         const materialBadge = item.MaterialType === 'upper'
             ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">Upper</span>'
             : item.MaterialType === 'bottom'
-            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Bottom</span>'
-            : '<span class="text-slate-400">—</span>';
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Bottom</span>'
+                : '<span class="text-slate-400">—</span>';
         const row = document.createElement('tr');
         row.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
         row.innerHTML = `
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${item.Timestamp.toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${item.Timestamp.toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalIncoming || '—'}</td>
             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalInspection || '—'}</td>
             <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.Bucket || '—'}</td>
@@ -618,5 +619,4 @@ function updateInspectionTable(data) {
         `;
         tbody.appendChild(row);
     });
-}
 }
