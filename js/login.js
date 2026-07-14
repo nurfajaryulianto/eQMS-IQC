@@ -112,20 +112,31 @@ function showLockout() {
 }
 
 // =====================================================
+// REDIRECT TARGET HELPER
+// Membaca app_target dari sessionStorage yang di-set oleh home.html
+// =====================================================
+function getRedirectTarget() {
+    const target = sessionStorage.getItem('app_target');
+    if (target === 'material') return '/material/index.html';
+    if (target === 'subcont') return '/index.html';
+    // Default: jika tidak ada target, kembali ke home
+    return '/home.html';
+}
+
+// =====================================================
 // REDIRECT JIKA SUDAH LOGIN
 // =====================================================
 async function redirectIfLoggedIn() {
     if (UI_TEST_MODE) {
         if (hasMockSession()) {
-            // Baca role dari mock session untuk arahkan ke halaman yang tepat
-            window.location.replace('/index.html');
+            window.location.replace(getRedirectTarget());
         }
         return;
     }
     try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-            window.location.replace('/index.html');
+            window.location.replace(getRedirectTarget());
         }
     } catch {
         // Lanjutkan ke halaman login jika ada error
@@ -199,7 +210,7 @@ async function handleLogin(event) {
 
             setMockSession({ display_name: displayName, nik, role: testRole });
 
-            window.location.replace('/index.html');
+            window.location.replace(getRedirectTarget());
             return;
         }
         // ── Akhir UI TESTING MODE ──
@@ -223,9 +234,9 @@ async function handleLogin(event) {
             return;
         }
 
-        // Login berhasil → bersihkan rate limit dan redirect berdasarkan role
+        // Login berhasil → bersihkan rate limit dan redirect berdasarkan app_target
         resetAttempts();
-        window.location.replace('/index.html');
+        window.location.replace(getRedirectTarget());
 
     } catch {
         showError('Terjadi kesalahan koneksi. Periksa jaringan dan coba lagi.');

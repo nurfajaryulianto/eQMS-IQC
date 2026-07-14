@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-QMS — Quality Management System</title>
+    <meta name="description" content="Portal E-QMS — Pilih modul inspeksi yang ingin Anda gunakan.">
+    <link rel="icon" href="assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="assets/css/tailwind.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0f3460 70%, #162032 100%);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated background blobs */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -20%;
+            left: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: blob1 12s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -20%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: blob2 15s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes blob1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(40px, -30px) scale(1.05); }
+            66% { transform: translate(-20px, 20px) scale(0.97); }
+        }
+
+        @keyframes blob2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(-30px, 20px) scale(1.08); }
+            66% { transform: translate(15px, -25px) scale(0.95); }
+        }
+
+        /* Grid overlay pattern */
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* App cards */
+        .app-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 24px;
+            padding: 2.5rem;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+        }
+
+        .app-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            border-radius: inherit;
+        }
+
+        .app-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: rgba(255, 255, 255, 0.28);
+            box-shadow:
+                0 32px 64px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255,255,255,0.1),
+                inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        .app-card:hover::before {
+            opacity: 1;
+        }
+
+        .app-card:active {
+            transform: translateY(-4px) scale(1.01);
+            transition: all 0.15s ease;
+        }
+
+        .card-subcont {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(29, 78, 216, 0.15) 100%);
+            border-color: rgba(96, 165, 250, 0.25);
+        }
+
+        .card-subcont:hover {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.35) 0%, rgba(29, 78, 216, 0.22) 100%);
+            border-color: rgba(96, 165, 250, 0.45);
+            box-shadow:
+                0 32px 64px rgba(37, 99, 235, 0.3),
+                0 0 0 1px rgba(96, 165, 250, 0.2),
+                inset 0 1px 0 rgba(147, 197, 253, 0.15);
+        }
+
+        .card-material {
+            background: linear-gradient(135deg, rgba(5, 150, 105, 0.22) 0%, rgba(4, 120, 87, 0.14) 100%);
+            border-color: rgba(52, 211, 153, 0.22);
+        }
+
+        .card-material:hover {
+            background: linear-gradient(135deg, rgba(5, 150, 105, 0.35) 0%, rgba(4, 120, 87, 0.22) 100%);
+            border-color: rgba(52, 211, 153, 0.45);
+            box-shadow:
+                0 32px 64px rgba(5, 150, 105, 0.28),
+                0 0 0 1px rgba(52, 211, 153, 0.2),
+                inset 0 1px 0 rgba(110, 231, 183, 0.15);
+        }
+
+        .card-icon-wrap {
+            width: 72px;
+            height: 72px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .card-icon-wrap::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: inherit;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .icon-subcont {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+        }
+
+        .icon-material {
+            background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-new {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 999px;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+        }
+
+        .arrow-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .app-card:hover .arrow-icon {
+            background: rgba(255,255,255,0.18);
+            transform: translateX(4px);
+        }
+
+        /* Feature pills */
+        .feature-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.65);
+            white-space: nowrap;
+        }
+
+        /* Divider */
+        .or-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.2);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .or-divider::before,
+        .or-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+        }
+
+        /* Stat chips */
+        .stat-chip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            gap: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .app-card {
+                padding: 1.75rem;
+                border-radius: 20px;
+            }
+            .card-icon-wrap {
+                width: 60px;
+                height: 60px;
+                border-radius: 16px;
+                margin-bottom: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="grid-bg"></div>
+
+    <div class="content">
+
+        <!-- Top bar -->
+        <header style="border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); backdrop-filter: blur(12px);">
+            <div style="max-width: 960px; margin: 0 auto; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #6366f1); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-symbols-outlined" style="color: white; font-size: 18px;">verified_user</span>
+                    </div>
+                    <span style="font-weight: 700; font-size: 15px; color: white; letter-spacing: -0.01em;">E-QMS</span>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 500; margin-left: 4px;">Portal</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.45);">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
+                    <span id="current-time">—</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px;">
+
+            <!-- Hero title -->
+            <div style="text-align: center; margin-bottom: 48px; max-width: 560px;">
+                <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 5px 14px; margin-bottom: 20px;">
+                    <span class="material-symbols-outlined" style="font-size: 14px; color: #60a5fa;">verified</span>
+                    <span style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); letter-spacing: 0.06em; text-transform: uppercase;">Quality Management System</span>
+                </div>
+                <h1 style="font-size: clamp(28px, 5vw, 40px); font-weight: 800; color: white; letter-spacing: -0.025em; line-height: 1.15; margin-bottom: 12px;">
+                    Pilih Modul Inspeksi
+                </h1>
+                <p style="font-size: 15px; color: rgba(255,255,255,0.45); line-height: 1.6;">
+                    Selamat datang di portal E-QMS. Silakan pilih modul yang ingin Anda akses untuk memulai.
+                </p>
+            </div>
+
+            <!-- Cards Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; width: 100%; max-width: 760px; margin-bottom: 48px;">
+
+                <!-- Card 1: IQC Subcont -->
+                <a id="btn-subcont" href="#" class="app-card card-subcont" onclick="goToApp('subcont', event)" role="button" aria-label="Buka IQC Subcont">
+                    <div style="display: flex; flex-direction: column; gap: 0;">
+                        <!-- Top row -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem;">
+                            <div class="card-icon-wrap icon-subcont">
+                                <span class="material-symbols-outlined" style="color: white; font-size: 34px;">factory</span>
+                            </div>
+                            <div class="arrow-icon">
+                                <span class="material-symbols-outlined" style="color: rgba(255,255,255,0.7); font-size: 20px;">arrow_forward</span>
+                            </div>
+                        </div>
+
+                        <!-- Title -->
+                        <div style="margin-bottom: 8px;">
+                            <h2 style="font-size: 22px; font-weight: 700; color: white; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 6px;">IQC Subcont</h2>
+                            <p style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.55;">
+                                Inspeksi kualitas komponen subcontract — defect tracking, FTT, dan vendor performance.
+                            </p>
+                        </div>
+
+                        <!-- Features -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;">
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">task_alt</span>
+                                Defect Tracking
+                            </span>
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">bar_chart</span>
+                                FTT Analytics
+                            </span>
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">storefront</span>
+                                Vendor KPI
+                            </span>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Card 2: IQC Material -->
+                <a id="btn-material" href="#" class="app-card card-material" onclick="goToApp('material', event)" role="button" aria-label="Buka IQC Material">
+                    <div style="display: flex; flex-direction: column; gap: 0;">
+                        <!-- Top row -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem;">
+                            <div class="card-icon-wrap icon-material">
+                                <span class="material-symbols-outlined" style="color: white; font-size: 34px;">inventory_2</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                                <span class="badge-new">✦ New</span>
+                                <div class="arrow-icon">
+                                    <span class="material-symbols-outlined" style="color: rgba(255,255,255,0.7); font-size: 20px;">arrow_forward</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Title -->
+                        <div style="margin-bottom: 8px;">
+                            <h2 style="font-size: 22px; font-weight: 700; color: white; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 6px;">IQC Material</h2>
+                            <p style="font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.55;">
+                                Inspeksi incoming material berdasarkan PO — input Qty Inspect, Qty Fail, dan laporan KPI.
+                            </p>
+                        </div>
+
+                        <!-- Features -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;">
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">receipt_long</span>
+                                Master Data PO
+                            </span>
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">upload_file</span>
+                                Upload Template
+                            </span>
+                            <span class="feature-pill">
+                                <span class="material-symbols-outlined" style="font-size: 12px;">speed</span>
+                                KPI Dashboard
+                            </span>
+                        </div>
+                    </div>
+                </a>
+
+            </div>
+
+            <!-- Stats row -->
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                <div class="stat-chip">
+                    <span style="font-size: 18px; font-weight: 800; color: white;">2</span>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 500;">Modul Aktif</span>
+                </div>
+                <div class="stat-chip">
+                    <span style="font-size: 18px; font-weight: 800; color: white;">1</span>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 500;">Portal Login</span>
+                </div>
+                <div class="stat-chip">
+                    <span style="font-size: 18px; font-weight: 800; color: white;">2</span>
+                    <span style="font-size: 11px; color: rgba(255,255,255,0.35); font-weight: 500;">Role Pengguna</span>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer style="border-top: 1px solid rgba(255,255,255,0.06); padding: 16px 24px; text-align: center;">
+            <p style="font-size: 12px; color: rgba(255,255,255,0.2);">
+                &copy; 2025 E-QMS &mdash; Sistem Manajemen Kualitas Internal. Akses terbatas untuk personel berwenang.
+            </p>
+        </footer>
+
+    </div>
+
+    <script>
+        // Update current time
+        function updateTime() {
+            const el = document.getElementById('current-time');
+            if (!el) return;
+            const now = new Date();
+            el.textContent = now.toLocaleString('id-ID', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        updateTime();
+        setInterval(updateTime, 60000);
+
+        // Navigate to app
+        function goToApp(appTarget, event) {
+            event.preventDefault();
+
+            // Store the chosen app so login.html knows where to redirect after login
+            sessionStorage.setItem('app_target', appTarget);
+
+            // Add loading state to clicked card
+            const card = event.currentTarget;
+            card.style.pointerEvents = 'none';
+            card.style.opacity = '0.7';
+
+            // Navigate to login
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 200);
+        }
+    </script>
+
+</body>
+</html>

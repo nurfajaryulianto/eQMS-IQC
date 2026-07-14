@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IQC Material — Dashboard KPI</title>
+    <meta name="description" content="Dashboard KPI IQC Material: FTT, Reject Rate, DPMO, dan performa vendor.">
+    <link rel="icon" href="../assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="../assets/css/tailwind.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; user-select: none; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; min-height: 100vh; }
+        .navbar { background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+        /* KPI Card */
+        .kpi-card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 20px; transition: box-shadow 0.2s; }
+        .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
+
+        /* Period filter button */
+        .period-btn { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid #e2e8f0; background: white; color: #64748b; transition: all 0.15s; }
+        .period-btn.active { background: #2563eb; color: white; border-color: #2563eb; }
+
+        /* Chart container */
+        .chart-card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 20px; }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .chart-title { font-size: 14px; font-weight: 700; color: #0f172a; }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .data-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        .data-table tr:hover td { background: #f8fafc; }
+
+        .thin-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+        #loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 300; display: none; align-items: center; justify-content: center; }
+        #loading-overlay.visible { display: flex; }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <a href="../home.html" style="width:36px;height:36px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;text-decoration:none;" title="Home">
+                    <span class="material-symbols-outlined" style="font-size:20px;color:#475569;">home</span>
+                </a>
+                <div style="width:1px;height:22px;background:#e2e8f0;"></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:28px;height:28px;background:linear-gradient(135deg,#10b981,#047857);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                        <span class="material-symbols-outlined" style="color:white;font-size:16px;">inventory_2</span>
+                    </div>
+                    <div>
+                        <div style="font-size:14px;font-weight:700;color:#0f172a;line-height:1.1;">IQC Material</div>
+                        <div style="font-size:10px;color:#94a3b8;font-weight:500;">Dashboard KPI</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <a href="index.html" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;border:1.5px solid #e2e8f0;background:white;color:#475569;font-size:13px;font-weight:600;text-decoration:none;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">assignment</span>Form Inspeksi
+                </a>
+                <a id="nav-admin-link" href="admin.html" style="display:none;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;border:1.5px solid #e2e8f0;background:white;color:#475569;font-size:13px;font-weight:600;text-decoration:none;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">admin_panel_settings</span>Admin
+                </a>
+                <div style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;background:#f8fafc;border:1.5px solid #e2e8f0;">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#64748b;">analytics</span>
+                    <span id="nav-user-name" style="font-size:13px;font-weight:600;color:#334155;">—</span>
+                </div>
+                <button id="nav-logout-btn" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:9px;border:1.5px solid #fecaca;background:#fff5f5;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">logout</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div style="background:white;border-radius:16px;padding:28px 32px;display:flex;align-items:center;gap:14px;box-shadow:0 16px 40px rgba(0,0,0,0.15);">
+            <svg class="animate-spin" style="width:24px;height:24px;color:#2563eb;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span style="font-size:14px;font-weight:600;color:#334155;">Memuat data...</span>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <main style="max-width: 1400px; margin: 0 auto; padding: 24px 20px;">
+
+        <!-- Header + Filters -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+            <div>
+                <h1 style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-0.02em;margin:0 0 3px;">Dashboard KPI — IQC Material</h1>
+                <p style="font-size:13px;color:#64748b;margin:0;">Monitoring kualitas incoming material: FTT, Reject Rate, dan DPMO.</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <!-- Period filter -->
+                <div style="display:flex;gap:4px;background:#f1f5f9;padding:4px;border-radius:10px;">
+                    <button class="period-btn active" id="period-daily"   onclick="setPeriod('daily')">Hari Ini</button>
+                    <button class="period-btn"         id="period-weekly"  onclick="setPeriod('weekly')">7 Hari</button>
+                    <button class="period-btn"         id="period-monthly" onclick="setPeriod('monthly')">30 Hari</button>
+                </div>
+                <!-- Date range -->
+                <input type="date" id="filter-start" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;color:#334155;outline:none;background:white;">
+                <span style="font-size:12px;color:#94a3b8;">s/d</span>
+                <input type="date" id="filter-end" style="padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;color:#334155;outline:none;background:white;">
+                <button onclick="applyFilter()" style="padding:7px 14px;border-radius:8px;border:none;background:#2563eb;color:white;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                    <span class="material-symbols-outlined" style="font-size:15px;">filter_alt</span>Terapkan
+                </button>
+                <button onclick="resetFilter()" style="padding:7px 12px;border-radius:8px;border:1.5px solid #e2e8f0;background:white;color:#475569;font-size:12px;font-weight:600;cursor:pointer;">
+                    <span class="material-symbols-outlined" style="font-size:15px;">restart_alt</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Vendor & Inspector Filters -->
+        <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+            <select id="filter-vendor" onchange="applyFilter()" style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;color:#334155;outline:none;background:white;min-width:160px;">
+                <option value="">Semua Vendor</option>
+            </select>
+            <select id="filter-inspector" onchange="applyFilter()" style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;color:#334155;outline:none;background:white;min-width:160px;">
+                <option value="">Semua Inspector</option>
+            </select>
+        </div>
+
+        <!-- KPI Cards Row -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
+
+            <!-- FTT -->
+            <div class="kpi-card">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;">
+                        <span class="material-symbols-outlined" style="color:white;font-size:20px;">verified</span>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">FTT</div>
+                        <div style="font-size:10px;color:#94a3b8;">First Time Through</div>
+                    </div>
+                </div>
+                <div id="kpi-ftt" style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-0.03em;">—</div>
+                <div id="kpi-ftt-sub" style="font-size:11px;color:#94a3b8;margin-top:4px;">memuat...</div>
+            </div>
+
+            <!-- Reject Rate -->
+            <div class="kpi-card">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;">
+                        <span class="material-symbols-outlined" style="color:white;font-size:20px;">cancel</span>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Reject Rate</div>
+                        <div style="font-size:10px;color:#94a3b8;">Qty Fail / Qty Inspect</div>
+                    </div>
+                </div>
+                <div id="kpi-reject" style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-0.03em;">—</div>
+                <div id="kpi-reject-sub" style="font-size:11px;color:#94a3b8;margin-top:4px;">memuat...</div>
+            </div>
+
+            <!-- DPMO -->
+            <div class="kpi-card">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;">
+                        <span class="material-symbols-outlined" style="color:white;font-size:20px;">speed</span>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">DPMO</div>
+                        <div style="font-size:10px;color:#94a3b8;">Defects per Million Opp.</div>
+                    </div>
+                </div>
+                <div id="kpi-dpmo" style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-0.03em;">—</div>
+                <div id="kpi-dpmo-sub" style="font-size:11px;color:#94a3b8;margin-top:4px;">memuat...</div>
+            </div>
+
+            <!-- Total Inspected -->
+            <div class="kpi-card">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;">
+                        <span class="material-symbols-outlined" style="color:white;font-size:20px;">inventory</span>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Qty Inspected</div>
+                        <div style="font-size:10px;color:#94a3b8;">Total unit diperiksa</div>
+                    </div>
+                </div>
+                <div id="kpi-qty" style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-0.03em;">—</div>
+                <div id="kpi-qty-sub" style="font-size:11px;color:#94a3b8;margin-top:4px;">memuat...</div>
+            </div>
+
+        </div>
+
+        <!-- Charts Row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+            <!-- Reject Rate per Vendor -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Reject Rate per Vendor</span>
+                </div>
+                <canvas id="chart-vendor" height="220"></canvas>
+            </div>
+
+            <!-- FTT Trend -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <span class="chart-title">Tren FTT Harian</span>
+                </div>
+                <canvas id="chart-ftt-trend" height="220"></canvas>
+            </div>
+
+        </div>
+
+        <!-- Inspection Log Table -->
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-title">Log Hasil Inspeksi</span>
+                <span id="table-count" style="font-size:12px;color:#64748b;font-weight:500;"></span>
+            </div>
+            <div class="thin-scroll" style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>PO Number</th>
+                            <th>Material</th>
+                            <th>Vendor</th>
+                            <th>Inspector</th>
+                            <th style="text-align:right;">Qty Inspect</th>
+                            <th style="text-align:right;">Qty Fail</th>
+                            <th style="text-align:right;">FTT</th>
+                            <th style="text-align:center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-tbody">
+                        <tr><td colspan="9" style="padding:40px;text-align:center;color:#94a3b8;">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script type="module" src="../js/material/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IQC Material — Form Inspeksi</title>
+    <meta name="description" content="Form input hasil inspeksi incoming material berdasarkan PO number.">
+    <link rel="icon" href="../assets/images/logo.png" type="image/png">
+    <link rel="stylesheet" href="../assets/css/tailwind.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; user-select: none; }
+        body { font-family: 'Inter', sans-serif; background: #f1f5f9; min-height: 100vh; }
+
+        /* Navbar */
+        .navbar { background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+
+        /* PO Card grid */
+        .po-card {
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .po-card:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            transform: translateY(-1px);
+        }
+        .po-card.selected {
+            border-color: #2563eb;
+            background: #eff6ff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        /* Status badge */
+        .badge-pending { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .badge-done    { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .badge-partial { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+
+        /* Validation dialog overlay */
+        #validation-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .validation-dialog {
+            background: white;
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 32px 64px rgba(0,0,0,0.25);
+        }
+
+        /* Loading overlay */
+        #loading-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            z-index: 300;
+            display: none;
+            align-items: center; justify-content: center;
+        }
+        #loading-overlay.visible { display: flex; }
+
+        /* Search input */
+        .search-wrap { position: relative; }
+        .search-wrap input { padding-left: 38px; }
+        .search-wrap .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+
+        /* Thin scrollbar */
+        .thin-scroll::-webkit-scrollbar { width: 4px; }
+        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+        /* Form section */
+        .form-section {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+        .section-header {
+            background: #f8fafc;
+            padding: 14px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Mode toggle */
+        .mode-tab {
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1.5px solid transparent;
+            color: #64748b;
+            background: transparent;
+        }
+        .mode-tab.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .mode-tab:not(.active):hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <a href="../home.html" style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: #f1f5f9; color: #475569; text-decoration: none; transition: background 0.15s;" title="Home">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">home</span>
+                </a>
+                <div style="width: 1px; height: 22px; background: #e2e8f0;"></div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 28px; height: 28px; background: linear-gradient(135deg, #10b981, #047857); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <span class="material-symbols-outlined" style="color: white; font-size: 16px;">inventory_2</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a; line-height: 1.1;">IQC Material</div>
+                        <div style="font-size: 10px; color: #94a3b8; font-weight: 500;">Form Inspeksi</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <a id="nav-dashboard-link" href="dashboard.html" style="display: none; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 9px; border: 1.5px solid #e2e8f0; background: white; color: #475569; font-size: 13px; font-weight: 600; text-decoration: none; gap: 6px; transition: all 0.15s;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">analytics</span>
+                    Dashboard
+                </a>
+                <a id="nav-admin-link" href="admin.html" style="display: none; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 9px; border: 1.5px solid #e2e8f0; background: white; color: #475569; font-size: 13px; font-weight: 600; text-decoration: none; gap: 6px; transition: all 0.15s;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">admin_panel_settings</span>
+                    Admin
+                </a>
+                <div style="display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; background: #f8fafc; border: 1.5px solid #e2e8f0;">
+                    <span class="material-symbols-outlined" style="font-size: 16px; color: #64748b;">person</span>
+                    <span id="nav-user-name" style="font-size: 13px; font-weight: 600; color: #334155;">—</span>
+                </div>
+                <button id="nav-logout-btn" style="display: flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 9px; border: 1.5px solid #fecaca; background: #fff5f5; color: #dc2626; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">logout</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div style="background: white; border-radius: 16px; padding: 28px 32px; display: flex; align-items: center; gap: 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.15);">
+            <svg class="animate-spin" style="width: 24px; height: 24px; color: #2563eb;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span id="loading-text" style="font-size: 14px; font-weight: 600; color: #334155;">Menyimpan data...</span>
+        </div>
+    </div>
+
+    <!-- Validation Overlay -->
+    <div id="validation-overlay" style="display: none;">
+        <div class="validation-dialog">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #fffbeb; border: 1.5px solid #fcd34d; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <span class="material-symbols-outlined" style="color: #d97706; font-size: 24px;">fact_check</span>
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 2px;">Konfirmasi Data Inspeksi</h3>
+                    <p style="font-size: 12px; color: #64748b; margin: 0;">Periksa data sebelum disimpan</p>
+                </div>
+            </div>
+
+            <div id="validation-summary" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #334155;">
+                <!-- populated by JS -->
+            </div>
+
+            <div id="validation-errors" style="display: none; background: #fff5f5; border: 1.5px solid #fca5a5; border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+                <!-- populated by JS -->
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="validation-cancel-btn" style="padding: 9px 20px; border-radius: 10px; border: 1.5px solid #e2e8f0; background: white; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">
+                    Kembali Edit
+                </button>
+                <button id="validation-confirm-btn" style="padding: 9px 20px; border-radius: 10px; border: none; background: #2563eb; color: white; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">save</span>
+                    Simpan Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Toast -->
+    <div id="alert-toast" style="position: fixed; top: 70px; right: 20px; z-index: 400; display: none; max-width: 340px;">
+        <div style="background: white; border-radius: 12px; padding: 14px 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: 1.5px solid #e2e8f0; display: flex; align-items: flex-start; gap: 10px;">
+            <span id="toast-icon" class="material-symbols-outlined" style="font-size: 20px; flex-shrink: 0;"></span>
+            <span id="toast-text" style="font-size: 13px; color: #334155; line-height: 1.5;"></span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main style="max-width: 1200px; margin: 0 auto; padding: 24px 20px;">
+
+        <!-- Page Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <h1 style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em; margin: 0 0 4px;">Form Inspeksi Material</h1>
+                <p style="font-size: 13px; color: #64748b; margin: 0;">Pilih PO/Material yang akan diinspeksi, lalu isi Qty Inspect dan Qty Fail.</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="sync-status" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: #f0fdf4; border: 1.5px solid #86efac; font-size: 12px; font-weight: 600; color: #16a34a;">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">wifi</span>
+                    <span id="sync-status-text">Memuat data...</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start;">
+
+            <!-- LEFT: PO/Material List -->
+            <div>
+                <div class="form-section">
+                    <div class="section-header">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: #64748b;">receipt_long</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #0f172a;">Daftar PO / Material</span>
+                        <span id="po-count-badge" style="margin-left: auto; font-size: 11px; font-weight: 600; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 99px; border: 1px solid #e2e8f0;">—</span>
+                    </div>
+
+                    <!-- Filters -->
+                    <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <div class="search-wrap" style="flex: 1; min-width: 200px;">
+                            <span class="material-symbols-outlined search-icon" style="font-size: 18px;">search</span>
+                            <input id="po-search" type="text" placeholder="Cari PO, material, vendor..."
+                                style="width: 100%; padding: 8px 12px 8px 36px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13px; color: #334155; outline: none; background: #f8fafc; transition: border 0.15s;"
+                                oninput="filterPOList()"
+                                onfocus="this.style.borderColor='#3b82f6'; this.style.background='white';"
+                                onblur="this.style.borderColor='#e2e8f0'; this.style.background='#f8fafc';">
+                        </div>
+                        <select id="status-filter" onchange="filterPOList()"
+                            style="padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; font-size: 13px; color: #334155; outline: none; background: #f8fafc; cursor: pointer;">
+                            <option value="all">Semua Status</option>
+                            <option value="pending" selected>Pending</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+
+                    <!-- PO List -->
+                    <div id="po-list" class="thin-scroll" style="padding: 14px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 280px); overflow-y: auto; min-height: 200px;">
+                        <!-- Loading state -->
+                        <div id="po-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #94a3b8; gap: 10px;">
+                            <svg class="animate-spin" style="width: 28px; height: 28px; color: #3b82f6;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            <p style="font-size: 13px; font-weight: 500;">Memuat data PO...</p>
+                        </div>
+                        <!-- Empty state (hidden initially) -->
+                        <div id="po-empty" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: #94a3b8; gap: 8px;">
+                            <span class="material-symbols-outlined" style="font-size: 40px; color: #cbd5e1;">inbox</span>
+                            <p style="font-size: 14px; font-weight: 600; color: #64748b; margin: 0;">Tidak ada data PO</p>
+                            <p style="font-size: 12px; color: #94a3b8; margin: 0; text-align: center;">Admin belum mengupload master data, atau semua PO sudah selesai diinspeksi.</p>
+                        </div>
+                        <!-- PO cards rendered here by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Inspection Form -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+
+                <!-- Selected PO Info -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: #64748b;">info</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #0f172a;">Detail Material Terpilih</span>
+                    </div>
+                    <div id="po-detail" style="padding: 16px; font-size: 13px; color: #64748b; font-style: italic;">
+                        Pilih PO dari daftar di kiri untuk mulai inspeksi.
+                    </div>
+                </div>
+
+                <!-- Qty Input Form -->
+                <div class="form-section" id="qty-form-section" style="opacity: 0.4; pointer-events: none; transition: opacity 0.2s;">
+                    <div class="section-header">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: #64748b;">edit_note</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #0f172a;">Input Hasil Inspeksi</span>
+                    </div>
+                    <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+
+                        <!-- Qty Inspect -->
+                        <div>
+                            <label for="qty-inspect" style="display: block; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Qty Inspect <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="number" id="qty-inspect" min="0" placeholder="0"
+                                style="width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-weight: 600; color: #0f172a; outline: none; transition: border 0.15s;"
+                                onfocus="this.style.borderColor='#3b82f6';"
+                                onblur="this.style.borderColor='#e2e8f0';"
+                                oninput="updateCalculations()">
+                        </div>
+
+                        <!-- Qty Fail -->
+                        <div>
+                            <label for="qty-fail" style="display: block; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Qty Fail <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="number" id="qty-fail" min="0" placeholder="0"
+                                style="width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 15px; font-weight: 600; color: #0f172a; outline: none; transition: border 0.15s;"
+                                onfocus="this.style.borderColor='#3b82f6';"
+                                onblur="this.style.borderColor='#e2e8f0';"
+                                oninput="updateCalculations()">
+                        </div>
+
+                        <!-- Auto calculations -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 10px 12px; text-align: center;">
+                                <div style="font-size: 10px; font-weight: 700; color: #16a34a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Pass Rate</div>
+                                <div id="calc-pass-rate" style="font-size: 18px; font-weight: 800; color: #15803d;">—</div>
+                            </div>
+                            <div style="background: #fff5f5; border: 1.5px solid #fca5a5; border-radius: 10px; padding: 10px 12px; text-align: center;">
+                                <div style="font-size: 10px; font-weight: 700; color: #dc2626; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Fail Rate</div>
+                                <div id="calc-fail-rate" style="font-size: 18px; font-weight: 800; color: #b91c1c;">—</div>
+                            </div>
+                        </div>
+
+                        <!-- Defect Notes -->
+                        <div>
+                            <label for="defect-notes" style="display: block; font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Catatan Defect <span style="color: #94a3b8; font-weight: 400; text-transform: none; letter-spacing: 0;">(opsional)</span>
+                            </label>
+                            <textarea id="defect-notes" rows="3" placeholder="Deskripsikan jenis defect yang ditemukan..."
+                                style="width: 100%; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; color: #334155; outline: none; resize: vertical; font-family: inherit; transition: border 0.15s; line-height: 1.5;"
+                                onfocus="this.style.borderColor='#3b82f6';"
+                                onblur="this.style.borderColor='#e2e8f0';"></textarea>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button id="submit-btn" onclick="openValidationDialog()"
+                            style="width: 100%; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">fact_check</span>
+                            Verifikasi & Simpan
+                        </button>
+
+                        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+                            Pop-up konfirmasi akan muncul sebelum data tersimpan.
+                        </p>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <script type="module" src="../js/material/form.js"></script>
+</body>
+</html>

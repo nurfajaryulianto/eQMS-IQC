@@ -1,6 +1,11 @@
 {
   "buildCommand": "npm run build:css",
   "outputDirectory": ".",
+  "routes": [
+    { "src": "^/$", "dest": "/home.html" },
+    { "src": "^/material$", "dest": "/material/index.html" },
+    { "src": "^/material/$", "dest": "/material/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -33,3 +38,4 @@
     }
   ]
 }
+
