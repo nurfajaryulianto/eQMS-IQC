@@ -28,8 +28,9 @@ export const UI_TEST_MODE = false;
 
 // Role yang tersedia di aplikasi
 export const ROLES = {
-    AUDITOR: 'auditor',
+    INSPECTOR: 'inspector',
     SUPERVISOR: 'supervisor',
+    MANAGER: 'manager',
     ADMIN: 'admin',
 };
 
@@ -169,7 +170,7 @@ export async function requireRole(allowedRoles) {
     if (!session) return null; // requireAuth sudah redirect ke login
 
     const user = await getUser();
-    const role = user?.user_metadata?.role || ROLES.AUDITOR;
+    const role = user?.user_metadata?.role || ROLES.INSPECTOR;
 
     if (!allowedRoles.includes(role)) {
         window.location.replace('/unauthorized.html');
@@ -194,7 +195,7 @@ export async function getUser() {
             user_metadata: {
                 display_name: mockSession.display_name,
                 nik: mockSession.nik,
-                role: mockSession.role || 'auditor',
+                role: mockSession.role || 'inspector',
             }
         };
     }
@@ -216,7 +217,7 @@ export async function getUser() {
  */
 export async function getUserRole() {
     const user = await getUser();
-    return user?.user_metadata?.role || ROLES.AUDITOR;
+    return user?.user_metadata?.role || ROLES.INSPECTOR;
 }
 
 /**

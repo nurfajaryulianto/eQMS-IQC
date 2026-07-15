@@ -114,7 +114,7 @@ async function populateLeaders() {
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.INSPECTOR]);
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.SUPERVISOR, MATERIAL_ROLES.MANAGER, MATERIAL_ROLES.INSPECTOR]);
     if (!currentUser) return; // requireMaterialRole handles redirect
 
     setupNavbar(currentUser);
@@ -151,8 +151,8 @@ function setupNavbar(user) {
 
     const role = user.role;
 
-    // Show admin & dashboard links for admin
-    if (role === MATERIAL_ROLES.ADMIN) {
+    // Show admin & dashboard links for admin, supervisor, manager
+    if (role === MATERIAL_ROLES.ADMIN || role === MATERIAL_ROLES.SUPERVISOR || role === MATERIAL_ROLES.MANAGER) {
         const dashLink = document.getElementById('nav-dashboard-link');
         const adminLink = document.getElementById('nav-admin-link');
         if (dashLink) dashLink.style.display = 'flex';

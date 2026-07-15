@@ -197,13 +197,14 @@ async function handleLogin(event) {
                 testRole = storedUser.role;
                 displayName = storedUser.display_name;
             } else {
-                // Fallback: derive role from NIK prefix
                 if (nik.toLowerCase() === 'admin' || nik.toLowerCase().startsWith('adm')) {
                     testRole = ROLES.ADMIN;
                 } else if (nik.toLowerCase().startsWith('spv')) {
                     testRole = ROLES.SUPERVISOR;
+                } else if (nik.toLowerCase().startsWith('mgr')) {
+                    testRole = ROLES.MANAGER;
                 } else {
-                    testRole = ROLES.AUDITOR;
+                    testRole = ROLES.INSPECTOR;
                 }
                 displayName = nik;
             }

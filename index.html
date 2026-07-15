@@ -1921,8 +1921,9 @@
                                         <select id="user-input-role" required
                                             class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                             <option value="">Select role</option>
-                                            <option value="auditor">Auditor</option>
+                                            <option value="inspector">Inspector</option>
                                             <option value="supervisor">Supervisor</option>
+                                            <option value="manager">Manager</option>
                                             <option value="admin">Admin</option>
                                         </select>
                                     </div>
@@ -2013,7 +2014,7 @@
     <script>
         let analyticsReady = false;
         let adminReady = false;
-        const VIEW_ROLES = { 'analytics': ['supervisor', 'admin'], 'admin': ['admin'] };
+        const VIEW_ROLES = { 'analytics': ['supervisor', 'manager', 'admin'], 'admin': ['admin'] };
         function showView(name) {
             if (VIEW_ROLES[name]) {
                 const role = window.__eqmsUserRole;

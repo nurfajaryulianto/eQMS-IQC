@@ -14,8 +14,10 @@ const LOGIN_PAGE  = '/material/login.html';
 
 // ─── ROLES ───────────────────────────────────────────────────
 export const MATERIAL_ROLES = {
-    ADMIN:    'admin',
-    INSPECTOR:'inspector',
+    ADMIN:      'admin',
+    SUPERVISOR: 'supervisor',
+    MANAGER:    'manager',
+    INSPECTOR:  'inspector',
 };
 
 // ─── UI TEST MODE ────────────────────────────────────────────
@@ -93,6 +95,8 @@ export async function materialLogin(nik, password) {
         const mockUsers = {
             'admin':     { name: 'Administrator', role: MATERIAL_ROLES.ADMIN },
             'inspector': { name: 'Inspector Test', role: MATERIAL_ROLES.INSPECTOR },
+            'spv':       { name: 'Supervisor Test', role: MATERIAL_ROLES.SUPERVISOR },
+            'mgr':       { name: 'Manager Test', role: MATERIAL_ROLES.MANAGER },
         };
         const user = mockUsers[nik.toLowerCase()] || { name: nik, role: MATERIAL_ROLES.INSPECTOR };
         const session = {
@@ -137,8 +141,8 @@ export async function materialLogout() {
 export function redirectIfLoggedIn() {
     if (isLoggedIn()) {
         const session = getSession();
-        if (session.role === MATERIAL_ROLES.ADMIN) {
-            window.location.replace('/material/admin.html');
+        if (session.role === MATERIAL_ROLES.ADMIN || session.role === MATERIAL_ROLES.SUPERVISOR || session.role === MATERIAL_ROLES.MANAGER) {
+            window.location.replace('/material/dashboard.html');
         } else {
             window.location.replace('/material/index.html');
         }

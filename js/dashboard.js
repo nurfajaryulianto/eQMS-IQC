@@ -24,13 +24,12 @@ const plant2Auditors = ['Iksan', 'Inda', 'Inggit', 'Yusuf', 'Anin'];
 
 
 export async function initDashboard() {
-    // --- ROLE CHECK: Hanya supervisor dan admin yang boleh akses analytics ---
     const user = await getUser();
-    const role = user?.user_metadata?.role || ROLES.AUDITOR;
-    if (![ROLES.SUPERVISOR, ROLES.ADMIN].includes(role)) {
+    const role = user?.user_metadata?.role || ROLES.INSPECTOR;
+    if (![ROLES.SUPERVISOR, ROLES.MANAGER, ROLES.ADMIN].includes(role)) {
         const container = document.getElementById('view-analytics');
         if (container) {
-            container.innerHTML = `<div class="flex items-center justify-center h-64"><div class="text-center"><p class="text-xl font-semibold text-slate-700">Access Denied</p><p class="text-slate-500 mt-2">You need Supervisor or Admin role to view Analytics.</p></div></div>`;
+            container.innerHTML = `<div class="flex items-center justify-center h-64"><div class="text-center"><p class="text-xl font-semibold text-slate-700">Access Denied</p><p class="text-slate-500 mt-2">You need Supervisor, Manager, or Admin role to view Analytics.</p></div></div>`;
         }
         return;
     }

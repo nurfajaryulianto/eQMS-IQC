@@ -454,7 +454,7 @@ function renderUsersTab() {
 }
 
 function roleBadge(role) {
-    return { admin: 'bg-purple-100 text-purple-700', supervisor: 'bg-blue-100 text-blue-700', auditor: 'bg-slate-100 text-slate-600' }[role] || 'bg-slate-100 text-slate-600';
+    return { admin: 'bg-purple-100 text-purple-700', supervisor: 'bg-blue-100 text-blue-700', manager: 'bg-emerald-100 text-emerald-700', inspector: 'bg-slate-100 text-slate-600' }[role] || 'bg-slate-100 text-slate-600';
 }
 
 function handleUserSubmit(e) {

@@ -24,7 +24,7 @@ const MOCK_MASTER_DATA = [
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN]);
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.SUPERVISOR, MATERIAL_ROLES.MANAGER]);
     if (!currentUser) return;
 
     setupNavbar(currentUser);

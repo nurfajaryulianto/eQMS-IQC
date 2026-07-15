@@ -35,7 +35,7 @@ function generateMockData() {
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN]);
+    currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.SUPERVISOR, MATERIAL_ROLES.MANAGER]);
     if (!currentUser) return;
 
     setupNavbar(currentUser);
@@ -49,7 +49,7 @@ function setupNavbar(user) {
     if (el) el.textContent = user.name || user.nik || 'User';
 
     const role = user.role;
-    if (role === MATERIAL_ROLES.ADMIN) {
+    if (role === MATERIAL_ROLES.ADMIN || role === MATERIAL_ROLES.SUPERVISOR || role === MATERIAL_ROLES.MANAGER) {
         const adminLink = document.getElementById('nav-admin-link');
         if (adminLink) adminLink.style.display = 'flex';
     }

@@ -1312,10 +1312,10 @@ async function initApp() {
         userDisplayEl.textContent = displayName;
     }
 
-    // Sembunyikan tombol statistik untuk auditor (hanya supervisor/admin)
-    const userRole = user?.user_metadata?.role || ROLES.AUDITOR;
+    // Sembunyikan tombol statistik untuk inspector (hanya supervisor/manager/admin)
+    const userRole = user?.user_metadata?.role || ROLES.INSPECTOR;
     const statisticBtn = document.querySelector('.statistic-button');
-    if (statisticBtn && userRole === ROLES.AUDITOR) {
+    if (statisticBtn && userRole === ROLES.INSPECTOR) {
         statisticBtn.style.display = 'none';
     }
 
@@ -1332,18 +1332,20 @@ async function initApp() {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 capitalize';
         } else if (userRole === ROLES.SUPERVISOR) {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 capitalize';
+        } else if (userRole === ROLES.MANAGER) {
+            roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 capitalize';
         } else {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize';
         }
     }
 
-    // Hide analytics nav items for auditor role (admin sees everything)
-    if (userRole === ROLES.AUDITOR) {
+    // Hide analytics nav items for inspector role (admin sees everything)
+    if (userRole === ROLES.INSPECTOR) {
         document.querySelectorAll('[data-view="analytics"]').forEach(el => { el.style.display = 'none'; });
     }
 
-    // Hide "New Inspection" button for supervisor only (admin keeps full access)
-    if (userRole === ROLES.SUPERVISOR) {
+    // Hide "New Inspection" button for supervisor and manager only (admin keeps full access)
+    if (userRole === ROLES.SUPERVISOR || userRole === ROLES.MANAGER) {
         const newInspBtn = document.getElementById('new-inspection-btn');
         if (newInspBtn) newInspBtn.style.display = 'none';
     }
