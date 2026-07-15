@@ -73,6 +73,8 @@ const SESSIONS_HEADERS = [
   'Defect',
   'TanggalInspection',
   'Bucket',
+  'ApprovedByLeader',
+  'EvidenceUrl',
 ];
 
 const DEFECT_HEADERS = [
@@ -304,6 +306,29 @@ function getOrCreateSheet(ss, name, headers) {
                .setFontColor('#ffffff');
     // Auto-resize kolom
     sheet.autoResizeColumns(1, headers.length);
+  } else if (name === 'Sessions') {
+    // Dynamic columns validation
+    const lastCol = sheet.getLastColumn();
+    if (lastCol > 0) {
+      const firstRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+      const headersLower = firstRow.map(function(h) { return String(h).toLowerCase().trim(); });
+      
+      if (headersLower.indexOf('approvedbyleader') < 0) {
+        sheet.getRange(1, lastCol + 1).setValue('ApprovedByLeader')
+             .setFontWeight('bold')
+             .setBackground('#1e3a5f')
+             .setFontColor('#ffffff');
+      }
+      const lastCol2 = sheet.getLastColumn();
+      const firstRow2 = sheet.getRange(1, 1, 1, lastCol2).getValues()[0];
+      const headersLower2 = firstRow2.map(function(h) { return String(h).toLowerCase().trim(); });
+      if (headersLower2.indexOf('evidenceurl') < 0) {
+        sheet.getRange(1, lastCol2 + 1).setValue('EvidenceUrl')
+             .setFontWeight('bold')
+             .setBackground('#1e3a5f')
+             .setFontColor('#ffffff');
+      }
+    }
   }
   return sheet;
 }

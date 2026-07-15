@@ -428,7 +428,6 @@
                             </div>
                         </div>
 
-                        <!-- Rolling Inspection Toggle -->
                         <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; margin-top: 2px;">
                             <input type="checkbox" id="rolling-inspection" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399; margin: 0;">
                             <label for="rolling-inspection" style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); cursor: pointer; user-select: none;">
@@ -443,6 +442,26 @@
                             </label>
                             <textarea id="defect-notes" rows="3" placeholder="Deskripsikan jenis defect yang ditemukan..."
                                 class="styled-input" style="resize: vertical; font-family: inherit; line-height: 1.5;"></textarea>
+                        </div>
+
+                        <!-- Approved by Leader Dropdown -->
+                        <div>
+                            <label for="approved-by-leader" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Approved by Leader <span style="color: rgba(255,255,255,0.3); font-weight: 400; text-transform: none; letter-spacing: 0;">(opsional)</span>
+                            </label>
+                            <select id="approved-by-leader" class="styled-input" style="cursor: pointer; width: 100%;">
+                                <option value="">— Tanpa Persetujuan —</option>
+                            </select>
+                        </div>
+
+                        <!-- Evidence Upload (hidden initially) -->
+                        <div id="evidence-upload-container" style="display: none; background: rgba(255,255,255,0.02); border: 1.5px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; margin-top: 2px;">
+                            <label for="evidence-file" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Upload Evidence <span style="color: #ef4444;">*</span>
+                            </label>
+                            <input type="file" id="evidence-file" accept="image/*,application/pdf"
+                                class="styled-input" style="font-size: 13px; color: rgba(255,255,255,0.7); width: 100%;">
+                            <p style="font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 4px;">Wajib diisi apabila Approved by Leader digunakan.</p>
                         </div>
 
                         <!-- Submit Button -->

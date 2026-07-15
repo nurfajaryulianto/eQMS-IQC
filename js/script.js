@@ -6,7 +6,7 @@ import { styleModelDatabase } from './databasemodel.js';
 
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getComponents, getProcesses, syncAllFromSupabase } from './admin.js';
+import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase } from './admin.js';
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
@@ -281,6 +281,13 @@ function resetAllFields() {
         addItemBtn.disabled = true;
     }
     
+    const leaderSelect = document.getElementById("approved-by-leader");
+    if (leaderSelect) leaderSelect.value = '';
+    const fileInput = document.getElementById("evidence-file");
+    if (fileInput) fileInput.value = '';
+    const container = document.getElementById("evidence-upload-container");
+    if (container) container.classList.add('hidden');
+
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
     saveToLocalStorage();
@@ -742,6 +749,40 @@ async function saveData() {
         return;
     }
 
+    // Leader and file evidence validation
+    const leaderSelect = document.getElementById('approved-by-leader');
+    const fileInput = document.getElementById('evidence-file');
+    let fileData = null;
+    let fileName = '';
+    let fileType = '';
+
+    if (leaderSelect && leaderSelect.value) {
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            showAlert('Harap upload evidence / bukti persetujuan leader.', 'warning', 'Evidence Wajib');
+            return;
+        }
+        const file = fileInput.files[0];
+        fileName = file.name;
+        fileType = file.type;
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('visible');
+        }
+        try {
+            fileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        } catch (err) {
+            if (loadingOverlay) {
+                loadingOverlay.classList.remove('visible');
+            }
+            showAlert('Gagal membaca file evidence. Coba file lain.', 'error');
+            return;
+        }
+    }
+
     const fttValueText = fttOutput ? fttOutput.innerText.replace("%", "").trim() : "0";
     const finalFtt = parseFloat(fttValueText) / 100;
 
@@ -766,6 +807,10 @@ async function saveData() {
         redoRate: finalRedoRate,
         "pass": qtyInspectOutputs['pass'],
         "defect": qtyInspectOutputs['defect'],
+        approvedByLeader: leaderSelect ? leaderSelect.value : '',
+        file_data: fileData,
+        file_name: fileName,
+        file_type: fileType,
         items: inspectionItems
     };
 
@@ -1342,6 +1387,36 @@ async function initApp() {
 
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
+
+    // Populate Approved by Leader Select Options
+    const leaderSelect = document.getElementById('approved-by-leader');
+    if (leaderSelect) {
+        leaderSelect.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
+        try {
+            const leaders = getUsers().filter(u => u.role === 'supervisor' || u.role === 'admin' || u.role === 'manager');
+            leaders.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.display_name || u.nik;
+                opt.textContent = `${u.display_name || u.nik} (${u.role})`;
+                leaderSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('Failed to populate leaders select:', e);
+        }
+        
+        leaderSelect.addEventListener('change', () => {
+            const container = document.getElementById('evidence-upload-container');
+            const fileInput = document.getElementById('evidence-file');
+            if (container) {
+                if (leaderSelect.value) {
+                    container.classList.remove('hidden');
+                } else {
+                    container.classList.add('hidden');
+                    if (fileInput) fileInput.value = '';
+                }
+            }
+        });
+    }
 
     // Render defect buttons dynamically from admin-managed catalog (not rendering flat defect buttons anymore)
     renderDefectLibrary();

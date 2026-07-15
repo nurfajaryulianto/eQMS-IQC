@@ -27,6 +27,15 @@ function doGet(e) {
     if (action === 'getInspectionData') return jsonResponse(getInspectionData(e.parameter));
     if (action === 'getUsers')          return jsonResponse(getUsers());
     if (action === 'generateTemplate')  return generateTemplate();
+    if (action === 'getStatus') {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      return jsonResponse({
+        status: 'ok',
+        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetName: ss.getName(),
+        spreadsheetUrl: ss.getUrl()
+      });
+    }
     if (action === 'ping')              return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() });
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
@@ -192,12 +201,29 @@ function getInspectionData(params) {
 
 function submitInspection(payload) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  lock.waitLock(15000);
 
   try {
     var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName(SHEET.INSPECTIONS);
     if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
+
+    // Save evidence file if uploaded
+    var evidenceUrl = '';
+    if (payload.file_data && payload.file_name) {
+      try {
+        var spreadsheetFile = DriveApp.getFileById(SPREADSHEET_ID);
+        var parents = spreadsheetFile.getParents();
+        var folder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+        
+        var fileBlob = Utilities.newBlob(Utilities.base64Decode(payload.file_data), payload.file_type || 'image/png', payload.file_name);
+        var driveFile = folder.createFile(fileBlob);
+        driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+        evidenceUrl = driveFile.getUrl();
+      } catch (err) {
+        throw new Error('Gagal upload file bukti: ' + err.message);
+      }
+    }
 
     var inspectionId = 'INSP-' + new Date().getTime();
     // Find index of headers in inspections to know where to write what
@@ -217,6 +243,8 @@ function submitInspection(payload) {
       else if (h === 'result_status') row.push(payload.result_status || 'Pass');
       else if (h === 'input_type') row.push(payload.input_type || 'manual');
       else if (h === 'rolling_inspection') row.push(payload.rolling_inspection || 'No');
+      else if (h === 'approved_by_leader') row.push(payload.approved_by_leader || '');
+      else if (h === 'evidence_url') row.push(evidenceUrl || payload.evidence_url || '');
       else if (h === 'inspection_date') row.push(payload.inspection_date || now);
       else if (h === 'created_at') row.push(now);
       else row.push('');
@@ -462,15 +490,31 @@ function setupSpreadsheetHeaders() {
 
   // inspections
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS) || ss.insertSheet(SHEET.INSPECTIONS);
-  var inspHeaders = ['inspection_id','po_number','inspector_nik','qty_inspect','qty_fail','defect_notes','result_status','input_type','rolling_inspection','inspection_date','created_at'];
+  var inspHeaders = ['inspection_id','po_number','inspector_nik','qty_inspect','qty_fail','defect_notes','result_status','input_type','rolling_inspection','approved_by_leader','evidence_url','inspection_date','created_at'];
   if (inspSheet.getLastRow() === 0) {
     inspSheet.getRange(1, 1, 1, inspHeaders.length).setValues([inspHeaders]);
     inspSheet.getRange(1, 1, 1, inspHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
   } else {
-    var firstRow = inspSheet.getRange(1, 1, 1, inspSheet.getLastColumn()).getValues()[0];
-    var rollIdx = firstRow.map(function(h) { return String(h).toLowerCase().trim(); }).indexOf('rolling_inspection');
-    if (rollIdx < 0) {
-      inspSheet.getRange(1, firstRow.length + 1).setValue('rolling_inspection').setFontWeight('bold').setBackground('#e2e8f0');
+    var lastCol = inspSheet.getLastColumn();
+    var firstRow = inspSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var headersLower = firstRow.map(function(h) { return String(h).toLowerCase().trim(); });
+    if (headersLower.indexOf('rolling_inspection') < 0) {
+      inspSheet.getRange(1, lastCol + 1).setValue('rolling_inspection').setFontWeight('bold').setBackground('#e2e8f0');
+    }
+    
+    // Refresh col check
+    var lastCol2 = inspSheet.getLastColumn();
+    var firstRow2 = inspSheet.getRange(1, 1, 1, lastCol2).getValues()[0];
+    var headersLower2 = firstRow2.map(function(h) { return String(h).toLowerCase().trim(); });
+    if (headersLower2.indexOf('approved_by_leader') < 0) {
+      inspSheet.getRange(1, lastCol2 + 1).setValue('approved_by_leader').setFontWeight('bold').setBackground('#e2e8f0');
+    }
+    
+    var lastCol3 = inspSheet.getLastColumn();
+    var firstRow3 = inspSheet.getRange(1, 1, 1, lastCol3).getValues()[0];
+    var headersLower3 = firstRow3.map(function(h) { return String(h).toLowerCase().trim(); });
+    if (headersLower3.indexOf('evidence_url') < 0) {
+      inspSheet.getRange(1, lastCol3 + 1).setValue('evidence_url').setFontWeight('bold').setBackground('#e2e8f0');
     }
   }
 

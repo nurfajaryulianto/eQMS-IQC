@@ -286,6 +286,10 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">group</span>
                 Manage Users
             </button>
+            <button class="tab-btn" id="tab-spreadsheet" onclick="switchTab('spreadsheet')">
+                <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
+                Spreadsheet
+            </button>
         </div>
 
         <!-- ── TAB: MASTER DATA ── -->
@@ -541,6 +545,35 @@
             </div>
         </div>
 
+        <!-- ── TAB: SPREADSHEET ── -->
+        <div id="panel-spreadsheet" style="display:none;">
+            <div class="card" style="max-width: 600px;">
+                <div class="card-header">
+                    <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">grid_on</span>
+                    <span style="font-size:14px;font-weight:700;color:white;">Google Spreadsheet Integration</span>
+                </div>
+                <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
+                    <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;line-height:1.6;">
+                        Aplikasi IQC Material menggunakan Google Spreadsheet sebagai database utama untuk menyimpan data transaksi hasil inspeksi, master data PO, vendor, dan user.
+                    </p>
+                    
+                    <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
+                        <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Status Spreadsheet Aktif</span>
+                        <div id="admin-spreadsheet-info" style="font-size:13px;font-weight:600;color:white;">
+                            Menghubungkan ke Google Apps Script...
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex;gap:12px;">
+                        <a id="admin-open-spreadsheet-btn" target="_blank" href="#" class="btn-gradient" style="padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;display:none;align-items:center;gap:8px;justify-content:center;">
+                            <span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span>
+                            Buka Spreadsheet Aktif
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- SheetJS CDN for Excel parsing -->
@@ -550,12 +583,15 @@
     <script>
         // Tab switching (needs to be non-module for onclick)
         window.switchTab = function(tab) {
-            ['master','upload','passall','users'].forEach(t => {
+            ['master','upload','passall','users','spreadsheet'].forEach(t => {
                 document.getElementById('panel-' + t).style.display = t === tab ? 'block' : 'none';
                 document.getElementById('tab-' + t).classList.toggle('active', t === tab);
             });
             if (tab === 'users' && typeof window.loadUsersList === 'function') {
                 window.loadUsersList();
+            }
+            if (tab === 'spreadsheet' && typeof window.loadSpreadsheetStatus === 'function') {
+                window.loadSpreadsheetStatus();
             }
         };
     </script>

@@ -73,6 +73,44 @@ const MOCK_MASTER_DATA = [
     },
 ];
 
+async function populateLeaders() {
+    const leaderSelect = document.getElementById('approved-by-leader');
+    if (!leaderSelect) return;
+    
+    leaderSelect.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
+    
+    try {
+        let users = [];
+        if (MATERIAL_TEST_MODE) {
+            users = [
+                { nik: 'admin', name: 'Admin Material', role: 'admin' },
+                { nik: 'spv01', name: 'Supervisor A', role: 'supervisor' },
+                { nik: 'mgr01', name: 'Manager B', role: 'manager' },
+                { nik: 'inspector1', name: 'Inspector C', role: 'inspector' }
+            ];
+        } else {
+            const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+            const json = await res.json();
+            users = json.data || [];
+        }
+        
+        // Filter for admin, supervisor, manager roles
+        const leaders = users.filter(u => {
+            const role = String(u.role).toLowerCase().trim();
+            return role === 'admin' || role === 'supervisor' || role === 'manager';
+        });
+        
+        leaders.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.name || u.nik;
+            opt.textContent = `${u.name || u.nik} (${u.role})`;
+            leaderSelect.appendChild(opt);
+        });
+    } catch (err) {
+        console.error('populateLeaders error:', err);
+    }
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -84,6 +122,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupLogout();
 
     await fetchMasterData();
+    await populateLeaders();
+
+    const leaderSelect = document.getElementById('approved-by-leader');
+    if (leaderSelect) {
+        leaderSelect.addEventListener('change', () => {
+            const container = document.getElementById('evidence-upload-container');
+            const fileInput = document.getElementById('evidence-file');
+            if (container) {
+                if (leaderSelect.value) {
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                    if (fileInput) fileInput.value = '';
+                }
+            }
+        });
+    }
 });
 
 // ─── NAVBAR ──────────────────────────────────────────────────
@@ -340,12 +395,20 @@ window.openValidationDialog = function () {
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
+    const leaderSelect = document.getElementById('approved-by-leader');
+    const fileInput = document.getElementById('evidence-file');
 
     const errors = [];
     if (!selectedPO) errors.push('Silakan pilih PO/Material terlebih dahulu.');
     if (inspect <= 0) errors.push('Qty Inspect harus lebih dari 0.');
     if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
     if (fail > inspect) errors.push(`Qty Fail (${fail}) tidak boleh melebihi Qty Inspect (${inspect}).`);
+    
+    if (leaderSelect && leaderSelect.value) {
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            errors.push('Harap upload evidence / bukti persetujuan leader.');
+        }
+    }
 
     const errorsEl = document.getElementById('validation-errors');
     const summaryEl = document.getElementById('validation-summary');
@@ -364,6 +427,8 @@ window.openValidationDialog = function () {
         const pass = inspect - fail;
         const passRate = ((pass / inspect) * 100).toFixed(1);
         const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
+        const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
+        const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
         summaryEl.innerHTML = `
             ${summaryRow('PO Number', selectedPO.po_number)}
             ${summaryRow('Material', selectedPO.material_name)}
@@ -372,6 +437,8 @@ window.openValidationDialog = function () {
             ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
             ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
             ${summaryRow('Rolling Method', rolling)}
+            ${summaryRow('Leader Approval', leaderVal)}
+            ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
             ${notes ? summaryRow('Catatan', notes) : ''}
         `;
     }
@@ -410,6 +477,33 @@ async function submitInspection() {
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
     const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
     const inspectorNik = currentUser?.nik || '';
+    const leaderSelect = document.getElementById('approved-by-leader');
+    const fileInput = document.getElementById('evidence-file');
+
+    let fileData = null;
+    let fileName = '';
+    let fileType = '';
+
+    if (leaderSelect && leaderSelect.value && fileInput && fileInput.files.length > 0) {
+        if (loadingTxt) loadingTxt.textContent = 'Membaca file evidence...';
+        const file = fileInput.files[0];
+        fileName = file.name;
+        fileType = file.type;
+        try {
+            fileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        } catch (err) {
+            loading.classList.remove('visible');
+            showToast('Gagal membaca file evidence.', 'error');
+            return;
+        }
+    }
+
+    if (loadingTxt) loadingTxt.textContent = 'Mengirim data ke server...';
 
     const payload = {
         action: 'submitInspection',
@@ -421,6 +515,10 @@ async function submitInspection() {
         result_status: fail === 0 ? 'Pass' : 'Fail',
         input_type: 'manual',
         rolling_inspection: rollingChecked,
+        approved_by_leader: leaderSelect ? leaderSelect.value : '',
+        file_data: fileData,
+        file_name: fileName,
+        file_type: fileType,
         inspection_date: new Date().toISOString(),
     };
 
@@ -482,6 +580,13 @@ function resetForm() {
 
     const notesEl = document.getElementById('defect-notes');
     if (notesEl) notesEl.value = '';
+
+    const leaderSelect = document.getElementById('approved-by-leader');
+    if (leaderSelect) leaderSelect.value = '';
+    const fileInput = document.getElementById('evidence-file');
+    if (fileInput) fileInput.value = '';
+    const container = document.getElementById('evidence-upload-container');
+    if (container) container.style.display = 'none';
 
     document.getElementById('calc-pass-rate').textContent = '—';
     document.getElementById('calc-fail-rate').textContent = '—';

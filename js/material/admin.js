@@ -30,6 +30,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavbar(currentUser);
     setupLogout();
     await loadMasterData();
+    if (typeof window.loadSpreadsheetStatus === 'function') {
+        await window.loadSpreadsheetStatus();
+    }
 });
 
 function setupNavbar(user) {
@@ -588,4 +591,53 @@ window.resetUserForm = function() {
     if (pwdRequiredStar) pwdRequiredStar.style.display = 'inline';
     if (formTitle) formTitle.textContent = 'Tambah Pengguna Baru';
     if (cancelBtn) cancelBtn.style.display = 'none';
+};
+
+// ─── SPREADSHEET STATUS ───────────────────────────────────────
+
+window.loadSpreadsheetStatus = async function() {
+    const infoContainer = document.getElementById('admin-spreadsheet-info');
+    const openBtn = document.getElementById('admin-open-spreadsheet-btn');
+    if (!infoContainer) return;
+
+    infoContainer.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.45);font-size:13px;">⏳ <span>Loading spreadsheet status...</span></div>';
+    if (openBtn) openBtn.style.display = 'none';
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            infoContainer.innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <span style="color:white;font-weight:600;">[TEST MODE] eQMS-IQC-Material-Database</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,0.4);font-family:monospace;">ID: mock_spreadsheet_id_123</span>
+                </div>
+            `;
+            if (openBtn) {
+                openBtn.href = '#';
+                openBtn.style.display = 'flex';
+            }
+            return;
+        }
+
+        const res = await fetch(`${MATERIAL_GAS_URL}?action=getStatus`);
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        const data = await res.json();
+        
+        if (data.spreadsheetId) {
+            infoContainer.innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <span style="color:white;font-weight:600;">${data.spreadsheetName || 'eQMS IQC Material Database'}</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,0.4);font-family:monospace;word-break:break-all;">ID: ${data.spreadsheetId}</span>
+                </div>
+            `;
+            if (openBtn && data.spreadsheetUrl) {
+                openBtn.href = data.spreadsheetUrl;
+                openBtn.style.display = 'flex';
+            }
+        } else {
+            throw new Error(data.message || 'Gagal memuat status spreadsheet');
+        }
+    } catch (err) {
+        console.error(err);
+        infoContainer.innerHTML = `<span style="color:#f87171;font-weight:600;font-size:12px;">Gagal memuat status: ${err.message}. Pastikan Web App sudah di-deploy dengan benar.</span>`;
+    }
 };
