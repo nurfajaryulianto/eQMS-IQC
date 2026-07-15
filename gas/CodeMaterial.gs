@@ -6,7 +6,7 @@
 
 // ─── SPREADSHEET CONFIG ──────────────────────────────────────
 // Ganti dengan ID Spreadsheet IQC Material yang baru dibuat
-var SPREADSHEET_ID = 'GANTI_DENGAN_ID_SPREADSHEET_ANDA';
+var SPREADSHEET_ID = '13C5MdJR_WN1A6wUzlRXCPCz6hKRoiR3Mg-0p_lMLblQ';
 
 var SHEET = {
   VENDORS:      'vendors',
