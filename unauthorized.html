@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html class="h-full bg-white antialiased" lang="id">
 <head>
     <meta charset="UTF-8">
@@ -47,19 +47,42 @@
 
     <script type="module">
         import { getUserRole, signOut } from './js/auth.js';
+        import { getSession as getMaterialSession, materialLogout } from './js/material/auth.js';
 
         document.addEventListener('DOMContentLoaded', async () => {
             const roleEl = document.getElementById('user-role-display');
-            try {
-                const role = await getUserRole();
-                if (roleEl) roleEl.textContent = role || 'tidak diketahui';
-            } catch {
-                if (roleEl) roleEl.textContent = 'tidak diketahui';
-            }
+            const homeLink = document.querySelector('a[href="/index.html"]');
+            
+            // Check if we are in Material mode
+            const isMaterial = localStorage.getItem('iqc_material_session_v1') !== null || sessionStorage.getItem('app_target') === 'material';
 
-            document.getElementById('logout-btn').addEventListener('click', async () => {
-                await signOut();
-            });
+            if (isMaterial) {
+                // Update home link to material index
+                if (homeLink) homeLink.setAttribute('href', '/material/index.html');
+                
+                try {
+                    const session = getMaterialSession();
+                    if (roleEl) roleEl.textContent = (session && session.role) ? session.role : 'tidak diketahui';
+                } catch {
+                    if (roleEl) roleEl.textContent = 'tidak diketahui';
+                }
+
+                document.getElementById('logout-btn').addEventListener('click', async () => {
+                    await materialLogout();
+                });
+            } else {
+                // Subcont mode
+                try {
+                    const role = await getUserRole();
+                    if (roleEl) roleEl.textContent = role || 'tidak diketahui';
+                } catch {
+                    if (roleEl) roleEl.textContent = 'tidak diketahui';
+                }
+
+                document.getElementById('logout-btn').addEventListener('click', async () => {
+                    await signOut();
+                });
+            }
         });
     </script>
 </body>

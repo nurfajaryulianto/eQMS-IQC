@@ -363,6 +363,7 @@ window.openValidationDialog = function () {
         errorsEl.style.display = 'none';
         const pass = inspect - fail;
         const passRate = ((pass / inspect) * 100).toFixed(1);
+        const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
         summaryEl.innerHTML = `
             ${summaryRow('PO Number', selectedPO.po_number)}
             ${summaryRow('Material', selectedPO.material_name)}
@@ -370,6 +371,7 @@ window.openValidationDialog = function () {
             ${summaryRow('Qty Inspect', inspect.toLocaleString('id-ID'))}
             ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
             ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
+            ${summaryRow('Rolling Method', rolling)}
             ${notes ? summaryRow('Catatan', notes) : ''}
         `;
     }
@@ -380,7 +382,7 @@ window.openValidationDialog = function () {
 function summaryRow(label, value) {
     return `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
         <span style="color:#94a3b8; font-weight:600; font-size:12px; white-space:nowrap;">${label}</span>
-        <span style="color:#0f172a; font-weight:600; font-size:13px; text-align:right;">${esc(String(value))}</span>
+        <span style="color:white; font-weight:600; font-size:13px; text-align:right;">${esc(String(value))}</span>
     </div>`;
 }
 
@@ -406,6 +408,7 @@ async function submitInspection() {
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
+    const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
     const inspectorNik = currentUser?.nik || '';
 
     const payload = {
@@ -417,6 +420,7 @@ async function submitInspection() {
         defect_notes: notes,
         result_status: fail === 0 ? 'Pass' : 'Fail',
         input_type: 'manual',
+        rolling_inspection: rollingChecked,
         inspection_date: new Date().toISOString(),
     };
 
@@ -472,6 +476,10 @@ function resetForm() {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    
+    const rollingCheck = document.getElementById('rolling-inspection');
+    if (rollingCheck) rollingCheck.checked = false;
+
     const notesEl = document.getElementById('defect-notes');
     if (notesEl) notesEl.value = '';
 

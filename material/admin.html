@@ -282,6 +282,10 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">done_all</span>
                 Pass All
             </button>
+            <button class="tab-btn" id="tab-users" onclick="switchTab('users')">
+                <span class="material-symbols-outlined" style="font-size:16px;">group</span>
+                Manage Users
+            </button>
         </div>
 
         <!-- ── TAB: MASTER DATA ── -->
@@ -442,6 +446,101 @@
             </div>
         </div>
 
+        <!-- ── TAB: MANAGE USERS ── -->
+        <div id="panel-users" style="display:none;">
+            <div style="display:grid;grid-template-columns: 2fr 1fr; gap:20px; align-items: start;">
+                <!-- Users Table Card -->
+                <div class="card">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">group</span>
+                            <span style="font-size:14px;font-weight:700;color:white;">Daftar Pengguna IQC Material</span>
+                            <span id="users-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">0</span>
+                        </div>
+                        <button onclick="loadUsersList()" class="btn-secondary" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;font-size:12px;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
+                        </button>
+                    </div>
+                    <div class="thin-scroll" style="overflow-x:auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>NIK</th>
+                                    <th>Nama</th>
+                                    <th>Role</th>
+                                    <th>Tanggal Dibuat</th>
+                                    <th style="text-align:center;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody">
+                                <tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                    Memuat daftar user...
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Add/Edit User Form Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">person_add</span>
+                        <span id="user-form-title" style="font-size:14px;font-weight:700;color:white;">Tambah Pengguna Baru</span>
+                    </div>
+                    <div style="padding:20px;">
+                        <form id="user-form" onsubmit="handleUserSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
+                            <!-- NIK Input -->
+                            <div>
+                                <label for="user-nik" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    NIK / Username <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" id="user-nik" class="styled-input" placeholder="Masukkan NIK/username" required>
+                            </div>
+
+                            <!-- Name Input -->
+                            <div>
+                                <label for="user-name" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    Nama Lengkap <span style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="text" id="user-name" class="styled-input" placeholder="Masukkan nama lengkap" required>
+                            </div>
+
+                            <!-- Role Select -->
+                            <div>
+                                <label for="user-role" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    Role Akses <span style="color:#ef4444;">*</span>
+                                </label>
+                                <select id="user-role" class="styled-input" style="cursor:pointer;" required>
+                                    <option value="inspector">Inspector (Hanya Form Inspeksi)</option>
+                                    <option value="admin">Admin (Akses Penuh)</option>
+                                </select>
+                            </div>
+
+                            <!-- Password Input -->
+                            <div>
+                                <label for="user-password" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    Password <span id="pwd-required-star" style="color:#ef4444;">*</span>
+                                </label>
+                                <input type="password" id="user-password" class="styled-input" placeholder="Minimal 6 karakter" required>
+                                <p id="user-password-hint" style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px;">Minimal 6 karakter.</p>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="btn-secondary" style="flex:1; padding:10px; border-radius:10px; font-size:13px; display:none;">
+                                    Batal
+                                </button>
+                                <button type="submit" class="btn-gradient" style="flex:2; padding:10px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                    <span class="material-symbols-outlined" style="font-size:16px;">save</span>
+                                    Simpan User
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- SheetJS CDN for Excel parsing -->
@@ -451,10 +550,13 @@
     <script>
         // Tab switching (needs to be non-module for onclick)
         window.switchTab = function(tab) {
-            ['master','upload','passall'].forEach(t => {
+            ['master','upload','passall','users'].forEach(t => {
                 document.getElementById('panel-' + t).style.display = t === tab ? 'block' : 'none';
                 document.getElementById('tab-' + t).classList.toggle('active', t === tab);
             });
+            if (tab === 'users' && typeof window.loadUsersList === 'function') {
+                window.loadUsersList();
+            }
         };
     </script>
 </body>

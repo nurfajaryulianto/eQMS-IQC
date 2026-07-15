@@ -25,6 +25,7 @@ function doGet(e) {
   try {
     if (action === 'getMasterData')     return jsonResponse(getMasterData(e.parameter));
     if (action === 'getInspectionData') return jsonResponse(getInspectionData(e.parameter));
+    if (action === 'getUsers')          return jsonResponse(getUsers());
     if (action === 'generateTemplate')  return generateTemplate();
     if (action === 'ping')              return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() });
     return jsonResponse({ error: 'Unknown action: ' + action });
@@ -47,6 +48,8 @@ function doPost(e) {
     if (action === 'submitInspection')   return jsonResponse(submitInspection(payload));
     if (action === 'bulkUpsertMasterData') return jsonResponse(bulkUpsertMasterData(payload));
     if (action === 'passAll')            return jsonResponse(passAll(payload));
+    if (action === 'saveUser')           return jsonResponse(saveUser(payload));
+    if (action === 'deleteUser')         return jsonResponse(deleteUser(payload));
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -197,20 +200,27 @@ function submitInspection(payload) {
     if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
     var inspectionId = 'INSP-' + new Date().getTime();
-    var now          = new Date().toISOString();
+    // Find index of headers in inspections to know where to write what
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function(h) { return String(h).toLowerCase().trim(); });
 
-    var row = [
-      inspectionId,
-      payload.po_number      || '',
-      payload.inspector_nik  || '',
-      payload.qty_inspect    || 0,
-      payload.qty_fail       || 0,
-      payload.defect_notes   || '',
-      payload.result_status  || 'Pass',
-      payload.input_type     || 'manual',
-      payload.inspection_date || now,
-      now,
-    ];
+    var now = new Date().toISOString();
+    var row = [];
+
+    headers.forEach(function(h) {
+      if (h === 'inspection_id') row.push(inspectionId);
+      else if (h === 'po_number') row.push(payload.po_number || '');
+      else if (h === 'inspector_nik') row.push(payload.inspector_nik || '');
+      else if (h === 'qty_inspect') row.push(payload.qty_inspect || 0);
+      else if (h === 'qty_fail') row.push(payload.qty_fail || 0);
+      else if (h === 'defect_notes') row.push(payload.defect_notes || '');
+      else if (h === 'result_status') row.push(payload.result_status || 'Pass');
+      else if (h === 'input_type') row.push(payload.input_type || 'manual');
+      else if (h === 'rolling_inspection') row.push(payload.rolling_inspection || 'No');
+      else if (h === 'inspection_date') row.push(payload.inspection_date || now);
+      else if (h === 'created_at') row.push(now);
+      else row.push('');
+    });
 
     sheet.appendRow(row);
 
@@ -337,6 +347,10 @@ function passAll(payload) {
     var qtyCol  = headers.indexOf('planned_qty');
     if (poCol < 0 || stCol < 0) throw new Error('Kolom po_number atau status tidak ditemukan.');
 
+    // Find index of headers in inspections to match columns dynamically
+    var inspHeaders = inspSheet.getRange(1, 1, 1, inspSheet.getLastColumn()).getValues()[0]
+      .map(function(h) { return String(h).toLowerCase().trim(); });
+
     var now = new Date().toISOString();
     var adminNik = payload.admin_nik || 'admin';
     var count = 0;
@@ -349,19 +363,25 @@ function passAll(payload) {
       var po  = String(data[i][poCol]);
       var qty = Number(data[i][qtyCol]) || 0;
 
-      // Add inspection record
-      newInspRows.push([
-        'INSP-BATCH-' + Date.now() + '-' + i,
-        po,
-        adminNik,
-        qty,  // qty_inspect = planned_qty
-        0,    // qty_fail = 0
-        '',   // defect_notes
-        'Pass',
-        'batch_pass_all',
-        now,
-        now,
-      ]);
+      var newRow = [];
+      var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
+      
+      inspHeaders.forEach(function(h) {
+        if (h === 'inspection_id') newRow.push(uniqueId);
+        else if (h === 'po_number') newRow.push(po);
+        else if (h === 'inspector_nik') newRow.push(adminNik);
+        else if (h === 'qty_inspect') newRow.push(qty);
+        else if (h === 'qty_fail') newRow.push(0);
+        else if (h === 'defect_notes') newRow.push('');
+        else if (h === 'result_status') newRow.push('Pass');
+        else if (h === 'input_type') newRow.push('batch_pass_all');
+        else if (h === 'rolling_inspection') newRow.push('No');
+        else if (h === 'inspection_date') newRow.push(now);
+        else if (h === 'created_at') newRow.push(now);
+        else newRow.push('');
+      });
+
+      newInspRows.push(newRow);
 
       // Update status to done
       mdSheet.getRange(i + 1, stCol + 1).setValue('done');
@@ -442,10 +462,16 @@ function setupSpreadsheetHeaders() {
 
   // inspections
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS) || ss.insertSheet(SHEET.INSPECTIONS);
+  var inspHeaders = ['inspection_id','po_number','inspector_nik','qty_inspect','qty_fail','defect_notes','result_status','input_type','rolling_inspection','inspection_date','created_at'];
   if (inspSheet.getLastRow() === 0) {
-    var inspHeaders = ['inspection_id','po_number','inspector_nik','qty_inspect','qty_fail','defect_notes','result_status','input_type','inspection_date','created_at'];
     inspSheet.getRange(1, 1, 1, inspHeaders.length).setValues([inspHeaders]);
     inspSheet.getRange(1, 1, 1, inspHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
+  } else {
+    var firstRow = inspSheet.getRange(1, 1, 1, inspSheet.getLastColumn()).getValues()[0];
+    var rollIdx = firstRow.map(function(h) { return String(h).toLowerCase().trim(); }).indexOf('rolling_inspection');
+    if (rollIdx < 0) {
+      inspSheet.getRange(1, firstRow.length + 1).setValue('rolling_inspection').setFontWeight('bold').setBackground('#e2e8f0');
+    }
   }
 
   // users
@@ -470,4 +496,130 @@ function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─── USER MANAGEMENT CRUD ─────────────────────────────────────
+
+function getUsers() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(SHEET.USERS);
+  if (!sheet) return { data: [] };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { data: [] };
+
+  var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+  var rows = data.slice(1);
+
+  var result = rows.map(function(row) {
+    var obj = {};
+    headers.forEach(function(h, i) {
+      obj[h] = row[i];
+    });
+    return obj;
+  });
+
+  return { data: result };
+}
+
+function saveUser(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var nik = String(payload.nik || '').trim();
+    var name = String(payload.name || '').trim();
+    var role = String(payload.role || '').trim();
+    var password = String(payload.password || '').trim();
+
+    if (!nik || !name || !role) throw new Error('Data tidak lengkap. NIK, Nama, dan Role wajib diisi.');
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.USERS);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET.USERS);
+      sheet.getRange(1, 1, 1, 5).setValues([['nik', 'password', 'name', 'role', 'created_at']]);
+      sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#e2e8f0');
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    var nikCol = headers.indexOf('nik');
+    var passCol = headers.indexOf('password');
+    var nameCol = headers.indexOf('name');
+    var roleCol = headers.indexOf('role');
+
+    var existingRowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][nikCol]).trim().toLowerCase() === nik.toLowerCase()) {
+        existingRowIdx = i + 1; // 1-indexed, +1 header
+        break;
+      }
+    }
+
+    var now = new Date().toISOString();
+
+    if (existingRowIdx >= 0) {
+      // Update
+      sheet.getRange(existingRowIdx, nameCol + 1).setValue(name);
+      sheet.getRange(existingRowIdx, roleCol + 1).setValue(role);
+      if (password) {
+        sheet.getRange(existingRowIdx, passCol + 1).setValue(password);
+      }
+      return { status: 'ok', message: 'User berhasil diperbarui.' };
+    } else {
+      // Insert new user
+      if (!password) throw new Error('Password wajib diisi untuk user baru.');
+      
+      var newRow = [];
+      headers.forEach(function(h) {
+        if (h === 'nik') newRow.push(nik);
+        else if (h === 'password') newRow.push(password);
+        else if (h === 'name') newRow.push(name);
+        else if (h === 'role') newRow.push(role);
+        else if (h === 'created_at') newRow.push(now);
+        else newRow.push('');
+      });
+      sheet.appendRow(newRow);
+      return { status: 'ok', message: 'User baru berhasil didaftarkan.' };
+    }
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteUser(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var nik = String(payload.nik || '').trim();
+    if (!nik) throw new Error('NIK tidak valid.');
+
+    // Proteksi default admin
+    if (nik.toLowerCase() === 'admin') {
+      throw new Error('User default "admin" tidak dapat dihapus.');
+    }
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.USERS);
+    if (!sheet) throw new Error('Sheet "users" tidak ditemukan.');
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    var nikCol = headers.indexOf('nik');
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][nikCol]).trim().toLowerCase() === nik.toLowerCase()) {
+        sheet.deleteRow(i + 1);
+        return { status: 'ok', message: 'User berhasil dihapus.' };
+      }
+    }
+
+    throw new Error('User tidak ditemukan.');
+
+  } finally {
+    lock.releaseLock();
+  }
 }

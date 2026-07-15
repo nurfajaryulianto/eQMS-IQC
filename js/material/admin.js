@@ -368,3 +368,224 @@ document.addEventListener('DOMContentLoaded', () => {
         passallTab.addEventListener('click', () => { window.loadPassAllPreview(); });
     }
 });
+
+// ─── USER MANAGEMENT TAB ─────────────────────────────────────
+
+let allUsers = [];
+let editingUserNik = null;
+
+// Expose users list loader
+window.loadUsersList = async function() {
+    const tbody = document.getElementById('users-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data user...</td></tr>`;
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            allUsers = [
+                { nik: 'admin', name: 'Admin Material', role: 'admin', created_at: '2026-07-10T12:00:00Z' },
+                { nik: 'inspector1', name: 'Budi Santoso', role: 'inspector', created_at: '2026-07-12T08:30:00Z' },
+                { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', created_at: '2026-07-14T09:45:00Z' },
+            ];
+        } else {
+            const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            allUsers = json.data || [];
+        }
+        renderUsersTable();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal memuat daftar user: ' + err.message, 'error');
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data user.</td></tr>`;
+    }
+};
+
+function renderUsersTable() {
+    const tbody = document.getElementById('users-tbody');
+    const countEl = document.getElementById('users-count');
+    if (!tbody) return;
+
+    if (countEl) countEl.textContent = allUsers.length;
+
+    if (!allUsers.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Tidak ada user terdaftar.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = allUsers.map(u => {
+        const dateStr = u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const roleLabel = u.role === 'admin' 
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(139,92,246,0.15);color:#c084fc;border:1px solid rgba(139,92,246,0.3);">Admin</span>` 
+            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
+        
+        return `<tr>
+            <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.85);">${esc(u.name)}</td>
+            <td style="padding:12px 14px;">${roleLabel}</td>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(dateStr)}</td>
+            <td style="padding:12px 14px;text-align:center;">
+                <div style="display:flex;gap:12px;justify-content:center;">
+                    <button onclick="window.editUser('${u.nik}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#60a5fa;border-color:rgba(96,165,250,0.3);">Edit</button>
+                    <button onclick="window.deleteUser('${u.nik}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#f87171;border-color:rgba(248,113,113,0.3);">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.handleUserSubmit = async function(e) {
+    e.preventDefault();
+    const nikInput = document.getElementById('user-nik');
+    const nameInput = document.getElementById('user-name');
+    const roleInput = document.getElementById('user-role');
+    const passwordInput = document.getElementById('user-password');
+
+    const nik = nikInput.value.trim();
+    const name = nameInput.value.trim();
+    const role = roleInput.value;
+    const password = passwordInput.value;
+
+    if (!nik || !name || !role) {
+        showToast('NIK, Nama, dan Role wajib diisi.', 'error');
+        return;
+    }
+
+    if (!editingUserNik && !password) {
+        showToast('Password wajib diisi untuk user baru.', 'error');
+        return;
+    }
+
+    if (password && password.length < 6) {
+        showToast('Password minimal 6 karakter.', 'error');
+        return;
+    }
+
+    setLoading(true, 'Menyimpan data user...');
+
+    const payload = {
+        action: 'saveUser',
+        nik: nik,
+        name: name,
+        role: role,
+        password: password || undefined
+    };
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            console.log('[TEST MODE] Save User Payload:', payload);
+            await delay(1000);
+            if (editingUserNik) {
+                const idx = allUsers.findIndex(u => u.nik === editingUserNik);
+                if (idx !== -1) {
+                    allUsers[idx].name = name;
+                    allUsers[idx].role = role;
+                }
+            } else {
+                allUsers.push({ nik, name, role, created_at: new Date().toISOString() });
+            }
+            showToast('User berhasil disimpan (simulasi)!', 'success');
+        } else {
+            const res = await fetch(MATERIAL_GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            showToast(json.message || 'User berhasil disimpan!', 'success');
+        }
+        resetUserForm();
+        await window.loadUsersList();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal menyimpan user: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
+
+window.editUser = function(nik) {
+    const user = allUsers.find(u => u.nik === nik);
+    if (!user) return;
+
+    editingUserNik = nik;
+
+    const nikInput = document.getElementById('user-nik');
+    const nameInput = document.getElementById('user-name');
+    const roleInput = document.getElementById('user-role');
+    const passwordInput = document.getElementById('user-password');
+    const formTitle = document.getElementById('user-form-title');
+    const cancelBtn = document.getElementById('btn-cancel-user-edit');
+    const pwdRequiredStar = document.getElementById('pwd-required-star');
+
+    if (nikInput) { nikInput.value = user.nik; nikInput.disabled = true; }
+    if (nameInput) nameInput.value = user.name || '';
+    if (roleInput) roleInput.value = user.role || 'inspector';
+    if (passwordInput) {
+        passwordInput.value = '';
+        passwordInput.placeholder = 'Kosongkan jika tidak diubah';
+        passwordInput.required = false;
+    }
+    if (pwdRequiredStar) pwdRequiredStar.style.display = 'none';
+    if (formTitle) formTitle.textContent = 'Edit Pengguna: ' + user.nik;
+    if (cancelBtn) cancelBtn.style.display = 'block';
+
+    if (nameInput) nameInput.focus();
+};
+
+window.deleteUser = async function(nik) {
+    if (nik.toLowerCase() === 'admin') {
+        showToast('User default "admin" tidak dapat dihapus.', 'error');
+        return;
+    }
+
+    if (!confirm(`Yakin ingin menghapus user "${nik}"? User ini tidak akan bisa login lagi.`)) {
+        return;
+    }
+
+    setLoading(true, 'Menghapus user...');
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            await delay(1000);
+            allUsers = allUsers.filter(u => u.nik !== nik);
+            showToast('User berhasil dihapus (simulasi)!', 'success');
+        } else {
+            const res = await fetch(MATERIAL_GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'deleteUser', nik: nik })
+            });
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            showToast(json.message || 'User berhasil dihapus!', 'success');
+        }
+        await window.loadUsersList();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal menghapus user: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
+
+window.resetUserForm = function() {
+    editingUserNik = null;
+    const form = document.getElementById('user-form');
+    if (form) form.reset();
+
+    const nikInput = document.getElementById('user-nik');
+    const passwordInput = document.getElementById('user-password');
+    const formTitle = document.getElementById('user-form-title');
+    const cancelBtn = document.getElementById('btn-cancel-user-edit');
+    const pwdRequiredStar = document.getElementById('pwd-required-star');
+
+    if (nikInput) nikInput.disabled = false;
+    if (passwordInput) {
+        passwordInput.placeholder = 'Minimal 6 karakter';
+        passwordInput.required = true;
+    }
+    if (pwdRequiredStar) pwdRequiredStar.style.display = 'inline';
+    if (formTitle) formTitle.textContent = 'Tambah Pengguna Baru';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+};

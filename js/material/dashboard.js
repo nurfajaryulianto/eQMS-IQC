@@ -326,7 +326,7 @@ function renderLogTable() {
     if (countEl) countEl.textContent = `${sorted.length} baris`;
 
     if (!sorted.length) {
-        tbody.innerHTML = `<tr><td colspan="9" style="padding:48px;text-align:center;color:#94a3b8;font-size:13px;">Tidak ada data untuk filter ini.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);font-size:13px;">Tidak ada data untuk filter ini.</td></tr>`;
         return;
     }
 
@@ -334,17 +334,21 @@ function renderLogTable() {
         const ftt = d.qty_inspect > 0 ? (((d.qty_inspect - d.qty_fail) / d.qty_inspect) * 100).toFixed(1) : '0.0';
         const fttColor = parseFloat(ftt) >= 95 ? '#16a34a' : parseFloat(ftt) >= 85 ? '#d97706' : '#dc2626';
         const statusBadge = d.result_status === 'Pass'
-            ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;">Pass</span>`
-            : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">Fail</span>`;
+            ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Pass</span>`
+            : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);">Fail</span>`;
+        const rollingBadge = d.rolling_inspection === 'Yes'
+            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);">Yes</span>`
+            : `<span style="font-size:11px;color:rgba(255,255,255,0.3);">No</span>`;
 
         return `<tr>
-            <td style="white-space:nowrap;">${d.inspection_date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-            <td style="font-weight:600;white-space:nowrap;">${esc(d.po_number)}</td>
-            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.material_name || '—')}</td>
-            <td>${esc(d.vendor_name || '—')}</td>
-            <td>${esc(d.inspector_nik || '—')}</td>
-            <td style="text-align:right;font-weight:600;">${d.qty_inspect.toLocaleString('id-ID')}</td>
-            <td style="text-align:right;font-weight:600;color:#dc2626;">${d.qty_fail.toLocaleString('id-ID')}</td>
+            <td style="white-space:nowrap;color:rgba(255,255,255,0.5);">${d.inspection_date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+            <td style="font-weight:600;white-space:nowrap;color:white;">${esc(d.po_number)}</td>
+            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,0.85);">${esc(d.material_name || '—')}</td>
+            <td style="color:rgba(255,255,255,0.85);">${esc(d.vendor_name || '—')}</td>
+            <td style="color:rgba(255,255,255,0.85);">${esc(d.inspector_nik || '—')}</td>
+            <td style="text-align:center;">${rollingBadge}</td>
+            <td style="text-align:right;font-weight:600;color:white;">${d.qty_inspect.toLocaleString('id-ID')}</td>
+            <td style="text-align:right;font-weight:600;color:#f87171;">${d.qty_fail.toLocaleString('id-ID')}</td>
             <td style="text-align:right;font-weight:700;color:${fttColor};">${ftt}%</td>
             <td style="text-align:center;">${statusBadge}</td>
         </tr>`;
