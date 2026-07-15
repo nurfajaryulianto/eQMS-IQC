@@ -514,10 +514,237 @@
             color: #1e293b;
             margin-left: 4px;
         }
+
+        /* ── GLASSMORPHISM BLUE THEME OVERRIDES ── */
+        body {
+            background: #070f1e !important;
+            color: #f1f5f9 !important;
+            position: relative;
+        }
+
+        /* Ambient glowing background orbs */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -20%;
+            left: -15%;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -2;
+            animation: none !important;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -20%;
+            right: -15%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -2;
+            animation: none !important;
+        }
+
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Header / Navbar */
+        header {
+            background: rgba(13, 27, 49, 0.75) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4) !important;
+            color: white !important;
+        }
+        header div, header button, header span {
+            color: white !important;
+        }
+
+        /* Side Navigation */
+        aside {
+            background: rgba(13, 27, 49, 0.5) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Navigation links styling */
+        .nav-link, .sidenav-link {
+            color: rgba(255, 255, 255, 0.55) !important;
+            transition: all 0.2s ease !important;
+        }
+        .nav-link:hover, .sidenav-link:hover {
+            color: white !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+        .nav-link.active, .sidenav-link.active {
+            color: #60a5fa !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            font-weight: 600;
+        }
+        .sidenav-link.active {
+            border-right: 2.5px solid #3b82f6 !important;
+        }
+
+        /* General layout cards */
+        .bg-white, .card, .stat-card {
+            background: rgba(255, 255, 255, 0.03) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* Subcont metric numbers colors */
+        .counter {
+            font-weight: 800 !important;
+        }
+        #fttOutput { color: #34d399 !important; }
+        #redoRateOutput { color: #f87171 !important; }
+        #qtyInspectOutput { color: white !important; }
+
+        /* Card Headers */
+        .border-b, .border-slate-200, .card-header {
+            border-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        .card-header, .px-4.py-3.border-b {
+            background: rgba(255, 255, 255, 0.01) !important;
+        }
+        .card-header h3, .px-4.py-3 h3 {
+            color: white !important;
+        }
+
+        /* Inputs & Select Elements */
+        select, input[type="date"], input[type="text"], input[type="number"], textarea {
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1.5px solid rgba(255, 255, 255, 0.09) !important;
+            color: white !important;
+            border-radius: 10px !important;
+            outline: none !important;
+            transition: all 0.2s ease !important;
+        }
+        select:focus, input:focus, textarea:focus {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(96, 165, 250, 0.5) !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        }
+        select option {
+            background: #0f1c2e !important;
+            color: white !important;
+        }
+
+        /* Dialogs and Popups */
+        .announcement-content, .confirmation-content, #dialog-box {
+            background: #0b1422 !important;
+            border: 1px solid rgba(255,255,255,0.12) !important;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.6) !important;
+            border-radius: 20px !important;
+            color: white !important;
+        }
+
+        /* Buttons styling */
+        .bg-blue-600, .btn-primary, #new-inspection-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 10px !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .bg-blue-600:hover, .btn-primary:hover, #new-inspection-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45) !important;
+        }
+        .btn-secondary {
+            border: 1.5px solid rgba(255,255,255,0.08) !important;
+            background: rgba(255,255,255,0.03) !important;
+            color: rgba(255,255,255,0.7) !important;
+            border-radius: 10px !important;
+            transition: all 0.2s !important;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.08) !important;
+            border-color: rgba(255,255,255,0.15) !important;
+            color: white !important;
+            transform: translateY(-1px);
+        }
+
+        /* Data Tables */
+        .data-table th {
+            background: rgba(255, 255, 255, 0.01) !important;
+            border-bottom: 1.5px solid rgba(255, 255, 255, 0.08) !important;
+            color: rgba(255, 255, 255, 0.4) !important;
+        }
+        .data-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02) !important;
+        }
+
+        /* Generic utilities overrides */
+        .text-slate-900, .text-slate-800, .text-slate-700, .text-slate-600 {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+        .text-slate-500, .text-slate-400 {
+            color: rgba(255, 255, 255, 0.45) !important;
+        }
+        .bg-blue-50, .bg-orange-50, .bg-slate-100 {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        }
+
+        /* Defect Buttons */
+        .defect-button {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: rgba(255,255,255,0.85) !important;
+            transition: all 0.2s !important;
+        }
+        .defect-button:hover:not(.inactive) {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        .defect-button.active {
+            outline: none !important;
+            background: rgba(37, 99, 235, 0.15) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.25) !important;
+            color: white !important;
+        }
+
+        /* Scrollbars */
+        .thin-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* Announcement indicator */
+        #announcement-button {
+            color: white !important;
+        }
     </style>
 </head>
 
 <body class="h-full flex flex-col bg-slate-50 text-slate-900">
+    <div class="grid-bg"></div>
 
     <!-- Top App Bar -->
     <header
