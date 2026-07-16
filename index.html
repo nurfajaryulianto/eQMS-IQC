@@ -1632,12 +1632,17 @@
                             class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
                             <span class="material-symbols-outlined text-[16px] align-middle mr-1">group</span>Users
                         </button>
+                        <button id="admin-tab-models"
+                            class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
+                            <span class="material-symbols-outlined text-[16px] align-middle mr-1">style</span>Models
+                        </button>
                         <button id="admin-tab-spreadsheet"
                             class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
                             <span
                                 class="material-symbols-outlined text-[16px] align-middle mr-1">grid_on</span>Spreadsheet
                         </button>
                     </div>
+
 
                     <!-- DEFECTS PANEL -->
                     <div id="admin-panel-defects">
@@ -1999,6 +2004,142 @@
                                             class="hidden py-2 px-4 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODELS PANEL -->
+                    <div id="admin-panel-models" class="hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                            <!-- Left: Table + Search -->
+                            <div class="lg:col-span-3 flex flex-col gap-4">
+                                <!-- Table Card -->
+                                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                    <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+                                        <h3 class="text-sm font-semibold text-slate-900">Style Number → Model Database</h3>
+                                        <span id="admin-models-count" class="text-xs text-slate-400 whitespace-nowrap"></span>
+                                    </div>
+                                    <!-- Search -->
+                                    <div class="px-4 py-2 border-b border-slate-100">
+                                        <div class="relative">
+                                            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]">search</span>
+                                            <input id="admin-model-search" type="text" placeholder="Cari style number atau model..."
+                                                class="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                                        <table class="w-full">
+                                            <thead class="sticky top-0">
+                                                <tr class="bg-slate-50 border-b border-slate-200 text-left">
+                                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Style Number</th>
+                                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
+                                                    <th class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="admin-models-tbody">
+                                                <tr><td colspan="3" class="px-4 py-8 text-center text-sm text-slate-400">Memuat data...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Batch Upload Card -->
+                                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                    <div class="px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-blue-600 text-[18px]">upload_file</span>
+                                        <h3 class="text-sm font-semibold text-slate-900">Upload Batch</h3>
+                                    </div>
+                                    <div class="p-4 flex flex-col gap-4">
+                                        <!-- Format info -->
+                                        <div class="bg-blue-50 border border-blue-100 rounded-md px-3 py-2 text-xs text-blue-800">
+                                            <p class="font-semibold mb-1">Format yang didukung (per baris):</p>
+                                            <p class="font-mono">STYLE_NUMBER,MODEL_NAME</p>
+                                            <p class="font-mono">STYLE_NUMBER: MODEL_NAME</p>
+                                            <p class="mt-1 text-blue-600">Baris yang diawali # akan diabaikan. Duplikat style number akan di-update otomatis.</p>
+                                        </div>
+
+                                        <!-- Paste text area -->
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-600 mb-1">Paste teks langsung</label>
+                                            <textarea id="admin-models-batch-text" rows="6"
+                                                placeholder="FD6574-001,M NIKE COURT LITE 4&#10;IR5776-400,NIKE REACT DC2&#10;# Baris komentar diabaikan"
+                                                class="w-full text-xs font-mono border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                                            <button id="admin-models-batch-parse-btn"
+                                                class="mt-2 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium">
+                                                Parse &amp; Preview
+                                            </button>
+                                        </div>
+
+                                        <!-- File upload -->
+                                        <div class="border-t border-slate-100 pt-4">
+                                            <label class="block text-xs font-medium text-slate-600 mb-1">Atau upload file CSV / TXT</label>
+                                            <input id="admin-models-batch-file" type="file" accept=".csv,.txt"
+                                                class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                                        </div>
+
+                                        <!-- Preview -->
+                                        <div id="admin-models-batch-preview" class="hidden border border-slate-200 rounded-md overflow-hidden">
+                                            <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                                <span class="text-xs font-semibold text-slate-700">Preview</span>
+                                                <span id="admin-models-batch-preview-count" class="text-xs text-slate-500"></span>
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto">
+                                                <table class="w-full">
+                                                    <thead>
+                                                        <tr class="bg-slate-50 border-b border-slate-100">
+                                                            <th class="px-3 py-1.5 text-xs font-semibold text-slate-500 text-left">Style Number</th>
+                                                            <th class="px-3 py-1.5 text-xs font-semibold text-slate-500 text-left">Model Name</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="admin-models-batch-preview-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                            <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 flex gap-2 justify-end">
+                                                <button id="admin-models-batch-cancel-btn"
+                                                    class="px-3 py-1.5 text-xs border border-slate-300 text-slate-600 rounded-md hover:bg-slate-100 transition-colors">
+                                                    Batal
+                                                </button>
+                                                <button id="admin-models-batch-confirm-btn"
+                                                    class="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors font-medium">
+                                                    Konfirmasi Upload
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Add / Edit Form -->
+                            <div class="lg:col-span-2">
+                                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden sticky top-4">
+                                    <div class="px-4 py-3 border-b border-slate-200">
+                                        <h3 class="text-sm font-semibold text-slate-900">Tambah / Edit Model</h3>
+                                    </div>
+                                    <form id="admin-model-form" class="p-4 flex flex-col gap-3">
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-600 mb-1">Style Number <span class="text-red-500">*</span></label>
+                                            <input id="admin-model-style-number" type="text" required
+                                                placeholder="Contoh: FD6574-001"
+                                                class="w-full text-sm font-mono border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-600 mb-1">Model Name <span class="text-red-500">*</span></label>
+                                            <input id="admin-model-model-name" type="text" required
+                                                placeholder="Contoh: M NIKE COURT LITE 4"
+                                                class="w-full text-sm border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        <div class="flex gap-2 pt-1">
+                                            <button id="admin-model-submit-btn" type="submit"
+                                                class="flex-1 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium">
+                                                Tambah Model
+                                            </button>
+                                            <button id="admin-model-cancel" type="button"
+                                                class="hidden px-4 py-2 text-sm border border-slate-300 text-slate-600 rounded-md hover:bg-slate-100 transition-colors">
+                                                Batal
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>

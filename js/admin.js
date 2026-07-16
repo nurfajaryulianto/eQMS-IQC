@@ -10,6 +10,7 @@ import {
     dbGetVendors,   dbInsertVendor,   dbUpdateVendor,   dbDeleteVendor,
     dbGetComponents,dbInsertComponent,dbUpdateComponent,dbDeleteComponent,
     dbGetProcesses, dbInsertProcess,  dbUpdateProcess,  dbDeleteProcess,
+    dbGetStyleModels, dbInsertStyleModel, dbUpdateStyleModel, dbDeleteStyleModel, dbUpsertStyleModelsBatch,
 } from './db.js';
 import { showAlert, showConfirm } from './dialog.js';
 
@@ -18,6 +19,7 @@ export const USERS_KEY      = 'eqms_users_v1';
 export const VENDORS_KEY    = 'eqms_vendors_v1';
 export const COMPONENTS_KEY = 'eqms_components_v1';
 export const PROCESSES_KEY  = 'eqms_processes_v1';
+export const MODELS_KEY     = 'eqms_style_models_v1';
 const SCRIPT_URL            = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 
 // ─── localStorage CACHE (dibaca oleh script.js secara sinkron) ───────────────
@@ -84,6 +86,26 @@ export function saveProcesses(processes) {
     localStorage.setItem(PROCESSES_KEY, JSON.stringify(processes));
 }
 
+export function getStyleModels() {
+    try {
+        const raw = localStorage.getItem(MODELS_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+}
+
+export function saveStyleModels(models) {
+    localStorage.setItem(MODELS_KEY, JSON.stringify(models));
+}
+
+/** Kembalikan styleModelDatabase-compatible object { STYLE_NUMBER: MODEL_NAME } */
+export function getStyleModelDatabaseMap() {
+    const models = getStyleModels();
+    const map = {};
+    models.forEach(m => { map[m.style_number] = m.model_name; });
+    return map;
+}
+
 // ─── SUPABASE SYNC ───────────────────────────────────────────
 // Ambil semua data dari Supabase, perbarui localStorage cache.
 // Diekspor agar bisa dipanggil dari script.js saat startup.
@@ -102,19 +124,21 @@ export async function syncAllFromSupabase() {
         };
     }
 
-    const [defects, users, vendors, components, processes] = await Promise.all([
+    const [defects, users, vendors, components, processes, styleModels] = await Promise.all([
         dbGetDefects(),
         dbGetAppUsers(),
         dbGetVendors(),
         dbGetComponents(),
         dbGetProcesses(),
+        dbGetStyleModels(),
     ]);
     saveDefects(defects);
     saveUsers(users);
     saveVendors(vendors);
     saveComponents(components);
     saveProcesses(processes);
-    return { defects, users, vendors, components, processes };
+    saveStyleModels(styleModels);
+    return { defects, users, vendors, components, processes, styleModels };
 }
 
 // ─── RENDER SELECT OPTIONS (used by script.js) ───────────────
@@ -246,6 +270,9 @@ let editingUserId      = null;
 let editingVendorId    = null;
 let editingComponentId = null;
 let editingProcessId   = null;
+let editingModelId     = null;
+let modelsSearchQuery  = '';
+let modelsBatchPreview = [];
 
 export async function initAdminPanel() {
     if (adminPanelInitialized) return;
@@ -268,13 +295,37 @@ export async function initAdminPanel() {
     renderVendorsTab();
     renderComponentsTab();
     renderProcessesTab();
+    renderModelsTab();
 
     document.getElementById('admin-tab-defects').addEventListener('click',    () => switchAdminTab('defects'));
     document.getElementById('admin-tab-users').addEventListener('click',      () => switchAdminTab('users'));
     document.getElementById('admin-tab-vendors').addEventListener('click',    () => switchAdminTab('vendors'));
     document.getElementById('admin-tab-components').addEventListener('click', () => switchAdminTab('components'));
     document.getElementById('admin-tab-processes').addEventListener('click',  () => switchAdminTab('processes'));
+    document.getElementById('admin-tab-models').addEventListener('click',     () => switchAdminTab('models'));
     document.getElementById('admin-tab-spreadsheet').addEventListener('click',() => switchAdminTab('spreadsheet'));
+
+    // Models tab event bindings
+    const modelForm = document.getElementById('admin-model-form');
+    if (modelForm) modelForm.addEventListener('submit', handleModelSubmit);
+    const modelCancel = document.getElementById('admin-model-cancel');
+    if (modelCancel) modelCancel.addEventListener('click', cancelModelEdit);
+    const modelSearch = document.getElementById('admin-model-search');
+    if (modelSearch) modelSearch.addEventListener('input', e => {
+        modelsSearchQuery = e.target.value.toLowerCase();
+        renderModelsTable();
+    });
+    const batchTextBtn = document.getElementById('admin-models-batch-parse-btn');
+    if (batchTextBtn) batchTextBtn.addEventListener('click', handleModelsBatchParse);
+    const batchFileInput = document.getElementById('admin-models-batch-file');
+    if (batchFileInput) batchFileInput.addEventListener('change', handleModelsBatchFileUpload);
+    const batchConfirmBtn = document.getElementById('admin-models-batch-confirm-btn');
+    if (batchConfirmBtn) batchConfirmBtn.addEventListener('click', handleModelsBatchConfirm);
+    const batchCancelBtn = document.getElementById('admin-models-batch-cancel-btn');
+    if (batchCancelBtn) batchCancelBtn.addEventListener('click', () => {
+        modelsBatchPreview = [];
+        document.getElementById('admin-models-batch-preview').classList.add('hidden');
+    });
 
     const createSpreadsheetBtn = document.getElementById('admin-create-spreadsheet-btn');
     if (createSpreadsheetBtn) {
@@ -307,7 +358,7 @@ export async function initAdminPanel() {
 }
 
 function switchAdminTab(tab) {
-    ['defects', 'users', 'vendors', 'components', 'processes', 'spreadsheet'].forEach(t => {
+    ['defects', 'users', 'vendors', 'components', 'processes', 'models', 'spreadsheet'].forEach(t => {
         const isActive = t === tab;
         const btn   = document.getElementById(`admin-tab-${t}`);
         const panel = document.getElementById(`admin-panel-${t}`);
@@ -1014,3 +1065,185 @@ async function handleCreateSpreadsheet() {
     }
 }
 
+// ─── MODELS TAB ───────────────────────────────────────────────
+
+function renderModelsTab() {
+    renderModelsTable();
+    const countEl = document.getElementById('admin-models-count');
+    if (countEl) countEl.textContent = `${getStyleModels().length} models`;
+}
+
+function renderModelsTable() {
+    const tbody = document.getElementById('admin-models-tbody');
+    if (!tbody) return;
+    const models = getStyleModels();
+    const query  = modelsSearchQuery.trim();
+    const filtered = query
+        ? models.filter(m =>
+            m.style_number.toLowerCase().includes(query) ||
+            m.model_name.toLowerCase().includes(query)
+          )
+        : models;
+
+    const countEl = document.getElementById('admin-models-count');
+    if (countEl) countEl.textContent = `${filtered.length} / ${models.length} models`;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-slate-400 italic">${
+            query ? 'Tidak ada model yang sesuai pencarian.' : 'Belum ada model. Tambahkan di bawah.'
+        }</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(m => `
+        <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+            <td class="px-4 py-2.5 text-xs font-mono font-semibold text-blue-700">${escHtml(m.style_number)}</td>
+            <td class="px-4 py-2.5 text-xs text-slate-700">${escHtml(m.model_name)}</td>
+            <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                <button onclick="window.__adminEditModel(${m.id})"
+                    class="text-xs text-blue-600 hover:text-blue-800 mr-3 font-medium">Edit</button>
+                <button onclick="window.__adminDeleteModel(${m.id})"
+                    class="text-xs text-red-500 hover:text-red-700 font-medium">Hapus</button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Expose handlers to global scope for inline onclick
+    window.__adminEditModel = async (id) => {
+        const m = getStyleModels().find(x => x.id === id);
+        if (!m) return;
+        editingModelId = id;
+        document.getElementById('admin-model-style-number').value = m.style_number;
+        document.getElementById('admin-model-model-name').value   = m.model_name;
+        document.getElementById('admin-model-submit-btn').textContent = 'Update Model';
+        document.getElementById('admin-model-cancel').classList.remove('hidden');
+        document.getElementById('admin-model-style-number').focus();
+    };
+
+    window.__adminDeleteModel = async (id) => {
+        const m = getStyleModels().find(x => x.id === id);
+        if (!m) return;
+        const ok = await showConfirm(`Hapus model "${m.style_number} — ${m.model_name}"?`, 'Hapus Model');
+        if (!ok) return;
+        try {
+            await dbDeleteStyleModel(id);
+            const updated = await dbGetStyleModels();
+            saveStyleModels(updated);
+            renderModelsTab();
+            await showAlert('Model berhasil dihapus.', 'success', 'Berhasil');
+        } catch (err) {
+            await showAlert(`Gagal menghapus: ${err.message}`, 'error', 'Error');
+        }
+    };
+}
+
+async function handleModelSubmit(e) {
+    e.preventDefault();
+    const styleNumber = document.getElementById('admin-model-style-number').value.trim();
+    const modelName   = document.getElementById('admin-model-model-name').value.trim();
+    if (!styleNumber || !modelName) return;
+    try {
+        if (editingModelId) {
+            await dbUpdateStyleModel(editingModelId, { style_number: styleNumber, model_name: modelName });
+        } else {
+            await dbInsertStyleModel({ style_number: styleNumber, model_name: modelName });
+        }
+        const updated = await dbGetStyleModels();
+        saveStyleModels(updated);
+        cancelModelEdit();
+        renderModelsTab();
+        await showAlert(editingModelId ? 'Model diperbarui.' : 'Model ditambahkan.', 'success', 'Berhasil');
+    } catch (err) {
+        await showAlert(`Gagal menyimpan: ${err.message}`, 'error', 'Error');
+    }
+}
+
+function cancelModelEdit() {
+    editingModelId = null;
+    const form = document.getElementById('admin-model-form');
+    if (form) form.reset();
+    const submitBtn = document.getElementById('admin-model-submit-btn');
+    if (submitBtn) submitBtn.textContent = 'Tambah Model';
+    const cancelBtn = document.getElementById('admin-model-cancel');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+}
+
+/** Parse raw text (CSV or STYLE: MODEL per line) into [{style_number, model_name}] */
+function parseModelsBatchText(raw) {
+    return raw.split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(line => {
+            // Support both comma-separated and colon-separated
+            const sepIdx = line.includes(',') ? line.indexOf(',') : line.indexOf(':');
+            if (sepIdx < 0) return null;
+            const styleNumber = line.slice(0, sepIdx).trim();
+            const modelName   = line.slice(sepIdx + 1).trim().replace(/^["']|["']$/g, '');
+            if (!styleNumber || !modelName) return null;
+            return { style_number: styleNumber.toUpperCase(), model_name: modelName };
+        })
+        .filter(Boolean);
+}
+
+function handleModelsBatchParse() {
+    const raw = document.getElementById('admin-models-batch-text').value;
+    modelsBatchPreview = parseModelsBatchText(raw);
+    showModelsBatchPreview();
+}
+
+function handleModelsBatchFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        modelsBatchPreview = parseModelsBatchText(ev.target.result);
+        showModelsBatchPreview();
+    };
+    reader.readAsText(file);
+}
+
+function showModelsBatchPreview() {
+    const previewSection = document.getElementById('admin-models-batch-preview');
+    const previewTbody   = document.getElementById('admin-models-batch-preview-tbody');
+    const previewCount   = document.getElementById('admin-models-batch-preview-count');
+    if (!previewSection || !previewTbody) return;
+
+    if (modelsBatchPreview.length === 0) {
+        previewSection.classList.add('hidden');
+        showAlert('Tidak ada data yang dapat diparsing. Pastikan format: STYLE_NUMBER,MODEL_NAME atau STYLE_NUMBER: MODEL_NAME', 'error', 'Format Error');
+        return;
+    }
+
+    if (previewCount) previewCount.textContent = `${modelsBatchPreview.length} entries`;
+    previewTbody.innerHTML = modelsBatchPreview.slice(0, 20).map(r => `
+        <tr class="border-b border-slate-100">
+            <td class="px-3 py-1.5 text-xs font-mono text-blue-700">${escHtml(r.style_number)}</td>
+            <td class="px-3 py-1.5 text-xs text-slate-700">${escHtml(r.model_name)}</td>
+        </tr>
+    `).join('') + (modelsBatchPreview.length > 20
+        ? `<tr><td colspan="2" class="px-3 py-2 text-xs text-slate-400 italic text-center">... dan ${modelsBatchPreview.length - 20} lainnya</td></tr>`
+        : '');
+    previewSection.classList.remove('hidden');
+}
+
+async function handleModelsBatchConfirm() {
+    if (modelsBatchPreview.length === 0) return;
+    const btn = document.getElementById('admin-models-batch-confirm-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
+    try {
+        await dbUpsertStyleModelsBatch(modelsBatchPreview);
+        const updated = await dbGetStyleModels();
+        saveStyleModels(updated);
+        modelsBatchPreview = [];
+        document.getElementById('admin-models-batch-preview').classList.add('hidden');
+        document.getElementById('admin-models-batch-text').value = '';
+        const fileInput = document.getElementById('admin-models-batch-file');
+        if (fileInput) fileInput.value = '';
+        renderModelsTab();
+        await showAlert(`${updated.length} model berhasil disimpan ke database!`, 'success', 'Upload Berhasil');
+    } catch (err) {
+        await showAlert(`Gagal upload batch: ${err.message}`, 'error', 'Error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Konfirmasi Upload'; }
+    }
+}

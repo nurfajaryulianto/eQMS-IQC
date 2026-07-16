@@ -2,11 +2,9 @@
 // 1. Deklarasi Variabel Global dan DOM References (Modifikasi)
 // ===========================================
 // --- IMPOR DATABASE DARI FILE TERPISAH ---
-import { styleModelDatabase } from './databasemodel.js';
-
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase } from './admin.js';
+import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap } from './admin.js';
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
@@ -1281,7 +1279,9 @@ function autoFillModelName() {
 
     const enteredStyleNumber = styleNumberInput.value.trim().toUpperCase();
     
-    const matchedModel = styleModelDatabase[enteredStyleNumber];
+    // Coba dari Supabase cache terlebih dahulu; fallback kosong jika tidak ada
+    const modelMap     = getStyleModelDatabaseMap();
+    const matchedModel = modelMap[enteredStyleNumber];
 
     if (matchedModel) {
         modelNameInput.value = matchedModel;

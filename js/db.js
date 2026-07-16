@@ -194,3 +194,53 @@ export async function dbUpdateProcess(id, { name, component_id }) {
 export async function dbDeleteProcess(id) {
     unwrap(await db.from('processes').delete().eq('id', id), 'deleteProcess');
 }
+
+// ─── STYLE MODELS ────────────────────────────────────────────
+
+export async function dbGetStyleModels() {
+    return unwrap(
+        await db.from('style_models').select('*').order('style_number'),
+        'getStyleModels'
+    );
+}
+
+export async function dbInsertStyleModel({ style_number, model_name }) {
+    return unwrap(
+        await db.from('style_models')
+            .insert({ style_number: style_number.trim().toUpperCase(), model_name: model_name.trim() })
+            .select().single(),
+        'insertStyleModel'
+    );
+}
+
+export async function dbUpdateStyleModel(id, { style_number, model_name }) {
+    return unwrap(
+        await db.from('style_models')
+            .update({ style_number: style_number.trim().toUpperCase(), model_name: model_name.trim() })
+            .eq('id', id).select().single(),
+        'updateStyleModel'
+    );
+}
+
+/** Upsert banyak model sekaligus (batch). Duplikat style_number akan di-update. */
+export async function dbUpsertStyleModelsBatch(rows) {
+    // rows = [{ style_number, model_name }, ...]
+    const clean = rows.map(r => ({
+        style_number: String(r.style_number).trim().toUpperCase(),
+        model_name:   String(r.model_name).trim(),
+    })).filter(r => r.style_number && r.model_name);
+
+    if (clean.length === 0) return [];
+
+    return unwrap(
+        await db.from('style_models')
+            .upsert(clean, { onConflict: 'style_number' })
+            .select(),
+        'upsertStyleModelsBatch'
+    );
+}
+
+export async function dbDeleteStyleModel(id) {
+    unwrap(await db.from('style_models').delete().eq('id', id), 'deleteStyleModel');
+}
+
