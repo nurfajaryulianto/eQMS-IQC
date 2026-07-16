@@ -31,7 +31,11 @@ function getActiveSpreadsheetId() {
 // Menghapus spreadsheet dinamis di properti script agar kembali ke spreadsheet awal
 function resetToOriginalSpreadsheet() {
   PropertiesService.getScriptProperties().deleteProperty('SPREADSHEET_ID');
-  Logger.log('Reset berhasil! Sekarang menggunakan Spreadsheet default ID: ' + SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
+  getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
+  getOrCreateSheet(ss, 'PivotReady', PIVOT_HEADERS);
+  Logger.log('Reset berhasil! Sekarang menggunakan Spreadsheet default ID dan header telah diperbarui: ' + SPREADSHEET_ID);
 }
 
 // ── BUAT SPREADSHEET BARU DAN INISIALISASI STRUKTURNYA ────────
