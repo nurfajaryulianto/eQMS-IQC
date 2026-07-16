@@ -727,23 +727,63 @@
         .text-amber-800, .text-amber-700 { color: #fde047 !important; }
 
 
-        /* Defect Buttons */
+        /* Defect Buttons base styling */
         .defect-button {
-            background: rgba(255, 255, 255, 0.03) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            color: rgba(255,255,255,0.85) !important;
             transition: all 0.2s !important;
         }
-        .defect-button:hover:not(.inactive) {
-            background: rgba(255, 255, 255, 0.08) !important;
-            border-color: rgba(255, 255, 255, 0.15) !important;
+
+        /* Minor (Blue) */
+        .defect-button.bg-blue-50 {
+            background: rgba(59, 130, 246, 0.06) !important;
+            border: 1px solid rgba(59, 130, 246, 0.2) !important;
+            color: #93c5fd !important;
         }
-        .defect-button.active {
-            outline: none !important;
-            background: rgba(37, 99, 235, 0.15) !important;
+        .defect-button.bg-blue-50:hover:not(.inactive) {
+            background: rgba(59, 130, 246, 0.12) !important;
+            border-color: rgba(59, 130, 246, 0.35) !important;
+        }
+        .defect-button.bg-blue-50.active {
+            background: rgba(59, 130, 246, 0.2) !important;
             border-color: #3b82f6 !important;
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.25) !important;
             color: white !important;
+            outline: none !important;
+        }
+
+        /* Major (Amber/Yellow) */
+        .defect-button.bg-amber-50 {
+            background: rgba(245, 158, 11, 0.06) !important;
+            border: 1px solid rgba(245, 158, 11, 0.2) !important;
+            color: #fde047 !important;
+        }
+        .defect-button.bg-amber-50:hover:not(.inactive) {
+            background: rgba(245, 158, 11, 0.12) !important;
+            border-color: rgba(245, 158, 11, 0.35) !important;
+        }
+        .defect-button.bg-amber-50.active {
+            background: rgba(245, 158, 11, 0.2) !important;
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.25) !important;
+            color: white !important;
+            outline: none !important;
+        }
+
+        /* Critical (Red) */
+        .defect-button.bg-red-50 {
+            background: rgba(239, 68, 68, 0.06) !important;
+            border: 1px solid rgba(239, 68, 68, 0.2) !important;
+            color: #fca5a5 !important;
+        }
+        .defect-button.bg-red-50:hover:not(.inactive) {
+            background: rgba(239, 68, 68, 0.12) !important;
+            border-color: rgba(239, 68, 68, 0.35) !important;
+        }
+        .defect-button.bg-red-50.active {
+            background: rgba(239, 68, 68, 0.2) !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.25) !important;
+            color: white !important;
+            outline: none !important;
         }
 
         /* Scrollbars */
