@@ -28,6 +28,12 @@ function getActiveSpreadsheetId() {
   return SPREADSHEET_ID;
 }
 
+// Menghapus spreadsheet dinamis di properti script agar kembali ke spreadsheet awal
+function resetToOriginalSpreadsheet() {
+  PropertiesService.getScriptProperties().deleteProperty('SPREADSHEET_ID');
+  Logger.log('Reset berhasil! Sekarang menggunakan Spreadsheet default ID: ' + SPREADSHEET_ID);
+}
+
 // ── BUAT SPREADSHEET BARU DAN INISIALISASI STRUKTURNYA ────────
 function createAndInitializeSpreadsheet() {
   try {
