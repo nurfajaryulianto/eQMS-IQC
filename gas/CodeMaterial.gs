@@ -18,6 +18,16 @@ var SHEET = {
 
 var SUPABASE_URL  = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 
+var FLAT_HEADERS = [
+  'no', 'material_name', 'item_description', 'color', 'uom', 'suppliers', 'supplier_pengirim', 'po_no',
+  'qty_receive', 'ok', 'no_qty', 'style', 'shoe_model', 'bucket', 'check_color', 'receive_date',
+  'in_lab', 'lot', 'category', 'workload_date', 'workload_time', 'actual_in_lab', 'finish', 'pass',
+  'marginal', 'fail', 'remark_aa', 'lab_number', 'component', 'pdm_material', 'mcs_num', 'tested',
+  're_test', 'remark_ah', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik',
+  'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date',
+  'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'
+];
+
 // ─── ENTRY POINTS ─────────────────────────────────────────────
 
 function doGet(e) {
@@ -47,8 +57,8 @@ function doPost(e) {
   var payload;
   try {
     payload = JSON.parse(e.postData.contents);
-  } catch {
-    return jsonResponse({ error: 'Invalid JSON payload' });
+  } catch (err) {
+    return jsonResponse({ error: 'Invalid JSON payload: ' + err.message });
   }
 
   var action = payload.action || '';
@@ -124,8 +134,6 @@ function login(payload) {
 }
 
 // ─── GET MASTER DATA ──────────────────────────────────────────
-// Mengembalikan daftar PO/Material dari sheet master_data
-// Parameter: ?status=pending|done|all (default: all)
 
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
@@ -134,15 +142,25 @@ function getMasterData(params) {
   if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
   var data  = sheet.getDataRange().getValues();
-  if (data.length < 2) return { data: [] };
+  if (data.length < 4) return { data: [] }; // 3 header rows
 
-  var headers = data[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-  var rows = data.slice(1);
+  var rows = data.slice(3); // Start at row 4 (index 3)
 
   var result = rows
     .map(function(row) {
       var obj = {};
-      headers.forEach(function(h, i) { obj[h] = row[i]; });
+      FLAT_HEADERS.forEach(function(h, i) { 
+        obj[h] = row[i] !== undefined ? row[i] : ''; 
+      });
+      // Compatibility mapping for frontend
+      obj.po_number = String(obj.po_no || '').trim();
+      obj.material_name = obj.material_name || '';
+      obj.vendor_name = obj.suppliers || '';
+      obj.uom = obj.uom || '';
+      obj.style = obj.style || '';
+      obj.model_shoe = obj.shoe_model || '';
+      obj.planned_qty = Number(obj.qty_receive) || 0;
+      obj.status = (obj.status || 'pending').toLowerCase();
       return obj;
     })
     .filter(function(obj) {
@@ -158,40 +176,30 @@ function getMasterData(params) {
 function getInspectionData(params) {
   var ss       = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet    = ss.getSheetByName(SHEET.INSPECTIONS);
-  var mdSheet  = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
   var data    = sheet.getDataRange().getValues();
-  var headers = data[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-  var rows    = data.slice(1);
+  if (data.length < 4) return { data: [] }; // 3 header rows
+
+  var rows    = data.slice(3);
 
   var inspections = rows.map(function(row) {
     var obj = {};
-    headers.forEach(function(h, i) { obj[h] = row[i]; });
+    FLAT_HEADERS.forEach(function(h, i) { 
+      obj[h] = row[i] !== undefined ? row[i] : ''; 
+    });
+    // Compatibility mapping for dashboard
+    obj.po_number = obj.po_no || '';
+    obj.qty_inspect = (Number(obj.ok) || 0) + (Number(obj.no_qty) || 0);
+    obj.qty_fail = Number(obj.no_qty) || 0;
+    obj.result_status = obj.qty_fail === 0 ? 'Pass' : 'Fail';
+    obj.inspection_date = obj.inspection_date || '';
+    obj.material_name = obj.material_name || '';
+    obj.vendor_name = obj.suppliers || '';
+    obj.style = obj.style || '';
+    obj.model_shoe = obj.shoe_model || '';
+    obj.item_description = obj.item_description || '';
     return obj;
-  });
-
-  // Enrich dengan master_data
-  var masterMap = {};
-  if (mdSheet) {
-    var mdData = mdSheet.getDataRange().getValues();
-    var mdHdr  = mdData[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-    mdData.slice(1).forEach(function(row) {
-      var obj = {};
-      mdHdr.forEach(function(h, i) { obj[h] = row[i]; });
-      masterMap[obj.po_number] = obj;
-    });
-  }
-
-  inspections = inspections.map(function(insp) {
-    var md = masterMap[insp.po_number] || {};
-    return Object.assign({}, insp, {
-      material_name:    md.material_name    || '',
-      vendor_name:      md.vendor_name      || '',
-      style:            md.style            || '',
-      model_shoe:       md.model_shoe       || '',
-      item_description: md.item_description || '',
-    });
   });
 
   return { data: inspections, total: inspections.length };
@@ -226,33 +234,69 @@ function submitInspection(payload) {
     }
 
     var inspectionId = 'INSP-' + new Date().getTime();
-    // Find index of headers in inspections to know where to write what
-    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
-      .map(function(h) { return String(h).toLowerCase().trim(); });
-
     var now = new Date().toISOString();
-    var row = [];
 
-    headers.forEach(function(h) {
-      if (h === 'inspection_id') row.push(inspectionId);
-      else if (h === 'po_number') row.push(payload.po_number || '');
-      else if (h === 'inspector_nik') row.push(payload.inspector_nik || '');
-      else if (h === 'qty_inspect') row.push(payload.qty_inspect || 0);
-      else if (h === 'qty_fail') row.push(payload.qty_fail || 0);
-      else if (h === 'defect_notes') row.push(payload.defect_notes || '');
-      else if (h === 'result_status') row.push(payload.result_status || 'Pass');
-      else if (h === 'input_type') row.push(payload.input_type || 'manual');
-      else if (h === 'rolling_inspection') row.push(payload.rolling_inspection || 'No');
-      else if (h === 'approved_by_leader') row.push(payload.approved_by_leader || '');
-      else if (h === 'evidence_url') row.push(evidenceUrl || payload.evidence_url || '');
-      else if (h === 'inspection_date') row.push(payload.inspection_date || now);
-      else if (h === 'created_at') row.push(now);
-      else row.push('');
+    // Find PO in master_data to copy static details
+    var mdSheet = ss.getSheetByName(SHEET.MASTER_DATA);
+    var mdRowData = null;
+    if (mdSheet) {
+      var mdData = mdSheet.getDataRange().getValues();
+      for (var i = 3; i < mdData.length; i++) {
+        if (String(mdData[i][7]).trim() === String(payload.po_number).trim()) {
+          mdRowData = mdData[i];
+          break;
+        }
+      }
+    }
+
+    var newRow = [];
+    FLAT_HEADERS.forEach(function(h, idx) {
+      if (h === 'no') {
+        newRow.push(Math.max(1, sheet.getLastRow() - 2)); // Auto NO
+      }
+      else if (h === 'inspection_id') newRow.push(inspectionId);
+      else if (h === 'po_no') newRow.push(payload.po_number || '');
+      else if (h === 'inspector_nik') newRow.push(payload.inspector_nik || '');
+      
+      // Inspection details
+      else if (h === 'qty_receive') {
+        var val = mdRowData ? Number(mdRowData[8]) : 0;
+        newRow.push(val);
+      }
+      else if (h === 'ok') {
+        newRow.push(payload.qty_inspect - payload.qty_fail);
+      }
+      else if (h === 'no_qty') {
+        newRow.push(payload.qty_fail);
+      }
+      else if (h === 'pass') {
+        newRow.push(payload.qty_fail === 0 ? 'Pass' : '');
+      }
+      else if (h === 'fail') {
+        newRow.push(payload.qty_fail > 0 ? 'Fail' : '');
+      }
+      
+      else if (h === 'defect_notes') newRow.push(payload.defect_notes || '');
+      else if (h === 'rolling_inspection') newRow.push(payload.rolling_inspection || 'No');
+      else if (h === 'approved_by_leader') newRow.push(payload.approved_by_leader || '');
+      else if (h === 'evidence_url') newRow.push(evidenceUrl || '');
+      else if (h === 'inspection_date') newRow.push(payload.inspection_date || now);
+      
+      else if (h === 'status') newRow.push('done');
+      else if (h === 'uploaded_at') newRow.push(now);
+      
+      // Copy remaining static cells from master data row if available
+      else if (mdRowData && mdRowData[idx] !== undefined && mdRowData[idx] !== '') {
+        newRow.push(mdRowData[idx]);
+      }
+      else {
+        newRow.push('');
+      }
     });
 
-    sheet.appendRow(row);
+    sheet.appendRow(newRow);
 
-    // Update status di master_data
+    // Update status in master_data
     updateMasterDataStatus(ss, payload.po_number, 'done');
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
@@ -267,21 +311,17 @@ function updateMasterDataStatus(ss, poNumber, newStatus) {
   if (!sheet) return;
 
   var data    = sheet.getDataRange().getValues();
-  var headers = data[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-  var poCol   = headers.indexOf('po_number');
-  var stCol   = headers.indexOf('status');
-  if (poCol < 0 || stCol < 0) return;
-
-  for (var i = 1; i < data.length; i++) {
-    if (String(data[i][poCol]) === String(poNumber)) {
-      sheet.getRange(i + 1, stCol + 1).setValue(newStatus);
+  // status is at index 34 (Column AI, 35th column)
+  // po_no is at index 7 (Column H, 8th column)
+  for (var i = 3; i < data.length; i++) {
+    if (String(data[i][7]).trim() === String(poNumber).trim()) {
+      sheet.getRange(i + 1, 35).setValue(newStatus);
       break;
     }
   }
 }
 
 // ─── BULK UPSERT MASTER DATA ──────────────────────────────────
-// Menerima array rows dari hasil parsing SheetJS di frontend
 
 function bulkUpsertMasterData(payload) {
   var lock = LockService.getScriptLock();
@@ -296,14 +336,16 @@ function bulkUpsertMasterData(payload) {
     if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
     var data    = sheet.getDataRange().getValues();
-    var headers = data[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-    var poCol   = headers.indexOf('po_number');
-
-    // Build existing PO map for upsert
     var existingMap = {};
-    data.slice(1).forEach(function(row, idx) {
-      existingMap[String(row[poCol])] = idx + 2; // 1-indexed + header row
-    });
+    
+    // Map existing POs (Column H is index 7)
+    // Row 4 is index 3 in data array
+    for (var i = 3; i < data.length; i++) {
+      var poKey = String(data[i][7]).trim();
+      if (poKey) {
+        existingMap[poKey] = i + 1; // 1-indexed row number
+      }
+    }
 
     var now        = new Date().toISOString();
     var uploaded   = payload.uploader_nik || 'admin';
@@ -311,26 +353,62 @@ function bulkUpsertMasterData(payload) {
     var updateCount = 0;
 
     rows.forEach(function(row) {
-      var po = String(row.po_number || row['PO Number'] || '').trim();
+      // Maps keys from the uploaded ADF Layout Excel template
+      var po = String(row['PO Number'] || row['po_number'] || '').trim();
       if (!po) return;
 
-      var newRow = [
-        po,
-        row.material_name    || row['Material Name']    || '',
-        row.item_description || row['Item Description'] || '',
-        row.uom              || row['UOM']              || '',
-        row.vendor_id        || row['Vendor ID']        || '',
-        row.vendor_name      || row['Vendor Name']      || '',
-        row.style            || row['Style']            || '',
-        row.model_shoe       || row['Model Shoe']       || '',
-        Number(row.planned_qty || row['Planned Qty'])   || 0,
-        'pending',
-        uploaded,
-        now,
-      ];
+      var matName = row['Material Name'] || row['material_name'] || '';
+      var matDesc = row['Material Description'] || row['item_description'] || '';
+      var uom = row['UOM'] || row['uom'] || '';
+      var supplier = row['Supplier'] || row['suppliers'] || '';
+      var supplierName = row['Supplier Name'] || row['supplier_pengirim'] || '';
+      var batchSize = Number(row['Batch Size'] || row['qty_receive'] || 0);
+      var productCode = row['Product Code'] || row['style'] || '';
+      var modelName = row['Model Name'] || row['shoe_model'] || '';
+      var bucket = row['Bucket'] || row['bucket'] || '';
+      var receiveDate = row['Receive Date'] || row['receive_date'] || '';
+      var shipment = row['Shipment Number'] || row['shipment_number'] || '';
+      var noBc = row['No BC'] || row['no_bc'] || '';
+      var bcType = row['BC Type'] || row['bc_type'] || '';
+      var receiveNum = row['Receive Number'] || row['receive_number'] || '';
+      var poArea = row['PO Area'] || row['po_area'] || '';
+
+      var newRow = [];
+      FLAT_HEADERS.forEach(function(h) {
+        if (h === 'no') newRow.push(''); // calculated later
+        else if (h === 'material_name') newRow.push(matName);
+        else if (h === 'item_description') newRow.push(matDesc);
+        else if (h === 'color') newRow.push('');
+        else if (h === 'uom') newRow.push(uom);
+        else if (h === 'suppliers') newRow.push(supplier);
+        else if (h === 'supplier_pengirim') newRow.push(supplierName);
+        else if (h === 'po_no') newRow.push(po);
+        else if (h === 'qty_receive') newRow.push(batchSize);
+        else if (h === 'ok') newRow.push('');
+        else if (h === 'no_qty') newRow.push('');
+        else if (h === 'style') newRow.push(productCode);
+        else if (h === 'shoe_model') newRow.push(modelName);
+        else if (h === 'bucket') newRow.push(bucket);
+        else if (h === 'check_color') newRow.push('');
+        else if (h === 'receive_date') newRow.push(receiveDate);
+        
+        else if (h === 'status') newRow.push('pending');
+        else if (h === 'uploaded_by') newRow.push(uploaded);
+        else if (h === 'uploaded_at') newRow.push(now);
+        
+        else if (h === 'shipment_number') newRow.push(shipment);
+        else if (h === 'no_bc') newRow.push(noBc);
+        else if (h === 'bc_type') newRow.push(bcType);
+        else if (h === 'receive_number') newRow.push(receiveNum);
+        else if (h === 'po_area') newRow.push(poArea);
+        else newRow.push('');
+      });
 
       if (existingMap[po]) {
         // Update existing row
+        // Preserve NO column value at index 0
+        var existingNo = sheet.getRange(existingMap[po], 1).getValue();
+        newRow[0] = existingNo || (existingMap[po] - 3);
         sheet.getRange(existingMap[po], 1, 1, newRow.length).setValues([newRow]);
         updateCount++;
       } else {
@@ -339,7 +417,12 @@ function bulkUpsertMasterData(payload) {
     });
 
     if (insertRows.length) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, insertRows.length, insertRows[0].length).setValues(insertRows);
+      var currentLastRow = sheet.getLastRow();
+      var startingNo = Math.max(0, currentLastRow - 3) + 1;
+      insertRows.forEach(function(r, idx) {
+        r[0] = startingNo + idx;
+      });
+      sheet.getRange(currentLastRow + 1, 1, insertRows.length, insertRows[0].length).setValues(insertRows);
     }
 
     return {
@@ -355,7 +438,6 @@ function bulkUpsertMasterData(payload) {
 }
 
 // ─── PASS ALL ─────────────────────────────────────────────────
-// Tandai semua item pending sebagai Pass secara batch
 
 function passAll(payload) {
   var lock = LockService.getScriptLock();
@@ -369,50 +451,51 @@ function passAll(payload) {
     if (!inspSheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
     var data    = mdSheet.getDataRange().getValues();
-    var headers = data[0].map(function(h) { return String(h).toLowerCase().replace(/ /g,'_'); });
-    var poCol   = headers.indexOf('po_number');
-    var stCol   = headers.indexOf('status');
-    var qtyCol  = headers.indexOf('planned_qty');
-    if (poCol < 0 || stCol < 0) throw new Error('Kolom po_number atau status tidak ditemukan.');
-
-    // Find index of headers in inspections to match columns dynamically
-    var inspHeaders = inspSheet.getRange(1, 1, 1, inspSheet.getLastColumn()).getValues()[0]
-      .map(function(h) { return String(h).toLowerCase().trim(); });
-
     var now = new Date().toISOString();
     var adminNik = payload.admin_nik || 'admin';
     var count = 0;
     var newInspRows = [];
 
-    for (var i = 1; i < data.length; i++) {
-      var status = String(data[i][stCol] || '').toLowerCase();
+    for (var i = 3; i < data.length; i++) {
+      var status = String(data[i][34] || '').toLowerCase(); // status is index 34
       if (status !== 'pending') continue;
 
-      var po  = String(data[i][poCol]);
-      var qty = Number(data[i][qtyCol]) || 0;
+      var po  = String(data[i][7]); // po_no is index 7
+      var qty = Number(data[i][8]) || 0; // qty_receive is index 8
 
       var newRow = [];
       var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
       
-      inspHeaders.forEach(function(h) {
-        if (h === 'inspection_id') newRow.push(uniqueId);
-        else if (h === 'po_number') newRow.push(po);
+      FLAT_HEADERS.forEach(function(h, idx) {
+        if (h === 'no') {
+          newRow.push(inspSheet.getLastRow() + newInspRows.length - 2);
+        }
+        else if (h === 'inspection_id') newRow.push(uniqueId);
+        else if (h === 'po_no') newRow.push(po);
         else if (h === 'inspector_nik') newRow.push(adminNik);
-        else if (h === 'qty_inspect') newRow.push(qty);
-        else if (h === 'qty_fail') newRow.push(0);
+        else if (h === 'qty_receive') newRow.push(qty);
+        else if (h === 'ok') newRow.push(qty);
+        else if (h === 'no_qty') newRow.push(0);
+        else if (h === 'pass') newRow.push('Pass');
+        else if (h === 'fail') newRow.push('');
         else if (h === 'defect_notes') newRow.push('');
-        else if (h === 'result_status') newRow.push('Pass');
-        else if (h === 'input_type') newRow.push('batch_pass_all');
         else if (h === 'rolling_inspection') newRow.push('No');
+        else if (h === 'status') newRow.push('done');
+        else if (h === 'uploaded_at') newRow.push(now);
         else if (h === 'inspection_date') newRow.push(now);
-        else if (h === 'created_at') newRow.push(now);
-        else newRow.push('');
+        // Copy static master data
+        else if (data[i][idx] !== undefined && data[i][idx] !== '') {
+          newRow.push(data[i][idx]);
+        }
+        else {
+          newRow.push('');
+        }
       });
 
       newInspRows.push(newRow);
 
       // Update status to done
-      mdSheet.getRange(i + 1, stCol + 1).setValue('done');
+      mdSheet.getRange(i + 1, 35).setValue('done');
       count++;
     }
 
@@ -433,18 +516,17 @@ function passAll(payload) {
 }
 
 // ─── GENERATE TEMPLATE ────────────────────────────────────────
-// Mengembalikan file Excel template kosong (CSV sebagai fallback)
 
 function generateTemplate() {
-  // Header template
   var headers = [
-    'po_number', 'material_name', 'item_description', 'uom',
-    'vendor_id', 'vendor_name', 'style', 'model_shoe', 'planned_qty'
+    'Material Name', 'Material Description', 'UOM', 'Supplier',
+    'Supplier Name', 'PO Area', 'Batch Size', 'Product Code',
+    'Model Name', 'Bucket', 'Receive Date', 'PO Number',
+    'Shipment Number', 'No BC', 'BC Type', 'Receive Number', 'Material Type'
   ];
 
   var csvContent = headers.join(',') + '\n';
-  // Tambahkan beberapa baris contoh
-  csvContent += '"PO-CONTOH-001","Nama Material","Deskripsi item","pcs","V001","Nama Vendor","STYLE-001","Model Sepatu",100\n';
+  csvContent += '"RM.LTH.1070000003.00A","FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)","Square Feet","YOUNGIL LEATHER INDONESIA PT.","","RM-LKL",9605.5,"CU6620-001","NIKE COURT VISION MID - BLACK/BLACK","260525,260810","01-07-2026","1263026745,1263035401","YLI/DO/26/11490,YLI/DO/26/11491","105743","BC 2.7","111260042835,111260042840","LEATHER"\n';
 
   var blob = Utilities.newBlob(csvContent, 'text/csv', 'template_master_data_iqc_material.csv');
   return ContentService.createTextOutput(blob.getDataAsString())
@@ -462,13 +544,12 @@ function verifySupabaseToken(token) {
     });
     if (res.getResponseCode() !== 200) return null;
     return JSON.parse(res.getContentText());
-  } catch {
+  } catch (err) {
     return null;
   }
 }
 
-// ─── SETUP SPREADSHEET HEADERS (jalankan sekali saja) ─────────
-// Buka Apps Script editor → Run → setupSpreadsheetHeaders
+// ─── SETUP SPREADSHEET HEADERS ────────────────────────────────
 
 function setupSpreadsheetHeaders() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -482,40 +563,30 @@ function setupSpreadsheetHeaders() {
 
   // master_data
   var mdSheet = ss.getSheetByName(SHEET.MASTER_DATA) || ss.insertSheet(SHEET.MASTER_DATA);
-  if (mdSheet.getLastRow() === 0) {
-    var mdHeaders = ['po_number','material_name','item_description','uom','vendor_id','vendor_name','style','model_shoe','planned_qty','status','uploaded_by','uploaded_at'];
-    mdSheet.getRange(1, 1, 1, mdHeaders.length).setValues([mdHeaders]);
-    mdSheet.getRange(1, 1, 1, mdHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
+  if (mdSheet.getLastRow() <= 1) { // includes legacy header cases
+    if (mdSheet.getLastRow() > 0) mdSheet.clear();
+    var r1 = []; for (var i=0; i<FLAT_HEADERS.length; i++) r1.push(''); r1[1] = 'LEATHER';
+    var r2 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'CATEGORY', 'WORKLOAD', '', 'Lab Status', '', '', '', '', 'Remark', 'Lab Number', 'COMPONENT', 'PDM MATERIAL', 'MCS#', 'TESTED', 'RE-TEST', 'REMARK', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
+    var r3 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', 'DATE', 'TIME', 'Actual In Lab', 'Finish', 'Pass', 'Marginal', 'Fail'];
+    
+    mdSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
+    mdSheet.getRange(2, 1, 1, r2.length).setValues([r2]);
+    mdSheet.getRange(3, 1, 1, r3.length).setValues([r3]);
+    mdSheet.getRange(1, 1, 3, r2.length).setFontWeight('bold').setBackground('#f1f5f9');
   }
 
   // inspections
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS) || ss.insertSheet(SHEET.INSPECTIONS);
-  var inspHeaders = ['inspection_id','po_number','inspector_nik','qty_inspect','qty_fail','defect_notes','result_status','input_type','rolling_inspection','approved_by_leader','evidence_url','inspection_date','created_at'];
-  if (inspSheet.getLastRow() === 0) {
-    inspSheet.getRange(1, 1, 1, inspHeaders.length).setValues([inspHeaders]);
-    inspSheet.getRange(1, 1, 1, inspHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
-  } else {
-    var lastCol = inspSheet.getLastColumn();
-    var firstRow = inspSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    var headersLower = firstRow.map(function(h) { return String(h).toLowerCase().trim(); });
-    if (headersLower.indexOf('rolling_inspection') < 0) {
-      inspSheet.getRange(1, lastCol + 1).setValue('rolling_inspection').setFontWeight('bold').setBackground('#e2e8f0');
-    }
+  if (inspSheet.getLastRow() <= 1) {
+    if (inspSheet.getLastRow() > 0) inspSheet.clear();
+    var r1 = []; for (var i=0; i<FLAT_HEADERS.length; i++) r1.push(''); r1[1] = 'LEATHER';
+    var r2 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'CATEGORY', 'WORKLOAD', '', 'Lab Status', '', '', '', '', 'Remark', 'Lab Number', 'COMPONENT', 'PDM MATERIAL', 'MCS#', 'TESTED', 'RE-TEST', 'REMARK', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
+    var r3 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', 'DATE', 'TIME', 'Actual In Lab', 'Finish', 'Pass', 'Marginal', 'Fail'];
     
-    // Refresh col check
-    var lastCol2 = inspSheet.getLastColumn();
-    var firstRow2 = inspSheet.getRange(1, 1, 1, lastCol2).getValues()[0];
-    var headersLower2 = firstRow2.map(function(h) { return String(h).toLowerCase().trim(); });
-    if (headersLower2.indexOf('approved_by_leader') < 0) {
-      inspSheet.getRange(1, lastCol2 + 1).setValue('approved_by_leader').setFontWeight('bold').setBackground('#e2e8f0');
-    }
-    
-    var lastCol3 = inspSheet.getLastColumn();
-    var firstRow3 = inspSheet.getRange(1, 1, 1, lastCol3).getValues()[0];
-    var headersLower3 = firstRow3.map(function(h) { return String(h).toLowerCase().trim(); });
-    if (headersLower3.indexOf('evidence_url') < 0) {
-      inspSheet.getRange(1, lastCol3 + 1).setValue('evidence_url').setFontWeight('bold').setBackground('#e2e8f0');
-    }
+    inspSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
+    inspSheet.getRange(2, 1, 1, r2.length).setValues([r2]);
+    inspSheet.getRange(3, 1, 1, r3.length).setValues([r3]);
+    inspSheet.getRange(1, 1, 3, r2.length).setFontWeight('bold').setBackground('#f1f5f9');
   }
 
   // users
@@ -525,21 +596,11 @@ function setupSpreadsheetHeaders() {
     uSheet.getRange(1, 1, 1, uHeaders.length).setValues([uHeaders]);
     uSheet.getRange(1, 1, 1, uHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
     
-    // Seed default admin user
     var now = new Date().toISOString();
     uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
   }
 
   SpreadsheetApp.flush();
-  Logger.log('Setup selesai! Sheets tersedia: vendors, master_data, inspections, users');
-}
-
-// ─── HELPER ───────────────────────────────────────────────────
-
-function jsonResponse(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ─── USER MANAGEMENT CRUD ─────────────────────────────────────
@@ -596,7 +657,7 @@ function saveUser(payload) {
     var existingRowIdx = -1;
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][nikCol]).trim().toLowerCase() === nik.toLowerCase()) {
-        existingRowIdx = i + 1; // 1-indexed, +1 header
+        existingRowIdx = i + 1;
         break;
       }
     }
@@ -604,7 +665,6 @@ function saveUser(payload) {
     var now = new Date().toISOString();
 
     if (existingRowIdx >= 0) {
-      // Update
       sheet.getRange(existingRowIdx, nameCol + 1).setValue(name);
       sheet.getRange(existingRowIdx, roleCol + 1).setValue(role);
       if (password) {
@@ -612,7 +672,6 @@ function saveUser(payload) {
       }
       return { status: 'ok', message: 'User berhasil diperbarui.' };
     } else {
-      // Insert new user
       if (!password) throw new Error('Password wajib diisi untuk user baru.');
       
       var newRow = [];
@@ -641,7 +700,6 @@ function deleteUser(payload) {
     var nik = String(payload.nik || '').trim();
     if (!nik) throw new Error('NIK tidak valid.');
 
-    // Proteksi default admin
     if (nik.toLowerCase() === 'admin') {
       throw new Error('User default "admin" tidak dapat dihapus.');
     }
@@ -666,4 +724,12 @@ function deleteUser(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ─── HELPER ───────────────────────────────────────────────────
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }

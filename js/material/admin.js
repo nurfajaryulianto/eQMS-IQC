@@ -33,6 +33,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof window.loadSpreadsheetStatus === 'function') {
         await window.loadSpreadsheetStatus();
     }
+    
+    // Show mock ADF loader in test mode
+    if (MATERIAL_TEST_MODE) {
+        const mockCont = document.getElementById('mock-adf-load-container');
+        if (mockCont) mockCont.style.display = 'block';
+    }
 });
 
 function setupNavbar(user) {
@@ -111,8 +117,13 @@ window.renderMasterTable = function () {
 window.downloadTemplate = async function () {
     if (UI_TEST_MODE) {
         // Generate CSV in browser
-        const headers = ['po_number', 'material_name', 'item_description', 'uom', 'vendor_id', 'vendor_name', 'style', 'model_shoe', 'planned_qty'];
-        const example = '"PO-CONTOH-001","Nama Material","Deskripsi item","pcs","V001","Nama Vendor","STYLE-001","Model Sepatu",100';
+        const headers = [
+            'Material Name', 'Material Description', 'UOM', 'Supplier',
+            'Supplier Name', 'PO Area', 'Batch Size', 'Product Code',
+            'Model Name', 'Bucket', 'Receive Date', 'PO Number',
+            'Shipment Number', 'No BC', 'BC Type', 'Receive Number', 'Material Type'
+        ];
+        const example = '"RM.LTH.1070000003.00A","FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)","Square Feet","YOUNGIL LEATHER INDONESIA PT.","","RM-LKL",9605.5,"CU6620-001","NIKE COURT VISION MID - BLACK/BLACK","260525,260810","01-07-2026","1263026745,1263035401","YLI/DO/26/11490,YLI/DO/26/11491","105743","BC 2.7","111260042835,111260042840","LEATHER"';
         const csv = headers.join(',') + '\n' + example + '\n';
         downloadCSV(csv, 'template_master_data_iqc_material.csv');
         showToast('Template berhasil didownload!', 'success');
@@ -177,7 +188,8 @@ function processFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            parsedFileData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+            // ADF Layout headers are on the second row (index 1)
+            parsedFileData = XLSX.utils.sheet_to_json(sheet, { range: 1, defval: '' });
 
             document.getElementById('file-name').textContent = file.name;
             document.getElementById('file-rows').textContent = `${parsedFileData.length} baris data`;
@@ -228,10 +240,17 @@ window.confirmUpload = async function () {
             await delay(1500);
             // Simulate adding to allMasterData
             parsedFileData.forEach(row => {
-                const po = String(row.po_number || row['PO Number'] || '').trim();
+                const po = String(row['PO Number'] || row.po_number || '').trim();
                 if (!po) return;
                 const existing = allMasterData.findIndex(d => d.po_number === po);
-                const newItem = { po_number: po, material_name: row.material_name || row['Material Name'] || '', vendor_name: row.vendor_name || row['Vendor Name'] || '', uom: row.uom || row['UOM'] || '', planned_qty: Number(row.planned_qty || row['Planned Qty']) || 0, status: 'pending' };
+                const newItem = {
+                    po_number: po,
+                    material_name: row['Material Name'] || row.material_name || '',
+                    vendor_name: row['Supplier'] || row.vendor_name || '',
+                    uom: row['UOM'] || row.uom || '',
+                    planned_qty: Number(row['Batch Size'] || row.planned_qty) || 0,
+                    status: 'pending'
+                };
                 if (existing >= 0) allMasterData[existing] = newItem;
                 else allMasterData.push(newItem);
             });
@@ -640,4 +659,70 @@ window.loadSpreadsheetStatus = async function() {
         console.error(err);
         infoContainer.innerHTML = `<span style="color:#f87171;font-weight:600;font-size:12px;">Gagal memuat status: ${err.message}. Pastikan Web App sudah di-deploy dengan benar.</span>`;
     }
+};
+
+window.loadMockADFFile = function() {
+    parsedFileData = [
+      {
+        "Material Name": "RM.LTH.1070000003.00A",
+        "Material Description": "FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
+        "UOM": "Square Feet",
+        "Supplier": "YOUNGIL LEATHER INDONESIA PT.",
+        "Supplier Name": "",
+        "PO Area": "RM-LKL",
+        "Batch Size": "9605.5",
+        "Product Code": "CU6620-001",
+        "Model Name": "NIKE COURT VISION MID - BLACK/BLACK",
+        "Bucket": "260525,260810",
+        "Receive Date": "01-07-2026",
+        "PO Number": "1263026745,1263035401",
+        "Shipment Number": "YLI/DO/26/11490,YLI/DO/26/11491",
+        "No BC": "105743",
+        "BC Type": "BC 2.7",
+        "Receive Number": "111260042835,111260042840",
+        "Material Type": "LEATHER "
+      },
+      {
+        "Material Name": "RM.LTH.1090700002.0AN",
+        "Material Description": "79564 - PM PU COATED NUBUCK - 1.2-1.4MM - DYE THROUGH - N/A - N/A - GREY FOG(0AN)",
+        "UOM": "Square Feet",
+        "Supplier": "OIA Global Logistics-SCM, Inc.",
+        "Supplier Name": "YOUNGIL LEATHER INDONESIA PT.",
+        "PO Area": "RM-IMP",
+        "Batch Size": "72",
+        "Product Code": "IH7681-004",
+        "Model Name": "NIKE TERRASCOUT (PS) - IH7681-20259",
+        "Bucket": "260727",
+        "Receive Date": "01-07-2026",
+        "PO Number": "1263026744",
+        "Shipment Number": "YLI/DO/26/11492",
+        "No BC": "105743",
+        "BC Type": "BC 2.7",
+        "Receive Number": "111260042837",
+        "Material Type": "LEATHER "
+      },
+      {
+        "Material Name": "RM.LTH.3060200003.00A",
+        "Material Description": "FP GENERIC SPLIT SUEDE - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
+        "UOM": "Square Feet",
+        "Supplier": "DAEHWA LEATHER LESTARI PT.",
+        "Supplier Name": "",
+        "PO Area": "RM-LKL",
+        "Batch Size": "20",
+        "Product Code": "IU7628-001",
+        "Model Name": "WMNS NIKE MD RUNNER 2 MM - IU7628-2",
+        "Bucket": "260713",
+        "Receive Date": "01-07-2026",
+        "PO Number": "1263031843",
+        "Shipment Number": "NC-26060144",
+        "No BC": "364948",
+        "BC Type": "BC 2.7",
+        "Receive Number": "111260042828",
+        "Material Type": "LEATHER "
+      }
+    ];
+    document.getElementById('file-name').textContent = 'mock_adf_raw_material_layout.xlsx';
+    document.getElementById('file-rows').textContent = `${parsedFileData.length} baris data`;
+    renderPreviewTable(parsedFileData);
+    document.getElementById('file-preview').style.display = 'block';
 };
