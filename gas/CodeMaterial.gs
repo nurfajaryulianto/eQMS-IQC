@@ -5,7 +5,6 @@
 // ============================================================
 
 // ─── SPREADSHEET CONFIG ──────────────────────────────────────
-// Ganti dengan ID Spreadsheet IQC Material yang baru dibuat
 var SPREADSHEET_ID = '13C5MdJR_WN1A6wUzlRXCPCz6hKRoiR3Mg-0p_lMLblQ';
 
 var SHEET = {
@@ -21,9 +20,7 @@ var SUPABASE_URL  = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 var FLAT_HEADERS = [
   'no', 'material_name', 'item_description', 'color', 'uom', 'suppliers', 'supplier_pengirim', 'po_no',
   'qty_receive', 'ok', 'no_qty', 'style', 'shoe_model', 'bucket', 'check_color', 'receive_date',
-  'in_lab', 'lot', 'category', 'workload_date', 'workload_time', 'actual_in_lab', 'finish', 'pass',
-  'marginal', 'fail', 'remark_aa', 'lab_number', 'component', 'pdm_material', 'mcs_num', 'tested',
-  're_test', 'remark_ah', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik',
+  'in_lab', 'lot', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik',
   'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date',
   'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'
 ];
@@ -93,7 +90,6 @@ function login(payload) {
 
   var data = sheet.getDataRange().getValues();
   
-  // Seed default admin if sheet only has headers
   if (data.length < 2) {
     var now = new Date().toISOString();
     sheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
@@ -118,7 +114,7 @@ function login(payload) {
       var roleVal = String(data[i][roleCol]).toLowerCase().trim();
       
       var expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 8); // 8 jam expiry
+      expiresAt.setHours(expiresAt.getHours() + 8);
 
       return {
         nik: rowNik,
@@ -142,9 +138,9 @@ function getMasterData(params) {
   if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
   var data  = sheet.getDataRange().getValues();
-  if (data.length < 4) return { data: [] }; // 3 header rows
+  if (data.length < 3) return { data: [] }; // 2 header rows
 
-  var rows = data.slice(3); // Start at row 4 (index 3)
+  var rows = data.slice(2); // Start at row 3 (index 2)
 
   var result = rows
     .map(function(row) {
@@ -152,7 +148,6 @@ function getMasterData(params) {
       FLAT_HEADERS.forEach(function(h, i) { 
         obj[h] = row[i] !== undefined ? row[i] : ''; 
       });
-      // Compatibility mapping for frontend
       obj.po_number = String(obj.po_no || '').trim();
       obj.material_name = obj.material_name || '';
       obj.vendor_name = obj.suppliers || '';
@@ -179,16 +174,15 @@ function getInspectionData(params) {
   if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
   var data    = sheet.getDataRange().getValues();
-  if (data.length < 4) return { data: [] }; // 3 header rows
+  if (data.length < 3) return { data: [] }; // 2 header rows
 
-  var rows    = data.slice(3);
+  var rows    = data.slice(2);
 
   var inspections = rows.map(function(row) {
     var obj = {};
     FLAT_HEADERS.forEach(function(h, i) { 
       obj[h] = row[i] !== undefined ? row[i] : ''; 
     });
-    // Compatibility mapping for dashboard
     obj.po_number = obj.po_no || '';
     obj.qty_inspect = (Number(obj.ok) || 0) + (Number(obj.no_qty) || 0);
     obj.qty_fail = Number(obj.no_qty) || 0;
@@ -241,7 +235,7 @@ function submitInspection(payload) {
     var mdRowData = null;
     if (mdSheet) {
       var mdData = mdSheet.getDataRange().getValues();
-      for (var i = 3; i < mdData.length; i++) {
+      for (var i = 2; i < mdData.length; i++) {
         if (String(mdData[i][7]).trim() === String(payload.po_number).trim()) {
           mdRowData = mdData[i];
           break;
@@ -252,7 +246,7 @@ function submitInspection(payload) {
     var newRow = [];
     FLAT_HEADERS.forEach(function(h, idx) {
       if (h === 'no') {
-        newRow.push(Math.max(1, sheet.getLastRow() - 2)); // Auto NO
+        newRow.push(Math.max(1, sheet.getLastRow() - 1)); // Auto NO
       }
       else if (h === 'inspection_id') newRow.push(inspectionId);
       else if (h === 'po_no') newRow.push(payload.po_number || '');
@@ -269,11 +263,8 @@ function submitInspection(payload) {
       else if (h === 'no_qty') {
         newRow.push(payload.qty_fail);
       }
-      else if (h === 'pass') {
-        newRow.push(payload.qty_fail === 0 ? 'Pass' : '');
-      }
-      else if (h === 'fail') {
-        newRow.push(payload.qty_fail > 0 ? 'Fail' : '');
+      else if (h === 'check_color') {
+        newRow.push(payload.check_color || 'OK');
       }
       
       else if (h === 'defect_notes') newRow.push(payload.defect_notes || '');
@@ -311,11 +302,11 @@ function updateMasterDataStatus(ss, poNumber, newStatus) {
   if (!sheet) return;
 
   var data    = sheet.getDataRange().getValues();
-  // status is at index 34 (Column AI, 35th column)
+  // status is at index 18 (Column S, 19th column)
   // po_no is at index 7 (Column H, 8th column)
-  for (var i = 3; i < data.length; i++) {
+  for (var i = 2; i < data.length; i++) {
     if (String(data[i][7]).trim() === String(poNumber).trim()) {
-      sheet.getRange(i + 1, 35).setValue(newStatus);
+      sheet.getRange(i + 1, 19).setValue(newStatus);
       break;
     }
   }
@@ -339,8 +330,8 @@ function bulkUpsertMasterData(payload) {
     var existingMap = {};
     
     // Map existing POs (Column H is index 7)
-    // Row 4 is index 3 in data array
-    for (var i = 3; i < data.length; i++) {
+    // Row 3 is index 2 in data array
+    for (var i = 2; i < data.length; i++) {
       var poKey = String(data[i][7]).trim();
       if (poKey) {
         existingMap[poKey] = i + 1; // 1-indexed row number
@@ -353,7 +344,6 @@ function bulkUpsertMasterData(payload) {
     var updateCount = 0;
 
     rows.forEach(function(row) {
-      // Maps keys from the uploaded ADF Layout Excel template
       var po = String(row['PO Number'] || row['po_number'] || '').trim();
       if (!po) return;
 
@@ -375,7 +365,7 @@ function bulkUpsertMasterData(payload) {
 
       var newRow = [];
       FLAT_HEADERS.forEach(function(h) {
-        if (h === 'no') newRow.push(''); // calculated later
+        if (h === 'no') newRow.push('');
         else if (h === 'material_name') newRow.push(matName);
         else if (h === 'item_description') newRow.push(matDesc);
         else if (h === 'color') newRow.push('');
@@ -389,7 +379,7 @@ function bulkUpsertMasterData(payload) {
         else if (h === 'style') newRow.push(productCode);
         else if (h === 'shoe_model') newRow.push(modelName);
         else if (h === 'bucket') newRow.push(bucket);
-        else if (h === 'check_color') newRow.push('');
+        else if (h === 'check_color') newRow.push('OK');
         else if (h === 'receive_date') newRow.push(receiveDate);
         
         else if (h === 'status') newRow.push('pending');
@@ -405,10 +395,8 @@ function bulkUpsertMasterData(payload) {
       });
 
       if (existingMap[po]) {
-        // Update existing row
-        // Preserve NO column value at index 0
         var existingNo = sheet.getRange(existingMap[po], 1).getValue();
-        newRow[0] = existingNo || (existingMap[po] - 3);
+        newRow[0] = existingNo || (existingMap[po] - 2);
         sheet.getRange(existingMap[po], 1, 1, newRow.length).setValues([newRow]);
         updateCount++;
       } else {
@@ -418,7 +406,7 @@ function bulkUpsertMasterData(payload) {
 
     if (insertRows.length) {
       var currentLastRow = sheet.getLastRow();
-      var startingNo = Math.max(0, currentLastRow - 3) + 1;
+      var startingNo = Math.max(0, currentLastRow - 2) + 1;
       insertRows.forEach(function(r, idx) {
         r[0] = startingNo + idx;
       });
@@ -456,19 +444,19 @@ function passAll(payload) {
     var count = 0;
     var newInspRows = [];
 
-    for (var i = 3; i < data.length; i++) {
-      var status = String(data[i][34] || '').toLowerCase(); // status is index 34
+    for (var i = 2; i < data.length; i++) {
+      var status = String(data[i][18] || '').toLowerCase(); // status is index 18
       if (status !== 'pending') continue;
 
-      var po  = String(data[i][7]); // po_no is index 7
-      var qty = Number(data[i][8]) || 0; // qty_receive is index 8
+      var po  = String(data[i][7]);
+      var qty = Number(data[i][8]) || 0;
 
       var newRow = [];
       var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
       
       FLAT_HEADERS.forEach(function(h, idx) {
         if (h === 'no') {
-          newRow.push(inspSheet.getLastRow() + newInspRows.length - 2);
+          newRow.push(inspSheet.getLastRow() + newInspRows.length - 1);
         }
         else if (h === 'inspection_id') newRow.push(uniqueId);
         else if (h === 'po_no') newRow.push(po);
@@ -476,14 +464,10 @@ function passAll(payload) {
         else if (h === 'qty_receive') newRow.push(qty);
         else if (h === 'ok') newRow.push(qty);
         else if (h === 'no_qty') newRow.push(0);
-        else if (h === 'pass') newRow.push('Pass');
-        else if (h === 'fail') newRow.push('');
-        else if (h === 'defect_notes') newRow.push('');
-        else if (h === 'rolling_inspection') newRow.push('No');
+        else if (h === 'check_color') newRow.push('OK');
         else if (h === 'status') newRow.push('done');
         else if (h === 'uploaded_at') newRow.push(now);
         else if (h === 'inspection_date') newRow.push(now);
-        // Copy static master data
         else if (data[i][idx] !== undefined && data[i][idx] !== '') {
           newRow.push(data[i][idx]);
         }
@@ -494,8 +478,7 @@ function passAll(payload) {
 
       newInspRows.push(newRow);
 
-      // Update status to done
-      mdSheet.getRange(i + 1, 35).setValue('done');
+      mdSheet.getRange(i + 1, 19).setValue('done');
       count++;
     }
 
@@ -563,30 +546,26 @@ function setupSpreadsheetHeaders() {
 
   // master_data
   var mdSheet = ss.getSheetByName(SHEET.MASTER_DATA) || ss.insertSheet(SHEET.MASTER_DATA);
-  if (mdSheet.getLastRow() <= 1) { // includes legacy header cases
+  if (mdSheet.getLastRow() <= 2) {
     if (mdSheet.getLastRow() > 0) mdSheet.clear();
-    var r1 = []; for (var i=0; i<FLAT_HEADERS.length; i++) r1.push(''); r1[1] = 'LEATHER';
-    var r2 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'CATEGORY', 'WORKLOAD', '', 'Lab Status', '', '', '', '', 'Remark', 'Lab Number', 'COMPONENT', 'PDM MATERIAL', 'MCS#', 'TESTED', 'RE-TEST', 'REMARK', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
-    var r3 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', 'DATE', 'TIME', 'Actual In Lab', 'Finish', 'Pass', 'Marginal', 'Fail'];
+    var r1 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
+    var r2 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
     
     mdSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
     mdSheet.getRange(2, 1, 1, r2.length).setValues([r2]);
-    mdSheet.getRange(3, 1, 1, r3.length).setValues([r3]);
-    mdSheet.getRange(1, 1, 3, r2.length).setFontWeight('bold').setBackground('#f1f5f9');
+    mdSheet.getRange(1, 1, 2, r1.length).setFontWeight('bold').setBackground('#f1f5f9');
   }
 
   // inspections
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS) || ss.insertSheet(SHEET.INSPECTIONS);
-  if (inspSheet.getLastRow() <= 1) {
+  if (inspSheet.getLastRow() <= 2) {
     if (inspSheet.getLastRow() > 0) inspSheet.clear();
-    var r1 = []; for (var i=0; i<FLAT_HEADERS.length; i++) r1.push(''); r1[1] = 'LEATHER';
-    var r2 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'CATEGORY', 'WORKLOAD', '', 'Lab Status', '', '', '', '', 'Remark', 'Lab Number', 'COMPONENT', 'PDM MATERIAL', 'MCS#', 'TESTED', 'RE-TEST', 'REMARK', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
-    var r3 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', 'DATE', 'TIME', 'Actual In Lab', 'Finish', 'Pass', 'Marginal', 'Fail'];
+    var r1 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'status', 'uploaded_by', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date', 'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'po_area'];
+    var r2 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
     
     inspSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
     inspSheet.getRange(2, 1, 1, r2.length).setValues([r2]);
-    inspSheet.getRange(3, 1, 1, r3.length).setValues([r3]);
-    inspSheet.getRange(1, 1, 3, r2.length).setFontWeight('bold').setBackground('#f1f5f9');
+    inspSheet.getRange(1, 1, 2, r1.length).setFontWeight('bold').setBackground('#f1f5f9');
   }
 
   // users

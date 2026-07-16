@@ -339,9 +339,11 @@ function selectPO(po, cardEl) {
     const qtyInspectEl = document.getElementById('qty-inspect');
     const qtyFailEl = document.getElementById('qty-fail');
     const notesEl = document.getElementById('defect-notes');
+    const checkColorEl = document.getElementById('check-color');
     if (qtyInspectEl) qtyInspectEl.value = '';
     if (qtyFailEl) qtyFailEl.value = '';
     if (notesEl) notesEl.value = '';
+    if (checkColorEl) checkColorEl.value = 'OK';
     updateCalculations();
 }
 
@@ -427,6 +429,7 @@ window.openValidationDialog = function () {
         const pass = inspect - fail;
         const passRate = ((pass / inspect) * 100).toFixed(1);
         const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
+        const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
         summaryEl.innerHTML = `
@@ -436,6 +439,7 @@ window.openValidationDialog = function () {
             ${summaryRow('Qty Inspect', inspect.toLocaleString('id-ID'))}
             ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
             ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
+            ${summaryRow('Check Color', checkColor)}
             ${summaryRow('Rolling Method', rolling)}
             ${summaryRow('Leader Approval', leaderVal)}
             ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
@@ -477,6 +481,7 @@ async function submitInspection() {
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
     const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
     const inspectorNik = currentUser?.nik || '';
+    const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
     const leaderSelect = document.getElementById('approved-by-leader');
     const fileInput = document.getElementById('evidence-file');
 
@@ -515,6 +520,7 @@ async function submitInspection() {
         result_status: fail === 0 ? 'Pass' : 'Fail',
         input_type: 'manual',
         rolling_inspection: rollingChecked,
+        check_color: checkColor,
         approved_by_leader: leaderSelect ? leaderSelect.value : '',
         file_data: fileData,
         file_name: fileName,
