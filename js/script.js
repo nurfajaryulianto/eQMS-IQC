@@ -1290,6 +1290,7 @@ function autoFillModelName() {
         modelNameInput.value = "";
         modelNameInput.disabled = false;
     }
+    checkInfoCompleteAndLockButtons();
 }
 
 // ===========================================
@@ -1496,13 +1497,17 @@ async function initApp() {
     }
 
     if (modelNameInput) {
-        modelNameInput.addEventListener('input', saveToLocalStorage);
+        modelNameInput.addEventListener('input', () => {
+            saveToLocalStorage();
+            checkInfoCompleteAndLockButtons();
+        });
     }
     
     if (styleNumberInput) {
         styleNumberInput.addEventListener('input', () => {
             saveToLocalStorage();
             autoFillModelName();
+            checkInfoCompleteAndLockButtons();
         });
     }
 
