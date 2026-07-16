@@ -256,7 +256,15 @@ function renderPOList(data) {
     // Remove existing cards (keep loading/empty elements)
     container.querySelectorAll('.po-card').forEach(el => el.remove());
 
-    data.forEach(po => {
+    // Sort: Pending naik ke atas, Done turun ke bawah
+    const sorted = [...data].sort((a, b) => {
+        const aIsDone = a.status === 'done' ? 1 : 0;
+        const bIsDone = b.status === 'done' ? 1 : 0;
+        return aIsDone - bIsDone;
+    });
+
+    sorted.forEach(po => {
+
         const card = document.createElement('div');
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
