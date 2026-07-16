@@ -273,16 +273,16 @@ function renderPOList(data) {
         card.innerHTML = `
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px;">
                 <div>
-                    <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:2px;">${esc(po.po_number)}</div>
-                    <div style="font-size:12px; color:#64748b; font-weight:500;">${esc(po.vendor_name)}</div>
+                    <div style="font-size:13px; font-weight:700; color:#ffffff; margin-bottom:2px;">${esc(po.po_number)}</div>
+                    <div style="font-size:12px; color:rgba(255, 255, 255, 0.7); font-weight:500;">${esc(po.vendor_name)}</div>
                 </div>
                 <span style="font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap; flex-shrink:0;" class="${badgeClass}">${badgeText}</span>
             </div>
-            <div style="font-size:13px; color:#334155; font-weight:600; margin-bottom:4px; line-height:1.3;">${esc(po.material_name)}</div>
-            <div style="font-size:11px; color:#94a3b8; margin-bottom:8px;">${esc(po.item_description)}</div>
-            <div style="display:flex; gap:12px; font-size:11px; color:#64748b;">
-                <span><span style="color:#94a3b8;">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
-                <span><span style="color:#94a3b8;">STYLE </span>${esc(po.style)}</span>
+            <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_name)}</div>
+            <div style="font-size:11px; color:rgba(255, 255, 255, 0.5); margin-bottom:8px;">${esc(po.item_description)}</div>
+            <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7);">
+                <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
+                <span><span style="color:rgba(255, 255, 255, 0.5);">STYLE </span>${esc(po.style)}</span>
             </div>
         `;
 
@@ -348,7 +348,7 @@ function selectPO(po, cardEl) {
 }
 
 function row(label, value) {
-    return `<span style="color:#94a3b8; font-weight:600; white-space:nowrap;">${label}</span><span style="color:#0f172a; font-weight:500;">${esc(String(value))}</span>`;
+    return `<span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap;">${label}</span><span style="color:#ffffff; font-weight:500;">${esc(String(value))}</span>`;
 }
 
 // ─── FILTER PO LIST ───────────────────────────────────────────

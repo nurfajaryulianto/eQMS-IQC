@@ -101,12 +101,12 @@ window.renderMasterTable = function () {
         const badge = d.status === 'done'
             ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`
             : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
-        return `<tr style="border-bottom:1px solid #f1f5f9;hover:background:#f8fafc;">
-            <td style="padding:10px 14px;font-weight:700;color:#0f172a;font-size:13px;white-space:nowrap;">${esc(d.po_number)}</td>
-            <td style="padding:10px 14px;color:#334155;font-size:13px;max-width:200px;">${esc(d.material_name)}</td>
-            <td style="padding:10px 14px;color:#64748b;font-size:13px;white-space:nowrap;">${esc(d.vendor_name)}</td>
-            <td style="padding:10px 14px;color:#64748b;font-size:12px;">${esc(d.uom)}</td>
-            <td style="padding:10px 14px;color:#334155;font-size:13px;text-align:right;font-weight:600;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
+            <td style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;white-space:nowrap;">${esc(d.po_number)}</td>
+            <td style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;max-width:200px;">${esc(d.material_name)}</td>
+            <td style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;white-space:nowrap;">${esc(d.vendor_name)}</td>
+            <td style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
+            <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
         </tr>`;
     }).join('');
@@ -210,13 +210,13 @@ function renderPreviewTable(rows) {
 
     table.innerHTML = `
         <thead>
-            <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
-                ${keys.map(k => `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:#64748b;white-space:nowrap;text-transform:uppercase;letter-spacing:0.04em;">${esc(k)}</th>`).join('')}
+            <tr style="background:rgba(255,255,255,0.02);border-bottom:1.5px solid rgba(255,255,255,0.08);">
+                ${keys.map(k => `<th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:rgba(255,255,255,0.45);white-space:nowrap;text-transform:uppercase;letter-spacing:0.04em;">${esc(k)}</th>`).join('')}
             </tr>
         </thead>
         <tbody>
-            ${rows.map(row => `<tr style="border-bottom:1px solid #f1f5f9;">
-                ${keys.map(k => `<td style="padding:7px 12px;font-size:12px;color:#334155;white-space:nowrap;">${esc(String(row[k]))}</td>`).join('')}
+            ${rows.map(row => `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                ${keys.map(k => `<td style="padding:7px 12px;font-size:12px;color:rgba(255,255,255,0.85);white-space:nowrap;">${esc(String(row[k]))}</td>`).join('')}
             </tr>`).join('')}
         </tbody>
     `;
@@ -299,12 +299,12 @@ window.loadPassAllPreview = async function () {
     }
 
     listEl.innerHTML = pending.map((d, i) => `
-        <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;${i < pending.length - 1 ? 'border-bottom:1px solid #e2e8f0;' : ''}">
+        <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;${i < pending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
             <div>
-                <div style="font-size:13px;font-weight:600;color:#0f172a;">${esc(d.po_number)}</div>
-                <div style="font-size:12px;color:#64748b;">${esc(d.material_name)} — ${esc(d.vendor_name)}</div>
+                <div style="font-size:13px;font-weight:600;color:#ffffff;">${esc(d.po_number)}</div>
+                <div style="font-size:12px;color:rgba(255, 255, 255, 0.7);"><span style="color:#34d399;font-weight:600;">${esc(d.material_name)}</span> — ${esc(d.vendor_name)}</div>
             </div>
-            <span style="font-size:12px;color:#64748b;white-space:nowrap;margin-left:12px;">${Number(d.planned_qty).toLocaleString('id-ID')} ${esc(d.uom)}</span>
+            <span style="font-size:12px;color:rgba(255, 255, 255, 0.7);white-space:nowrap;margin-left:12px;font-weight:600;">${Number(d.planned_qty).toLocaleString('id-ID')} ${esc(d.uom)}</span>
         </div>
     `).join('');
 };
