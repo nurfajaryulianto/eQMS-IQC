@@ -114,6 +114,24 @@ function doPost(e) {
 
     const ss   = SpreadsheetApp.openById(getActiveSpreadsheetId());
 
+    // Save evidence file if uploaded
+    var evidenceUrl = '';
+    if (data.file_data && data.file_name) {
+      try {
+        var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
+        var parents = spreadsheetFile.getParents();
+        var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+        var subDepartmentFolder = getOrCreateSubfolder(parentFolder, "IQC Subcont");
+        
+        var fileBlob = Utilities.newBlob(Utilities.base64Decode(data.file_data), data.file_type || 'image/png', data.file_name);
+        var driveFile = subDepartmentFolder.createFile(fileBlob);
+        driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+        evidenceUrl = driveFile.getUrl();
+      } catch (err) {
+        throw new Error('Gagal upload file bukti: ' + err.message);
+      }
+    }
+
     const sessionSheet = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
     const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',     PIVOT_HEADERS);
@@ -144,6 +162,8 @@ function doPost(e) {
           item.defect               || 0,
           data.tanggalInspection    || '',
           data.tanggalBucket        || '',
+          data.approvedByLeader     || '',
+          evidenceUrl               || '',
         ];
         sessionSheet.appendRow(sessionRow);
 
@@ -194,6 +214,8 @@ function doPost(e) {
         data.defect               || 0,
         data.tanggalInspection    || '',
         data.tanggalBucket        || '',
+        data.approvedByLeader     || '',
+        evidenceUrl               || '',
       ];
       sessionSheet.appendRow(sessionRow);
 
@@ -354,6 +376,15 @@ function jsonResponse(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getOrCreateSubfolder(parentFolder, folderName) {
+  var folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  } else {
+    return parentFolder.createFolder(folderName);
+  }
 }
 
 

@@ -226,10 +226,11 @@ function submitInspection(payload) {
       try {
         var spreadsheetFile = DriveApp.getFileById(SPREADSHEET_ID);
         var parents = spreadsheetFile.getParents();
-        var folder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+        var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+        var subDepartmentFolder = getOrCreateSubfolder(parentFolder, "IQC Material");
         
         var fileBlob = Utilities.newBlob(Utilities.base64Decode(payload.file_data), payload.file_type || 'image/png', payload.file_name);
-        var driveFile = folder.createFile(fileBlob);
+        var driveFile = subDepartmentFolder.createFile(fileBlob);
         driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
         evidenceUrl = driveFile.getUrl();
       } catch (err) {
@@ -738,4 +739,13 @@ function jsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function getOrCreateSubfolder(parentFolder, folderName) {
+  var folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  } else {
+    return parentFolder.createFolder(folderName);
+  }
 }
