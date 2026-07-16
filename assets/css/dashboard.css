@@ -370,6 +370,21 @@ body.dark .form-select {
     color: #e2e8f0;
 }
 
+body.dark select option,
+body.dark .form-select option,
+body.dark .form-select-inline option {
+    background-color: #1f2937 !important;
+    color: #e2e8f0 !important;
+}
+
+select option,
+.form-select option,
+.form-select-inline option {
+    background-color: #ffffff;
+    color: #1e293b;
+}
+
+
 .form-input:focus,
 .form-select:focus {
     outline: none;
