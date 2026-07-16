@@ -1339,10 +1339,7 @@ async function initApp() {
         }
     }
 
-    // Hide analytics nav items for inspector role (admin sees everything)
-    if (userRole === ROLES.INSPECTOR) {
-        document.querySelectorAll('[data-view="analytics"]').forEach(el => { el.style.display = 'none'; });
-    }
+
 
     // Hide settings nav items for non-admin roles (only admin sees it)
     if (userRole !== ROLES.ADMIN) {

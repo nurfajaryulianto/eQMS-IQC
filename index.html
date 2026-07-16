@@ -2069,7 +2069,7 @@
     <script>
         let analyticsReady = false;
         let adminReady = false;
-        const VIEW_ROLES = { 'analytics': ['supervisor', 'manager', 'admin'], 'admin': ['admin'], 'settings': ['admin'] };
+        const VIEW_ROLES = { 'admin': ['admin'], 'settings': ['admin'] };
         function showView(name) {
             if (VIEW_ROLES[name]) {
                 const role = window.__eqmsUserRole;
