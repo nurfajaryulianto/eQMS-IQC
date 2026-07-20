@@ -198,10 +198,32 @@ export async function dbDeleteProcess(id) {
 // ─── STYLE MODELS ────────────────────────────────────────────
 
 export async function dbGetStyleModels() {
-    return unwrap(
-        await db.from('style_models').select('*').order('style_number'),
-        'getStyleModels'
-    );
+    let allData = [];
+    let page = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        
+        const res = await db.from('style_models')
+            .select('*')
+            .order('style_number')
+            .range(from, to);
+            
+        const data = unwrap(res, 'getStyleModels');
+        if (!data || data.length === 0) {
+            break;
+        }
+        
+        allData = allData.concat(data);
+        if (data.length < pageSize) {
+            break; // Tidak ada halaman berikutnya
+        }
+        page++;
+    }
+    
+    return allData;
 }
 
 export async function dbInsertStyleModel({ style_number, model_name }) {
