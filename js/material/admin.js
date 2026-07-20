@@ -670,10 +670,13 @@ window.handleUserSubmit = async function(e) {
 };
 
 window.editUser = function(nik) {
-    const user = allUsers.find(u => String(u.nik) === String(nik));
-    if (!user) return;
+    const user = allUsers.find(u => String(u.nik).trim() === String(nik).trim());
+    if (!user) {
+        console.error('User not found for NIK:', nik);
+        return;
+    }
 
-    editingUserNik = nik;
+    editingUserNik = String(user.nik).trim();
 
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
@@ -683,9 +686,9 @@ window.editUser = function(nik) {
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
     const pwdRequiredStar = document.getElementById('pwd-required-star');
 
-    if (nikInput) { nikInput.value = user.nik; nikInput.disabled = true; }
+    if (nikInput) { nikInput.value = editingUserNik; nikInput.disabled = true; }
     if (nameInput) nameInput.value = user.name || '';
-    if (roleInput) roleInput.value = user.role || 'inspector';
+    if (roleInput) roleInput.value = String(user.role || 'inspector').trim().toLowerCase();
     if (passwordInput) {
         passwordInput.value = '';
         passwordInput.placeholder = 'Kosongkan jika tidak diubah';
@@ -699,12 +702,13 @@ window.editUser = function(nik) {
 };
 
 window.deleteUser = async function(nik) {
-    if (nik.toLowerCase() === 'admin') {
+    const nikStr = String(nik).trim();
+    if (nikStr.toLowerCase() === 'admin') {
         showToast('User default "admin" tidak dapat dihapus.', 'error');
         return;
     }
 
-    if (!confirm(`Yakin ingin menghapus user "${nik}"? User ini tidak akan bisa login lagi.`)) {
+    if (!confirm(`Yakin ingin menghapus user "${nikStr}"? User ini tidak akan bisa login lagi.`)) {
         return;
     }
 
@@ -713,12 +717,12 @@ window.deleteUser = async function(nik) {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
-            allUsers = allUsers.filter(u => String(u.nik) !== String(nik));
+            allUsers = allUsers.filter(u => String(u.nik).trim() !== nikStr);
             showToast('User berhasil dihapus (simulasi)!', 'success');
         } else {
             const res = await fetch(MATERIAL_GAS_URL, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'deleteUser', nik: nik })
+                body: JSON.stringify({ action: 'deleteUser', nik: nikStr })
             });
             const json = await res.json();
             if (json.error) throw new Error(json.error);
