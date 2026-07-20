@@ -444,11 +444,37 @@
                         </div>
                     </div>
 
+                    <!-- Date Filter Controls -->
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                        <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal (Receive Date)</label>
+                            <input type="date" id="passall-filter-start" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal (Receive Date)</label>
+                            <input type="date" id="passall-filter-end" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <button onclick="applyPassAllDateFilter()" class="btn-gradient" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                                <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>Filter
+                            </button>
+                            <button onclick="resetPassAllDateFilter()" class="btn-secondary" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                                <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>Reset
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Pending items summary -->
                     <div id="passall-summary" style="margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-                            <span style="font-size:13px;font-weight:700;color:white;">Item Pending yang akan di-Pass:</span>
-                            <span id="passall-count" style="font-size:13px;font-weight:700;color:#34d399;background:rgba(16, 185, 129, 0.1);padding:3px 10px;border-radius:99px;border:1px solid rgba(16,185,129,0.2);">—</span>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:13px;font-weight:700;color:white;">Item Pending yang akan di-Pass:</span>
+                                <span id="passall-count" style="font-size:13px;font-weight:700;color:#34d399;background:rgba(16, 185, 129, 0.1);padding:3px 10px;border-radius:99px;border:1px solid rgba(16,185,129,0.2);">—</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.6);">
+                                <input type="checkbox" id="passall-select-all" checked onchange="togglePassAllSelectAll(this)" style="cursor:pointer;width:15px;height:15px;">
+                                <label for="passall-select-all" style="cursor:pointer;user-select:none;">Pilih Semua</label>
+                            </div>
                         </div>
                         <div id="passall-list" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;max-height:280px;overflow-y:auto;" class="thin-scroll">
                             <!-- Populated by JS -->
@@ -457,7 +483,7 @@
 
                     <button id="passall-btn" onclick="confirmPassAll()" class="btn-gradient" style="padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
                         <span class="material-symbols-outlined" style="font-size:18px;">done_all</span>
-                        Jalankan Pass All
+                        Jalankan Pass
                     </button>
                 </div>
             </div>

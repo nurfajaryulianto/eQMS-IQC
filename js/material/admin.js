@@ -283,46 +283,180 @@ window.confirmUpload = async function () {
 
 // ─── PASS ALL TAB ─────────────────────────────────────────────
 
+function parseReceiveDate(dateVal) {
+    if (!dateVal) return null;
+    if (dateVal instanceof Date) return dateVal;
+    
+    const str = String(dateVal).trim();
+    if (!str) return null;
+    
+    // ISO string or YYYY-MM-DDTHH:mm:ss...
+    if (str.includes('T')) {
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) return d;
+    }
+    
+    // Check DD-MM-YYYY or DD/MM/YYYY
+    let m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (m) {
+        const day = parseInt(m[1], 10);
+        const month = parseInt(m[2], 10);
+        const year = parseInt(m[3], 10);
+        return new Date(year, month - 1, day);
+    }
+    
+    // Check YYYY-MM-DD
+    m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (m) {
+        const year = parseInt(m[1], 10);
+        const month = parseInt(m[2], 10);
+        const day = parseInt(m[3], 10);
+        return new Date(year, month - 1, day);
+    }
+    
+    // Check Excel serial number
+    if (/^\d+(\.\d+)?$/.test(str)) {
+        const serial = parseFloat(str);
+        const date = new Date((serial - 25569) * 86400 * 1000);
+        if (!isNaN(date.getTime())) return date;
+    }
+    
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 window.loadPassAllPreview = async function () {
     await loadMasterData();
-    const pending = allMasterData.filter(d => d.status === 'pending');
+    window.applyPassAllDateFilter();
+};
+
+window.applyPassAllDateFilter = function () {
+    const startVal = document.getElementById('passall-filter-start')?.value;
+    const endVal = document.getElementById('passall-filter-end')?.value;
+    
+    let filteredPending = allMasterData.filter(d => d.status === 'pending');
+    
+    const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
+    const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
+    
+    if (startDate || endDate) {
+        filteredPending = filteredPending.filter(d => {
+            const rDate = parseReceiveDate(d.receive_date);
+            if (!rDate) return false;
+            
+            const rDateClear = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate());
+            
+            if (startDate) {
+                const startClear = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                if (rDateClear < startClear) return false;
+            }
+            if (endDate) {
+                const endClear = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                if (rDateClear > endClear) return false;
+            }
+            return true;
+        });
+    }
+
     const countEl = document.getElementById('passall-count');
     const listEl = document.getElementById('passall-list');
-    if (countEl) countEl.textContent = `${pending.length} item`;
+    if (countEl) countEl.textContent = `${filteredPending.length} item`;
 
     if (!listEl) return;
-    if (!pending.length) {
-        listEl.innerHTML = `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">Tidak ada item pending. Semua item sudah diinspeksi.</div>`;
+    if (!filteredPending.length) {
+        listEl.innerHTML = `<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;">Tidak ada item pending yang sesuai filter.</div>`;
         const btn = document.getElementById('passall-btn');
-        if (btn) btn.disabled = true;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;">done_all</span>Jalankan Pass (0 Item)`;
+        }
         return;
     }
 
-    listEl.innerHTML = pending.map((d, i) => `
-        <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;${i < pending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <div>
-                <div style="font-size:13px;font-weight:600;color:#ffffff;">${esc(d.po_number)}</div>
-                <div style="font-size:12px;color:rgba(255, 255, 255, 0.7);"><span style="color:#34d399;font-weight:600;">${esc(d.material_name)}</span> — ${esc(d.vendor_name)}</div>
+    listEl.innerHTML = filteredPending.map((d, i) => `
+        <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <div>
+                    <div style="font-size:13px;font-weight:600;color:#ffffff;">
+                        ${esc(d.po_number)} 
+                        <span style="font-size:11px;font-weight:normal;color:rgba(255,255,255,0.4);margin-left:6px;">(${esc(d.receive_date || 'No Date')})</span>
+                    </div>
+                    <div style="font-size:12px;color:rgba(255, 255, 255, 0.7);"><span style="color:#34d399;font-weight:600;">${esc(d.material_name)}</span> — ${esc(d.vendor_name)}</div>
+                </div>
+                <span style="font-size:12px;color:rgba(255, 255, 255, 0.7);white-space:nowrap;margin-left:12px;font-weight:600;">${Number(d.planned_qty).toLocaleString('id-ID')} ${esc(d.uom)}</span>
             </div>
-            <span style="font-size:12px;color:rgba(255, 255, 255, 0.7);white-space:nowrap;margin-left:12px;font-weight:600;">${Number(d.planned_qty).toLocaleString('id-ID')} ${esc(d.uom)}</span>
         </div>
     `).join('');
+
+    // Reset select all checkbox to checked
+    const masterCheckbox = document.getElementById('passall-select-all');
+    if (masterCheckbox) {
+        masterCheckbox.checked = true;
+        masterCheckbox.indeterminate = false;
+    }
+    
+    window.updatePassAllSelectedCount();
+};
+
+window.resetPassAllDateFilter = function () {
+    const startInput = document.getElementById('passall-filter-start');
+    const endInput = document.getElementById('passall-filter-end');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    window.applyPassAllDateFilter();
+};
+
+window.togglePassAllSelectAll = function (master) {
+    const checkboxes = document.querySelectorAll('.passall-item-checkbox');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    window.updatePassAllSelectedCount();
+};
+
+window.updatePassAllSelectedCount = function () {
+    const checkboxes = document.querySelectorAll('.passall-item-checkbox');
+    const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const btn = document.getElementById('passall-btn');
+    if (btn) {
+        btn.disabled = checkedCount === 0;
+        btn.innerHTML = `
+            <span class="material-symbols-outlined" style="font-size:18px;">done_all</span>
+            Jalankan Pass (${checkedCount} Item)
+        `;
+    }
+    
+    const masterCheckbox = document.getElementById('passall-select-all');
+    if (masterCheckbox) {
+        masterCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+        masterCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+    }
 };
 
 window.confirmPassAll = async function () {
-    const pending = allMasterData.filter(d => d.status === 'pending');
-    if (!pending.length) { showToast('Tidak ada item pending untuk di-pass.', 'info'); return; }
+    const checkboxes = document.querySelectorAll('.passall-item-checkbox');
+    const selectedPos = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.po);
 
-    if (!confirm(`Apakah Anda yakin ingin menandai ${pending.length} item sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!selectedPos.length) { 
+        showToast('Tidak ada item yang dipilih untuk di-pass.', 'info'); 
+        return; 
+    }
 
-    setLoading(true, `Memproses ${pending.length} item...`);
+    if (!confirm(`Apakah Anda yakin ingin menandai ${selectedPos.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
+
+    setLoading(true, `Memproses ${selectedPos.length} item...`);
 
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(2000);
-            allMasterData.forEach(d => { if (d.status === 'pending') d.status = 'done'; });
+            allMasterData.forEach(d => { 
+                if (d.status === 'pending' && selectedPos.includes(d.po_number)) {
+                    d.status = 'done'; 
+                }
+            });
             setLoading(false);
-            showToast(`Pass All berhasil: ${pending.length} item ditandai sebagai Pass. (simulasi)`, 'success');
+            showToast(`Pass berhasil: ${selectedPos.length} item ditandai sebagai Pass. (simulasi)`, 'success');
             await loadPassAllPreview();
             renderMasterTable();
             return;
@@ -331,19 +465,20 @@ window.confirmPassAll = async function () {
         const payload = {
             action: 'passAll',
             admin_nik: currentUser?.nik || 'admin',
+            po_numbers: selectedPos
         };
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
 
         setLoading(false);
-        showToast(json.message || 'Pass All berhasil!', 'success');
+        showToast(json.message || 'Pass berhasil!', 'success');
         await loadMasterData();
         await loadPassAllPreview();
 
     } catch (err) {
         setLoading(false);
-        showToast('Pass All gagal: ' + err.message, 'error');
+        showToast('Pass gagal: ' + err.message, 'error');
     }
 };
 

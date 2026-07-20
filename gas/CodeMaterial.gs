@@ -463,11 +463,22 @@ function passAll(payload) {
     var count = 0;
     var newInspRows = [];
 
+    // Filter by specific PO numbers if provided
+    var targetPOs = null;
+    if (payload.po_numbers && Array.isArray(payload.po_numbers)) {
+      targetPOs = {};
+      payload.po_numbers.forEach(function(po) {
+        targetPOs[String(po).trim()] = true;
+      });
+    }
+
     for (var i = 1; i < data.length; i++) {
       var status = String(data[i][18] || '').toLowerCase(); // status is Col S (index 18)
       if (status !== 'pending') continue;
 
-      var po  = String(data[i][12]); // po_number is Col M (index 12)
+      var po  = String(data[i][12]).trim(); // po_number is Col M (index 12)
+      if (targetPOs && !targetPOs[po]) continue;
+
       var qty = Number(data[i][7]) || 0; // batch_size is Col H (index 7)
 
       var newRow = [];
