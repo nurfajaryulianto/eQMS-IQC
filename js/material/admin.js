@@ -573,9 +573,16 @@ function renderUsersTable() {
 
     tbody.innerHTML = allUsers.map(u => {
         const dateStr = u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-        const roleLabel = u.role === 'admin' 
-            ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(139,92,246,0.15);color:#c084fc;border:1px solid rgba(139,92,246,0.3);">Admin</span>` 
-            : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
+        let roleLabel = '';
+        if (u.role === 'admin') {
+            roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(139,92,246,0.15);color:#c084fc;border:1px solid rgba(139,92,246,0.3);">Admin</span>`;
+        } else if (u.role === 'supervisor') {
+            roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);">Supervisor</span>`;
+        } else if (u.role === 'manager') {
+            roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Manager</span>`;
+        } else {
+            roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
+        }
         
         return `<tr>
             <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
