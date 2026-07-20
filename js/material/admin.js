@@ -27,13 +27,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser = await requireMaterialRole([MATERIAL_ROLES.ADMIN, MATERIAL_ROLES.SUPERVISOR, MATERIAL_ROLES.MANAGER]);
     if (!currentUser) return;
 
+    window.__currentUserRole = currentUser.role;
+
+    if (currentUser.role === 'supervisor' || currentUser.role === 'manager') {
+        ['tab-master', 'tab-upload', 'tab-passall', 'tab-users', 'tab-spreadsheet'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        window.switchTab('leadermonitor');
+    }
+
     setupNavbar(currentUser);
     setupLogout();
     await loadMasterData();
     if (typeof window.loadSpreadsheetStatus === 'function') {
         await window.loadSpreadsheetStatus();
     }
-    
+
     // Show mock ADF loader in test mode
     if (MATERIAL_TEST_MODE) {
         const mockCont = document.getElementById('mock-adf-load-container');
@@ -286,16 +296,16 @@ window.confirmUpload = async function () {
 function parseReceiveDate(dateVal) {
     if (!dateVal) return null;
     if (dateVal instanceof Date) return dateVal;
-    
+
     const str = String(dateVal).trim();
     if (!str) return null;
-    
+
     // ISO string or YYYY-MM-DDTHH:mm:ss...
     if (str.includes('T')) {
         const d = new Date(str);
         if (!isNaN(d.getTime())) return d;
     }
-    
+
     // Check DD-MM-YYYY or DD/MM/YYYY
     let m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
     if (m) {
@@ -304,7 +314,7 @@ function parseReceiveDate(dateVal) {
         const year = parseInt(m[3], 10);
         return new Date(year, month - 1, day);
     }
-    
+
     // Check YYYY-MM-DD
     m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
     if (m) {
@@ -313,14 +323,14 @@ function parseReceiveDate(dateVal) {
         const day = parseInt(m[3], 10);
         return new Date(year, month - 1, day);
     }
-    
+
     // Check Excel serial number
     if (/^\d+(\.\d+)?$/.test(str)) {
         const serial = parseFloat(str);
         const date = new Date((serial - 25569) * 86400 * 1000);
         if (!isNaN(date.getTime())) return date;
     }
-    
+
     const d = new Date(str);
     return isNaN(d.getTime()) ? null : d;
 }
@@ -333,19 +343,19 @@ window.loadPassAllPreview = async function () {
 window.applyPassAllDateFilter = function () {
     const startVal = document.getElementById('passall-filter-start')?.value;
     const endVal = document.getElementById('passall-filter-end')?.value;
-    
+
     let filteredPending = allMasterData.filter(d => d.status === 'pending');
-    
+
     const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
     const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
-    
+
     if (startDate || endDate) {
         filteredPending = filteredPending.filter(d => {
             const rDate = parseReceiveDate(d.receive_date);
             if (!rDate) return false;
-            
+
             const rDateClear = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate());
-            
+
             if (startDate) {
                 const startClear = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
                 if (rDateClear < startClear) return false;
@@ -395,7 +405,7 @@ window.applyPassAllDateFilter = function () {
         masterCheckbox.checked = true;
         masterCheckbox.indeterminate = false;
     }
-    
+
     window.updatePassAllSelectedCount();
 };
 
@@ -424,7 +434,7 @@ window.updatePassAllSelectedCount = function () {
             Jalankan Pass (${checkedCount} Item)
         `;
     }
-    
+
     const masterCheckbox = document.getElementById('passall-select-all');
     if (masterCheckbox) {
         masterCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
@@ -438,9 +448,9 @@ window.confirmPassAll = async function () {
         .filter(cb => cb.checked)
         .map(cb => cb.dataset.po);
 
-    if (!selectedPos.length) { 
-        showToast('Tidak ada item yang dipilih untuk di-pass.', 'info'); 
-        return; 
+    if (!selectedPos.length) {
+        showToast('Tidak ada item yang dipilih untuk di-pass.', 'info');
+        return;
     }
 
     if (!confirm(`Apakah Anda yakin ingin menandai ${selectedPos.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
@@ -450,9 +460,9 @@ window.confirmPassAll = async function () {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(2000);
-            allMasterData.forEach(d => { 
+            allMasterData.forEach(d => {
                 if (d.status === 'pending' && selectedPos.includes(d.po_number)) {
-                    d.status = 'done'; 
+                    d.status = 'done';
                 }
             });
             setLoading(false);
@@ -532,7 +542,7 @@ let allUsers = [];
 let editingUserNik = null;
 
 // Expose users list loader
-window.loadUsersList = async function() {
+window.loadUsersList = async function () {
     const tbody = document.getElementById('users-tbody');
     if (!tbody) return;
 
@@ -583,7 +593,7 @@ function renderUsersTable() {
         } else {
             roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
         }
-        
+
         return `<tr>
             <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.85);">${esc(u.name)}</td>
@@ -599,7 +609,7 @@ function renderUsersTable() {
     }).join('');
 }
 
-window.handleUserSubmit = async function(e) {
+window.handleUserSubmit = async function (e) {
     e.preventDefault();
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
@@ -669,7 +679,7 @@ window.handleUserSubmit = async function(e) {
     }
 };
 
-window.editUser = function(nik) {
+window.editUser = function (nik) {
     const user = allUsers.find(u => String(u.nik).trim() === String(nik).trim());
     if (!user) {
         console.error('User not found for NIK:', nik);
@@ -701,7 +711,7 @@ window.editUser = function(nik) {
     if (nameInput) nameInput.focus();
 };
 
-window.deleteUser = async function(nik) {
+window.deleteUser = async function (nik) {
     const nikStr = String(nik).trim();
     if (nikStr.toLowerCase() === 'admin') {
         showToast('User default "admin" tidak dapat dihapus.', 'error');
@@ -737,7 +747,7 @@ window.deleteUser = async function(nik) {
     }
 };
 
-window.resetUserForm = function() {
+window.resetUserForm = function () {
     editingUserNik = null;
     const form = document.getElementById('user-form');
     if (form) form.reset();
@@ -760,7 +770,7 @@ window.resetUserForm = function() {
 
 // ─── SPREADSHEET STATUS ───────────────────────────────────────
 
-window.loadSpreadsheetStatus = async function() {
+window.loadSpreadsheetStatus = async function () {
     const infoContainer = document.getElementById('admin-spreadsheet-info');
     const openBtn = document.getElementById('admin-open-spreadsheet-btn');
     if (!infoContainer) return;
@@ -786,7 +796,7 @@ window.loadSpreadsheetStatus = async function() {
         const res = await fetch(`${MATERIAL_GAS_URL}?action=getStatus`);
         if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
         const data = await res.json();
-        
+
         if (data.spreadsheetId) {
             infoContainer.innerHTML = `
                 <div style="display:flex;flex-direction:column;gap:4px;">
@@ -807,65 +817,65 @@ window.loadSpreadsheetStatus = async function() {
     }
 };
 
-window.loadMockADFFile = function() {
+window.loadMockADFFile = function () {
     parsedFileData = [
-      {
-        "Material Name": "RM.LTH.1070000003.00A",
-        "Material Description": "FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
-        "UOM": "Square Feet",
-        "Supplier": "YOUNGIL LEATHER INDONESIA PT.",
-        "Supplier Name": "",
-        "PO Area": "RM-LKL",
-        "Batch Size": "9605.5",
-        "Product Code": "CU6620-001",
-        "Model Name": "NIKE COURT VISION MID - BLACK/BLACK",
-        "Bucket": "260525,260810",
-        "Receive Date": "01-07-2026",
-        "PO Number": "1263026745,1263035401",
-        "Shipment Number": "YLI/DO/26/11490,YLI/DO/26/11491",
-        "No BC": "105743",
-        "BC Type": "BC 2.7",
-        "Receive Number": "111260042835,111260042840",
-        "Material Type": "LEATHER "
-      },
-      {
-        "Material Name": "RM.LTH.1090700002.0AN",
-        "Material Description": "79564 - PM PU COATED NUBUCK - 1.2-1.4MM - DYE THROUGH - N/A - N/A - GREY FOG(0AN)",
-        "UOM": "Square Feet",
-        "Supplier": "OIA Global Logistics-SCM, Inc.",
-        "Supplier Name": "YOUNGIL LEATHER INDONESIA PT.",
-        "PO Area": "RM-IMP",
-        "Batch Size": "72",
-        "Product Code": "IH7681-004",
-        "Model Name": "NIKE TERRASCOUT (PS) - IH7681-20259",
-        "Bucket": "260727",
-        "Receive Date": "01-07-2026",
-        "PO Number": "1263026744",
-        "Shipment Number": "YLI/DO/26/11492",
-        "No BC": "105743",
-        "BC Type": "BC 2.7",
-        "Receive Number": "111260042837",
-        "Material Type": "LEATHER "
-      },
-      {
-        "Material Name": "RM.LTH.3060200003.00A",
-        "Material Description": "FP GENERIC SPLIT SUEDE - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
-        "UOM": "Square Feet",
-        "Supplier": "DAEHWA LEATHER LESTARI PT.",
-        "Supplier Name": "",
-        "PO Area": "RM-LKL",
-        "Batch Size": "20",
-        "Product Code": "IU7628-001",
-        "Model Name": "WMNS NIKE MD RUNNER 2 MM - IU7628-2",
-        "Bucket": "260713",
-        "Receive Date": "01-07-2026",
-        "PO Number": "1263031843",
-        "Shipment Number": "NC-26060144",
-        "No BC": "364948",
-        "BC Type": "BC 2.7",
-        "Receive Number": "111260042828",
-        "Material Type": "LEATHER "
-      }
+        {
+            "Material Name": "RM.LTH.1070000003.00A",
+            "Material Description": "FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
+            "UOM": "Square Feet",
+            "Supplier": "YOUNGIL LEATHER INDONESIA PT.",
+            "Supplier Name": "",
+            "PO Area": "RM-LKL",
+            "Batch Size": "9605.5",
+            "Product Code": "CU6620-001",
+            "Model Name": "NIKE COURT VISION MID - BLACK/BLACK",
+            "Bucket": "260525,260810",
+            "Receive Date": "01-07-2026",
+            "PO Number": "1263026745,1263035401",
+            "Shipment Number": "YLI/DO/26/11490,YLI/DO/26/11491",
+            "No BC": "105743",
+            "BC Type": "BC 2.7",
+            "Receive Number": "111260042835,111260042840",
+            "Material Type": "LEATHER "
+        },
+        {
+            "Material Name": "RM.LTH.1090700002.0AN",
+            "Material Description": "79564 - PM PU COATED NUBUCK - 1.2-1.4MM - DYE THROUGH - N/A - N/A - GREY FOG(0AN)",
+            "UOM": "Square Feet",
+            "Supplier": "OIA Global Logistics-SCM, Inc.",
+            "Supplier Name": "YOUNGIL LEATHER INDONESIA PT.",
+            "PO Area": "RM-IMP",
+            "Batch Size": "72",
+            "Product Code": "IH7681-004",
+            "Model Name": "NIKE TERRASCOUT (PS) - IH7681-20259",
+            "Bucket": "260727",
+            "Receive Date": "01-07-2026",
+            "PO Number": "1263026744",
+            "Shipment Number": "YLI/DO/26/11492",
+            "No BC": "105743",
+            "BC Type": "BC 2.7",
+            "Receive Number": "111260042837",
+            "Material Type": "LEATHER "
+        },
+        {
+            "Material Name": "RM.LTH.3060200003.00A",
+            "Material Description": "FP GENERIC SPLIT SUEDE - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)",
+            "UOM": "Square Feet",
+            "Supplier": "DAEHWA LEATHER LESTARI PT.",
+            "Supplier Name": "",
+            "PO Area": "RM-LKL",
+            "Batch Size": "20",
+            "Product Code": "IU7628-001",
+            "Model Name": "WMNS NIKE MD RUNNER 2 MM - IU7628-2",
+            "Bucket": "260713",
+            "Receive Date": "01-07-2026",
+            "PO Number": "1263031843",
+            "Shipment Number": "NC-26060144",
+            "No BC": "364948",
+            "BC Type": "BC 2.7",
+            "Receive Number": "111260042828",
+            "Material Type": "LEATHER "
+        }
     ];
     document.getElementById('file-name').textContent = 'mock_adf_raw_material_layout.xlsx';
     document.getElementById('file-rows').textContent = `${parsedFileData.length} baris data`;
@@ -876,11 +886,11 @@ window.loadMockADFFile = function() {
 // ─── LEADER MONITORING LOG ──────────────────────────────────
 let allLeaderMonitorInspections = [];
 
-window.loadLeaderMonitorLog = async function() {
+window.loadLeaderMonitorLog = async function () {
     const tbody = document.getElementById('leadermonitor-tbody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Memuat data log...</td></tr>';
-    
+
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const startEl = document.getElementById('leadermonitor-filter-start');
@@ -920,7 +930,7 @@ window.loadLeaderMonitorLog = async function() {
             if (json.error) throw new Error(json.error);
             allLeaderMonitorInspections = json.data || [];
         }
-        
+
         window.renderLeaderMonitorLog();
     } catch (err) {
         console.error(err);
@@ -929,7 +939,7 @@ window.loadLeaderMonitorLog = async function() {
     }
 };
 
-window.renderLeaderMonitorLog = function() {
+window.renderLeaderMonitorLog = function () {
     const tbody = document.getElementById('leadermonitor-tbody');
     if (!tbody) return;
 
@@ -979,15 +989,15 @@ window.renderLeaderMonitorLog = function() {
 
         let statusBadge = '';
         if (!hasDefects) {
-            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Auto-Pass</span>';
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);display:inline-block;white-space:nowrap;">Auto-Pass</span>';
         } else if (leaderApproved) {
-            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Approved</span>';
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);display:inline-block;white-space:nowrap;">Approved</span>';
         } else {
-            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);">Pending Approval</span>';
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);display:inline-block;white-space:nowrap;">Pending Approval</span>';
         }
 
         const approvedText = item.approved_by_leader || '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
-        
+
         let evidenceLink = '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
         if (item.evidence_url) {
             evidenceLink = `<a href="${item.evidence_url}" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
@@ -1013,11 +1023,11 @@ window.renderLeaderMonitorLog = function() {
     }).join('');
 };
 
-window.applyLeaderMonitorFilter = function() {
+window.applyLeaderMonitorFilter = function () {
     window.renderLeaderMonitorLog();
 };
 
-window.resetLeaderMonitorFilter = function() {
+window.resetLeaderMonitorFilter = function () {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const startEl = document.getElementById('leadermonitor-filter-start');

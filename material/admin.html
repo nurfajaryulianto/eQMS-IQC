@@ -694,6 +694,23 @@
     <script>
         // Tab switching (needs to be non-module for onclick)
         window.switchTab = function(tab) {
+            let role = null;
+            try {
+                const userRaw = localStorage.getItem('eqms_material_user');
+                if (userRaw) {
+                    const parsed = JSON.parse(userRaw);
+                    role = parsed.role;
+                }
+            } catch (e) {}
+            
+            if (window.__currentUserRole) {
+                role = window.__currentUserRole;
+            }
+
+            if ((role === 'supervisor' || role === 'manager') && tab !== 'leadermonitor') {
+                tab = 'leadermonitor';
+            }
+
             ['master','upload','passall','users','leadermonitor','spreadsheet'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
