@@ -331,6 +331,11 @@ export async function initAdminPanel() {
     if (createSpreadsheetBtn) {
         createSpreadsheetBtn.addEventListener('click', handleCreateSpreadsheet);
     }
+    // Also wire the Settings page hidden create button
+    const settingsCreateBtn = document.getElementById('settings-create-spreadsheet-btn');
+    if (settingsCreateBtn) {
+        settingsCreateBtn.addEventListener('click', handleCreateSpreadsheet);
+    }
 
     document.getElementById('admin-defect-form').addEventListener('submit', handleDefectSubmit);
     document.getElementById('admin-defect-cancel').addEventListener('click', cancelDefectEdit);

@@ -824,7 +824,7 @@ async function saveData() {
         if (UI_TEST_MODE) {
             console.log("[TEST MODE] Data yang akan dikirim:", JSON.stringify(dataToSend, null, 2));
             await showAlert('Data berhasil disimpan! (simulasi — tidak ada data yang dikirim ke server)', 'success', '[TEST MODE]');
-            appendSessionLog(dataToSend);
+
             resetAllFields();
             return;
         }
@@ -841,7 +841,6 @@ async function saveData() {
         const isSuccess = response.ok && (parsedResult.status === 'ok' || resultText.toLowerCase().includes('berhasil'));
         if (isSuccess) {
             await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
-            appendSessionLog(dataToSend);
             resetAllFields();
         } else {
             await showAlert(parsedResult.message || resultText || 'Gagal menyimpan data.', 'error');
@@ -1574,27 +1573,4 @@ async function initApp() {
 document.addEventListener('DOMContentLoaded', initApp);
 
 
-
-// ===========================================
-// Helper: Append session to localStorage log
-// ===========================================
-function appendSessionLog(data) {
-    try {
-        const raw = localStorage.getItem('sessionLog');
-        const log = raw ? JSON.parse(raw) : [];
-        log.push({
-            timestamp: data.timestamp,
-            auditor: data.auditor,
-            modelName: data.modelName,
-            styleNumber: data.styleNumber,
-            qtyInspect: data.qtyInspect,
-            ftt: Math.round((data.ftt || 0) * 100),
-        });
-        // Keep only last 200 entries to avoid storage bloat
-        if (log.length > 200) log.splice(0, log.length - 200);
-        localStorage.setItem('sessionLog', JSON.stringify(log));
-    } catch (e) {
-        console.warn('Could not write session log:', e);
-    }
-}
 
