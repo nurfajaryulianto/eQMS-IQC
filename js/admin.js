@@ -895,13 +895,11 @@ function renderProcessesTab() {
     const countEl = document.getElementById('admin-processes-count');
     if (countEl) countEl.textContent = `${processes.length} processes`;
     tbody.innerHTML = processes.map(p => {
-        const comp   = components.find(c => c.id === p.component_id);
-        const vendor = comp ? vendors.find(v => v.id === comp.vendor_id) : null;
+        const comp = components.find(c => c.id === p.component_id);
         return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(p.name)}</td>
-            <td class="px-4 py-2.5 text-sm text-slate-500">${comp   ? escHtml(comp.name)   : '\u2014'}</td>
-            <td class="px-4 py-2.5 text-sm text-slate-500">${vendor ? escHtml(vendor.name) : '\u2014'}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-500">${comp ? escHtml(comp.name) : '\u2014'}</td>
             <td class="px-4 py-2.5">
                 <div class="flex gap-3">
                     <button onclick="window.__adminEditProcess(${p.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
@@ -914,9 +912,8 @@ function renderProcessesTab() {
 
 function handleProcessSubmit(e) {
     e.preventDefault();
-    const name        = document.getElementById('process-input-name').value.trim();
-    const componentId = parseInt(document.getElementById('process-input-component').value, 10) || null;
-    if (!name || !componentId) { showAlert('Pilih component dan masukkan nama process.', 'warning', 'Form Tidak Lengkap'); return; }
+    const name = document.getElementById('process-input-name').value.trim();
+    if (!name) { showAlert('Masukkan nama process.', 'warning', 'Form Tidak Lengkap'); return; }
 
     const btn = e.target.querySelector('button[type="submit"]');
     setFormBusy(btn, true);
@@ -924,9 +921,9 @@ function handleProcessSubmit(e) {
     const finish = async () => {
         try {
             if (editingProcessId !== null) {
-                await dbUpdateProcess(editingProcessId, { name, component_id: componentId });
+                await dbUpdateProcess(editingProcessId, { name, component_id: null });
             } else {
-                await dbInsertProcess({ name, component_id: componentId });
+                await dbInsertProcess({ name, component_id: null });
             }
             const fresh = await dbGetProcesses();
             saveProcesses(fresh);
@@ -946,14 +943,7 @@ window.__adminEditProcess = function(id) {
     const proc = getProcesses().find(p => p.id === id);
     if (!proc) return;
     editingProcessId = id;
-    // Restore vendor first (look up via component), then filter & set component
-    const comp = getComponents().find(c => c.id === proc.component_id);
-    const vendorId = comp ? (comp.vendor_id ?? '') : '';
-    const procVendorSel = document.getElementById('process-input-vendor');
-    if (procVendorSel) procVendorSel.value = vendorId;
-    _populateProcessFormComponent(String(vendorId));
-    document.getElementById('process-input-component').value = proc.component_id ?? '';
-    document.getElementById('process-input-name').value      = proc.name;
+    document.getElementById('process-input-name').value = proc.name;
     document.getElementById('admin-process-form-title').textContent = 'Edit Process';
     document.getElementById('admin-process-cancel').classList.remove('hidden');
     document.getElementById('process-input-name').focus();

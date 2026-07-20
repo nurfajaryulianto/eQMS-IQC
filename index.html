@@ -596,8 +596,8 @@
 
         /* Buttons styling */
         .bg-blue-600, .btn-primary, #new-inspection-btn {
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3) !important;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3) !important;
             color: white !important;
             border: none !important;
             border-radius: 10px !important;
@@ -605,7 +605,8 @@
         }
         .bg-blue-600:hover, .btn-primary:hover, #new-inspection-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45) !important;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45) !important;
         }
         .btn-secondary {
             border: 1.5px solid rgba(255,255,255,0.08) !important;
@@ -1831,7 +1832,7 @@
                                 <h3 id="admin-process-form-title" class="text-sm font-semibold text-slate-900 mb-4">Add
                                     Process</h3>
                                 <form id="admin-process-form" class="space-y-3">
-                                    <div>
+                                    <div class="hidden">
                                         <label
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vendor</label>
                                         <select id="process-input-vendor"
@@ -1839,10 +1840,10 @@
                                             <option value="">Pilih Vendor (opsional)</option>
                                         </select>
                                     </div>
-                                    <div>
+                                    <div class="hidden">
                                         <label
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Component</label>
-                                        <select id="process-input-component" required
+                                        <select id="process-input-component"
                                             class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                             <option value="">Pilih Component</option>
                                         </select>

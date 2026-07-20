@@ -151,14 +151,12 @@ function renderModalComponentButtons(vendorName) {
         btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
         
         if (modalComponent === c.name) {
-            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
         }
         
         btn.addEventListener('click', () => {
             modalComponent = c.name;
-            modalProcess = ''; // Reset process selection
             updateModalComponentButtonsActiveState();
-            renderModalProcessButtons(modalComponent);
         });
         container.appendChild(btn);
     });
@@ -167,30 +165,23 @@ function renderModalComponentButtons(vendorName) {
 function updateModalComponentButtonsActiveState() {
     document.querySelectorAll('.modal-comp-btn').forEach(btn => {
         if (btn.dataset.value === modalComponent) {
-            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
         } else {
             btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
         }
     });
 }
 
-function renderModalProcessButtons(componentName) {
+function renderModalProcessButtons() {
     const container = document.getElementById('modal-process-container');
     if (!container) return;
     container.innerHTML = '';
-    if (!componentName) {
-        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih component terlebih dahulu —</span>';
+    const processes = getProcesses();
+    if (!processes.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada process terdaftar —</span>';
         return;
     }
-    const processes  = getProcesses();
-    const components = getComponents();
-    const comp       = components.find(c => c.name === componentName);
-    const filtered   = comp ? processes.filter(p => p.component_id === comp.id) : [];
-    if (!filtered.length) {
-        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada process untuk component ini —</span>';
-        return;
-    }
-    filtered.forEach(p => {
+    processes.forEach(p => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = p.name;
@@ -198,7 +189,7 @@ function renderModalProcessButtons(componentName) {
         btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
         
         if (modalProcess === p.name) {
-            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
         }
         
         btn.addEventListener('click', () => {
@@ -212,7 +203,7 @@ function renderModalProcessButtons(componentName) {
 function updateModalProcessButtonsActiveState() {
     document.querySelectorAll('.modal-proc-btn').forEach(btn => {
         if (btn.dataset.value === modalProcess) {
-            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-blue-600 border-blue-600 text-white shadow-sm cursor-pointer';
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
         } else {
             btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
         }
@@ -1102,7 +1093,7 @@ function openInspectionItemModal(index = null) {
     modalComponent = modalSelectedComponent;
     modalProcess = modalSelectedProcess;
     renderModalComponentButtons(selectedVendor);
-    renderModalProcessButtons(modalComponent);
+    renderModalProcessButtons();
     
     // Render modal defect buttons dynamically
     const modalDefectsContainer = document.getElementById('modal-defect-buttons');
