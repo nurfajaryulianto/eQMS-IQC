@@ -85,8 +85,9 @@
         }
 
         /* Status badge */
-        .badge-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-        .badge-done    { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-pending  { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge-progress { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .badge-done     { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
 
         /* Validation dialog overlay */
         #validation-overlay {
@@ -470,6 +471,17 @@
                             <input type="file" id="evidence-file" accept="image/*,application/pdf"
                                 class="styled-input" style="font-size: 13px; color: rgba(255,255,255,0.7); width: 100%;">
                             <p style="font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 4px;">Wajib diisi apabila Approved by Leader digunakan.</p>
+                        </div>
+
+                        <!-- Status Checking Dropdown -->
+                        <div>
+                            <label for="checking-status" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                Status Checking <span style="color: #ef4444;">*</span>
+                            </label>
+                            <select id="checking-status" class="styled-input" style="cursor: pointer; width: 100%;">
+                                <option value="done">Done (Selesai)</option>
+                                <option value="in-progress">In-Progress (Belum Selesai)</option>
+                            </select>
                         </div>
 
                         <!-- Submit Button -->

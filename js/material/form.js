@@ -94,10 +94,10 @@ async function populateLeaders() {
             users = json.data || [];
         }
         
-        // Filter for admin, supervisor, manager roles
+        // Filter for supervisor and manager roles
         const leaders = users.filter(u => {
             const role = String(u.role).toLowerCase().trim();
-            return role === 'admin' || role === 'supervisor' || role === 'manager';
+            return role === 'supervisor' || role === 'manager';
         });
         
         leaders.forEach(u => {
@@ -256,11 +256,12 @@ function renderPOList(data) {
     // Remove existing cards (keep loading/empty elements)
     container.querySelectorAll('.po-card').forEach(el => el.remove());
 
-    // Sort: Pending naik ke atas, Done turun ke bawah
+    // Sort: pending -> 0, in-progress -> 1, done -> 2
     const sorted = [...data].sort((a, b) => {
-        const aIsDone = a.status === 'done' ? 1 : 0;
-        const bIsDone = b.status === 'done' ? 1 : 0;
-        return aIsDone - bIsDone;
+        const order = { 'pending': 0, 'in-progress': 1, 'done': 2 };
+        const valA = order[a.status] !== undefined ? order[a.status] : 0;
+        const valB = order[b.status] !== undefined ? order[b.status] : 0;
+        return valA - valB;
     });
 
     sorted.forEach(po => {
@@ -269,8 +270,8 @@ function renderPOList(data) {
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
 
-        const badgeClass = po.status === 'done' ? 'badge-done' : 'badge-pending';
-        const badgeText = po.status === 'done' ? 'Done' : 'Pending';
+        const badgeClass = po.status === 'done' ? 'badge-done' : (po.status === 'in-progress' ? 'badge-progress' : 'badge-pending');
+        const badgeText = po.status === 'done' ? 'Done' : (po.status === 'in-progress' ? 'In-Progress' : 'Pending');
         const isDisabled = po.status === 'done';
 
         if (isDisabled) {
@@ -440,6 +441,7 @@ window.openValidationDialog = function () {
         const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
+        const statusChecking = document.getElementById('checking-status')?.value === 'in-progress' ? 'In-Progress (Belum Selesai)' : 'Done (Selesai)';
         summaryEl.innerHTML = `
             ${summaryRow('PO Number', selectedPO.po_number)}
             ${summaryRow('Material', selectedPO.material_name)}
@@ -451,6 +453,7 @@ window.openValidationDialog = function () {
             ${summaryRow('Rolling Method', rolling)}
             ${summaryRow('Leader Approval', leaderVal)}
             ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
+            ${summaryRow('Status Checking', statusChecking)}
             ${notes ? summaryRow('Catatan', notes) : ''}
         `;
     }
@@ -518,6 +521,8 @@ async function submitInspection() {
 
     if (loadingTxt) loadingTxt.textContent = 'Mengirim data ke server...';
 
+    const checkingStatus = document.getElementById('checking-status')?.value || 'done';
+
     const payload = {
         action: 'submitInspection',
         po_number: selectedPO.po_number,
@@ -534,15 +539,16 @@ async function submitInspection() {
         file_name: fileName,
         file_type: fileType,
         inspection_date: new Date().toISOString(),
+        status: checkingStatus,
     };
 
     try {
         if (MATERIAL_TEST_MODE) {
             console.log('[TEST MODE] Payload:', JSON.stringify(payload, null, 2));
             await delay(1000);
-            // Mark PO as done in local mock
+            // Update PO status in local mock
             const idx = allPOData.findIndex(p => p.po_number === selectedPO.po_number);
-            if (idx !== -1) allPOData[idx].status = 'done';
+            if (idx !== -1) allPOData[idx].status = checkingStatus;
 
             loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan! (simulasi)`, 'success');

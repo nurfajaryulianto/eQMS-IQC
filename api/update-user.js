@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
     if (!app_user_id || !display_name || !role) {
         return res.status(400).json({ error: 'app_user_id, Display Name, dan Role wajib diisi.' });
     }
-    if (!['auditor', 'supervisor', 'admin'].includes(role)) {
+    if (!['auditor', 'supervisor', 'manager', 'admin'].includes(role)) {
         return res.status(400).json({ error: 'Role tidak valid.' });
     }
     if (password && password.length < 6) {

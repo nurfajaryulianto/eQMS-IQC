@@ -41,7 +41,7 @@ module.exports = async function handler(req, res) {
     if (!/^[a-zA-Z0-9]{1,20}$/.test(nik)) {
         return res.status(400).json({ error: 'NIK hanya boleh alfanumerik, maks 20 karakter.' });
     }
-    if (!['auditor', 'supervisor', 'admin'].includes(role)) {
+    if (!['auditor', 'supervisor', 'manager', 'admin'].includes(role)) {
         return res.status(400).json({ error: 'Role tidak valid.' });
     }
     if (password.length < 6) {

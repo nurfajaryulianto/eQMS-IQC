@@ -285,7 +285,7 @@ function submitInspection(payload) {
       else if (h === 'evidence_url') newRow.push(evidenceUrl || '');
       else if (h === 'inspection_date') newRow.push(payload.inspection_date || now);
       
-      else if (h === 'status') newRow.push('done');
+      else if (h === 'status') newRow.push(payload.status || 'done');
       else if (h === 'uploaded_at') newRow.push(now);
       
       // Map static elements from master_data
@@ -309,7 +309,7 @@ function submitInspection(payload) {
     sheet.appendRow(newRow);
 
     // Update status in master_data
-    updateMasterDataStatus(ss, payload.po_number, 'done');
+    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done');
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 

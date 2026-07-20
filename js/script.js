@@ -1398,7 +1398,7 @@ async function initApp() {
     if (leaderSelect) {
         leaderSelect.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
         try {
-            const leaders = getUsers().filter(u => u.role === 'supervisor' || u.role === 'admin' || u.role === 'manager');
+            const leaders = getUsers().filter(u => u.role === 'supervisor' || u.role === 'manager');
             leaders.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u.display_name || u.nik;
@@ -1428,6 +1428,10 @@ async function initApp() {
     // Show admin nav items for admin role
     if (userRole === ROLES.ADMIN) {
         document.querySelectorAll('[data-view="admin"]').forEach(el => { el.style.display = ''; });
+    }
+    // Show leader monitor nav items for admin, supervisor, and manager
+    if (userRole === ROLES.ADMIN || userRole === ROLES.SUPERVISOR || userRole === ROLES.MANAGER) {
+        document.querySelectorAll('[data-view="leader-monitor"]').forEach(el => { el.style.display = ''; });
     }
 
     defectButtons = document.querySelectorAll('.defect-button');

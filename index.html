@@ -822,6 +822,8 @@
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Defect Library</a>
             <a data-view="settings" onclick="showView('settings')"
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Settings</a>
+            <a data-view="leader-monitor" onclick="showView('leader-monitor')"
+                class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Leader Monitor</a>
             <a data-view="admin" onclick="showView('admin')"
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
         </nav>
@@ -884,6 +886,11 @@
                 <a data-view="settings" onclick="showView('settings')"
                     class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">settings</span> Settings
+                </a>
+                <a data-view="leader-monitor" onclick="showView('leader-monitor')"
+                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer"
+                    style="display:none">
+                    <span class="material-symbols-outlined text-[18px]">monitoring</span> Leader Monitor
                 </a>
                 <a data-view="admin" onclick="showView('admin')"
                     class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer"
@@ -1597,6 +1604,72 @@
                 </div>
             </div>
 
+            <!-- ====== VIEW: LEADER MONITOR ====== -->
+            <div id="view-leader-monitor" class="app-view hidden p-4 lg:p-6">
+                <div class="max-w-[1200px] mx-auto flex flex-col gap-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900">Leader Monitoring Panel</h2>
+                            <p class="text-sm text-slate-500 mt-1">Monitor all inspector checking results and approval status.</p>
+                        </div>
+                        <button id="leader-monitor-refresh-btn" class="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+                            <span class="material-symbols-outlined text-[15px]">refresh</span> Refresh Data
+                        </button>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-wrap gap-4 items-end">
+                        <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Start Date</label>
+                            <input type="date" id="leader-monitor-start" class="border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">End Date</label>
+                            <input type="date" id="leader-monitor-end" class="border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Status Approval</label>
+                            <select id="leader-monitor-status" class="border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="all">Semua Status</option>
+                                <option value="pending">Pending Leader Approval</option>
+                                <option value="approved">Approved</option>
+                                <option value="autopass">Auto-Pass (No Defect)</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="leader-monitor-filter-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">Filter</button>
+                            <button id="leader-monitor-reset-btn" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors">Reset</button>
+                        </div>
+                    </div>
+
+                    <!-- Logs Table -->
+                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto thin-scroll">
+                            <table class="w-full border-collapse">
+                                <thead>
+                                    <tr class="text-left border-b border-slate-200">
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">Tanggal</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">Inspector</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">Component</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">Style / Model</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10 text-right">Qty Inspect</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10 text-right">Qty Fail</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10 text-center">Status</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10">Approved By</th>
+                                        <th class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider sticky top-0 bg-slate-50 z-10 text-center">Evidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leader-monitor-tbody">
+                                    <tr>
+                                        <td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">Loading data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ====== VIEW: ADMIN ====== -->
             <div id="view-admin" class="app-view hidden p-4 lg:p-6">
                 <div class="max-w-[1100px] mx-auto">
@@ -2214,7 +2287,11 @@
     <script>
         let analyticsReady = false;
         let adminReady = false;
-        const VIEW_ROLES = { 'admin': ['admin'], 'settings': ['admin'] };
+        const VIEW_ROLES = { 
+            'admin': ['admin'], 
+            'settings': ['admin'],
+            'leader-monitor': ['admin', 'supervisor', 'manager']
+        };
         function showView(name) {
             if (VIEW_ROLES[name]) {
                 const role = window.__eqmsUserRole;
@@ -2228,6 +2305,9 @@
             if (name === 'analytics' && !analyticsReady) {
                 analyticsReady = true;
                 import('./js/dashboard.js').then(m => m.initDashboard()).catch(e => console.error('Analytics init failed:', e));
+            }
+            if (name === 'leader-monitor') {
+                import('./js/dashboard.js').then(m => m.initLeaderMonitor()).catch(e => console.error('Leader monitor init failed:', e));
             }
             if (name === 'admin' && !adminReady) {
                 adminReady = true;

@@ -194,6 +194,8 @@ async function fetchData() {
                 FTT: ftt,
                 Rework_Rate: defectRate,
                 SessionId: item.SessionId || item.SessionID || '',
+                ApprovedByLeader: item.ApprovedByLeader || item['Approved By Leader'] || '',
+                EvidenceUrl: item.EvidenceUrl || item['Evidence Url'] || '',
             };
         });
 
@@ -618,4 +620,138 @@ function updateInspectionTable(data) {
         `;
         tbody.appendChild(row);
     });
+}
+
+function parseDateString(str) {
+    if (!str) return null;
+    if (str.includes('-')) return new Date(str);
+    if (str.includes('/')) {
+        const parts = str.split('/');
+        return new Date(parts[2], parts[0] - 1, parts[1]);
+    }
+    return new Date(str);
+}
+
+export async function initLeaderMonitor() {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const startEl = document.getElementById('leader-monitor-start');
+    const endEl = document.getElementById('leader-monitor-end');
+    if (startEl && !startEl.value) startEl.value = todayStr;
+    if (endEl && !endEl.value) endEl.value = todayStr;
+
+    if (!allInspections.length) {
+        await fetchData();
+    }
+    renderLeaderMonitor();
+
+    const filterBtn = document.getElementById('leader-monitor-filter-btn');
+    if (filterBtn) {
+        filterBtn.onclick = () => renderLeaderMonitor();
+    }
+    const resetBtn = document.getElementById('leader-monitor-reset-btn');
+    if (resetBtn) {
+        resetBtn.onclick = () => {
+            if (startEl) startEl.value = todayStr;
+            if (endEl) endEl.value = todayStr;
+            const statusSelect = document.getElementById('leader-monitor-status');
+            if (statusSelect) statusSelect.value = 'all';
+            renderLeaderMonitor();
+        };
+    }
+    const refreshBtn = document.getElementById('leader-monitor-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.onclick = async () => {
+            const tbody = document.getElementById('leader-monitor-tbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">Refreshing data from server...</td></tr>';
+            await fetchData();
+            renderLeaderMonitor();
+        };
+    }
+}
+
+function renderLeaderMonitor() {
+    const tbody = document.getElementById('leader-monitor-tbody');
+    if (!tbody) return;
+
+    const startVal = document.getElementById('leader-monitor-start')?.value;
+    const endVal = document.getElementById('leader-monitor-end')?.value;
+    const statusVal = document.getElementById('leader-monitor-status')?.value || 'all';
+
+    const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
+    const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+    const filtered = allInspections.filter(item => {
+        const inspDateStr = item.TanggalInspection || item.TanggalIncoming;
+        if (inspDateStr) {
+            const dateObj = parseDateString(inspDateStr);
+            if (dateObj) {
+                if (startDate && dateObj < startDate) return false;
+                if (endDate && dateObj > endDate) return false;
+            }
+        }
+
+        const hasDefects = item.Defect > 0;
+        const leaderApproved = item.ApprovedByLeader && item.ApprovedByLeader.trim().length > 0;
+
+        if (statusVal === 'pending') {
+            return hasDefects && !leaderApproved;
+        } else if (statusVal === 'approved') {
+            return hasDefects && leaderApproved;
+        } else if (statusVal === 'autopass') {
+            return !hasDefects;
+        }
+        return true;
+    });
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">Tidak ada data hasil monitoring yang sesuai filter.</td></tr>';
+        return;
+    }
+
+    filtered.sort((a, b) => b.Timestamp - a.Timestamp);
+
+    tbody.innerHTML = filtered.map(item => {
+        let statusBadge = '';
+        const hasDefects = item.Defect > 0;
+        const leaderApproved = item.ApprovedByLeader && item.ApprovedByLeader.trim().length > 0;
+
+        if (!hasDefects) {
+            statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">Auto-Pass</span>';
+        } else if (leaderApproved) {
+            statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Approved</span>';
+        } else {
+            statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 animate-pulse">Pending Approval</span>';
+        }
+
+        const approvedText = item.ApprovedByLeader || '<span class="text-slate-400 font-normal italic">—</span>';
+        
+        let evidenceLink = '<span class="text-slate-400 italic">—</span>';
+        if (item.EvidenceUrl) {
+            evidenceLink = `<a href="${item.EvidenceUrl}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
+                <span class="material-symbols-outlined text-[14px]">visibility</span> Lihat Bukti
+            </a>`;
+        }
+
+        return `
+            <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600">${item.TanggalInspection || item.TanggalIncoming || '—'}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${item.Auditor}</td>
+                <td class="px-4 py-3 text-xs text-slate-600">
+                    <span class="font-bold text-slate-700 block">${item.Vendor || '—'}</span>
+                    <span class="text-[11px]">${item.Component || '—'}</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-xs">
+                    <span class="font-mono block">${item['Style Number'] || '—'}</span>
+                    <span class="text-slate-500">${item.Model || '—'}</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-slate-700">${item.Qty_Inspect.toLocaleString('id-ID')}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums font-semibold ${item.Defect > 0 ? 'text-red-500' : 'text-slate-500'}">${item.Defect.toLocaleString('id-ID')}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-center">${statusBadge}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${approvedText}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-center">${evidenceLink}</td>
+            </tr>
+        `;
+    }).join('');
 }

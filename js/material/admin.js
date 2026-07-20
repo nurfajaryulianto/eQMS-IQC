@@ -861,3 +861,159 @@ window.loadMockADFFile = function() {
     renderPreviewTable(parsedFileData);
     document.getElementById('file-preview').style.display = 'block';
 };
+
+// ─── LEADER MONITORING LOG ──────────────────────────────────
+let allLeaderMonitorInspections = [];
+
+window.loadLeaderMonitorLog = async function() {
+    const tbody = document.getElementById('leadermonitor-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Memuat data log...</td></tr>';
+    
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const startEl = document.getElementById('leadermonitor-filter-start');
+    const endEl = document.getElementById('leadermonitor-filter-end');
+    if (startEl && !startEl.value) startEl.value = todayStr;
+    if (endEl && !endEl.value) endEl.value = todayStr;
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            allLeaderMonitorInspections = [
+                {
+                    po_no: '1263026745',
+                    material_name: 'FP JUNIOR BUCK',
+                    qty_inspect: 100,
+                    qty_fail: 5,
+                    status: 'done',
+                    inspector_nik: 'auditor1',
+                    approved_by_leader: 'Supervisor A',
+                    evidence_url: 'https://example.com/evidence1.jpg',
+                    inspection_date: new Date().toISOString()
+                },
+                {
+                    po_no: '1263026744',
+                    material_name: 'FP GENERIC SPLIT SUEDE',
+                    qty_inspect: 80,
+                    qty_fail: 0,
+                    status: 'in-progress',
+                    inspector_nik: 'auditor2',
+                    approved_by_leader: '',
+                    evidence_url: '',
+                    inspection_date: new Date().toISOString()
+                }
+            ];
+        } else {
+            const res = await fetch(`${MATERIAL_GAS_URL}?action=getInspectionData`);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            allLeaderMonitorInspections = json.data || [];
+        }
+        
+        window.renderLeaderMonitorLog();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal memuat log leader: ' + err.message, 'error');
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:48px;text-align:center;color:#f87171;">Gagal memuat data log.</td></tr>';
+    }
+};
+
+window.renderLeaderMonitorLog = function() {
+    const tbody = document.getElementById('leadermonitor-tbody');
+    if (!tbody) return;
+
+    const startVal = document.getElementById('leadermonitor-filter-start')?.value;
+    const endVal = document.getElementById('leadermonitor-filter-end')?.value;
+    const statusVal = document.getElementById('leadermonitor-filter-status')?.value || 'all';
+
+    const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
+    const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+    const filtered = allLeaderMonitorInspections.filter(item => {
+        const dateStr = item.inspection_date || item.uploaded_at;
+        if (dateStr) {
+            const dateObj = new Date(dateStr);
+            if (!isNaN(dateObj.getTime())) {
+                if (startDate && dateObj < startDate) return false;
+                if (endDate && dateObj > endDate) return false;
+            }
+        }
+
+        const fail = Number(item.qty_fail || item.no_qty) || 0;
+        const hasDefects = fail > 0;
+        const leaderApproved = item.approved_by_leader && item.approved_by_leader.trim().length > 0;
+
+        if (statusVal === 'pending') {
+            return hasDefects && !leaderApproved;
+        } else if (statusVal === 'approved') {
+            return hasDefects && leaderApproved;
+        } else if (statusVal === 'autopass') {
+            return !hasDefects;
+        }
+        return true;
+    });
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Tidak ada data monitoring yang sesuai filter.</td></tr>';
+        return;
+    }
+
+    filtered.sort((a, b) => new Date(b.inspection_date || b.uploaded_at) - new Date(a.inspection_date || a.uploaded_at));
+
+    tbody.innerHTML = filtered.map(item => {
+        const fail = Number(item.qty_fail || item.no_qty) || 0;
+        const inspect = Number(item.qty_inspect) || 0;
+        const hasDefects = fail > 0;
+        const leaderApproved = item.approved_by_leader && item.approved_by_leader.trim().length > 0;
+
+        let statusBadge = '';
+        if (!hasDefects) {
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Auto-Pass</span>';
+        } else if (leaderApproved) {
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Approved</span>';
+        } else {
+            statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);">Pending Approval</span>';
+        }
+
+        const approvedText = item.approved_by_leader || '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
+        
+        let evidenceLink = '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
+        if (item.evidence_url) {
+            evidenceLink = `<a href="${item.evidence_url}" target="_blank" style="color:#60a5fa;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                <span class="material-symbols-outlined" style="font-size:14px;">visibility</span> Lihat Bukti
+            </a>`;
+        }
+
+        const dateFormatted = item.inspection_date ? new Date(item.inspection_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+        return `<tr>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.7);">${dateFormatted}</td>
+            <td style="padding:12px 14px;font-weight:700;color:white;">${esc(item.inspector_nik || '—')}</td>
+            <td style="padding:12px 14px;">
+                <div style="font-weight:700;color:white;margin-bottom:2px;">PO: ${esc(item.po_no || item.po_number || '—')}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.5);">${esc(item.material_name || '—')}</div>
+            </td>
+            <td style="padding:12px 14px;text-align:right;font-weight:600;color:white;">${inspect.toLocaleString('id-ID')}</td>
+            <td style="padding:12px 14px;text-align:right;font-weight:600;color:${fail > 0 ? '#f87171' : 'rgba(255,255,255,0.7)'};">${fail.toLocaleString('id-ID')}</td>
+            <td style="padding:12px 14px;text-align:center;">${statusBadge}</td>
+            <td style="padding:12px 14px;font-weight:700;color:white;">${approvedText}</td>
+            <td style="padding:12px 14px;text-align:center;">${evidenceLink}</td>
+        </tr>`;
+    }).join('');
+};
+
+window.applyLeaderMonitorFilter = function() {
+    window.renderLeaderMonitorLog();
+};
+
+window.resetLeaderMonitorFilter = function() {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const startEl = document.getElementById('leadermonitor-filter-start');
+    const endEl = document.getElementById('leadermonitor-filter-end');
+    const statusSelect = document.getElementById('leadermonitor-filter-status');
+    if (startEl) startEl.value = todayStr;
+    if (endEl) endEl.value = todayStr;
+    if (statusSelect) statusSelect.value = 'all';
+    window.renderLeaderMonitorLog();
+};

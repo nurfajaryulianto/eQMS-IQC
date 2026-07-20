@@ -286,6 +286,10 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">group</span>
                 Manage Users
             </button>
+            <button class="tab-btn" id="tab-leadermonitor" onclick="switchTab('leadermonitor')">
+                <span class="material-symbols-outlined" style="font-size:16px;">monitoring</span>
+                Leader Monitor
+            </button>
             <button class="tab-btn" id="tab-spreadsheet" onclick="switchTab('spreadsheet')">
                 <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
                 Spreadsheet
@@ -586,6 +590,72 @@
             </div>
         </div>
 
+        <!-- ── TAB: LEADER MONITOR ── -->
+        <div id="panel-leadermonitor" style="display:none;">
+            <div class="card">
+                <div class="card-header" style="justify-content:space-between;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.4);">monitoring</span>
+                        <span style="font-size:14px;font-weight:700;color:white;">Leader Monitoring Panel</span>
+                    </div>
+                    <button onclick="window.loadLeaderMonitorLog()" class="btn-secondary" style="padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <span class="material-symbols-outlined" style="font-size:14px;">refresh</span> Refresh Data
+                    </button>
+                </div>
+                
+                <!-- Filters -->
+                <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
+                        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal</label>
+                        <input type="date" id="leadermonitor-filter-start" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
+                        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal</label>
+                        <input type="date" id="leadermonitor-filter-end" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
+                        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Status Approval</label>
+                        <select id="leadermonitor-filter-status" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;cursor:pointer;">
+                            <option value="all">Semua Status</option>
+                            <option value="pending">Pending Leader Approval</option>
+                            <option value="approved">Approved</option>
+                            <option value="autopass">Auto-Pass (No Defect)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="window.applyLeaderMonitorFilter()" class="btn-gradient" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                            <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>Filter
+                        </button>
+                        <button onclick="window.resetLeaderMonitorFilter()" class="btn-secondary" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                            <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div style="padding:0;overflow-x:auto;">
+                    <table class="data-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="padding:12px 14px;">Tanggal</th>
+                                <th style="padding:12px 14px;">Inspector</th>
+                                <th style="padding:12px 14px;">PO / Material</th>
+                                <th style="padding:12px 14px;text-align:right;">Qty Inspect</th>
+                                <th style="padding:12px 14px;text-align:right;">Qty Fail</th>
+                                <th style="padding:12px 14px;text-align:center;">Status</th>
+                                <th style="padding:12px 14px;">Approved By</th>
+                                <th style="padding:12px 14px;text-align:center;">Evidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadermonitor-tbody">
+                            <tr>
+                                <td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- ── TAB: SPREADSHEET ── -->
         <div id="panel-spreadsheet" style="display:none;">
             <div class="card" style="max-width: 600px;">
@@ -596,7 +666,7 @@
                 <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
                     <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;line-height:1.6;">
                         Aplikasi IQC Material menggunakan Google Spreadsheet sebagai database utama untuk menyimpan data transaksi hasil inspeksi, master data PO, vendor, dan user.
-                    </p>
+                     </p>
                     
                     <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
                         <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Status Spreadsheet Aktif</span>
@@ -624,12 +694,17 @@
     <script>
         // Tab switching (needs to be non-module for onclick)
         window.switchTab = function(tab) {
-            ['master','upload','passall','users','spreadsheet'].forEach(t => {
-                document.getElementById('panel-' + t).style.display = t === tab ? 'block' : 'none';
-                document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+            ['master','upload','passall','users','leadermonitor','spreadsheet'].forEach(t => {
+                const panel = document.getElementById('panel-' + t);
+                const btn = document.getElementById('tab-' + t);
+                if (panel) panel.style.display = t === tab ? 'block' : 'none';
+                if (btn) btn.classList.toggle('active', t === tab);
             });
             if (tab === 'users' && typeof window.loadUsersList === 'function') {
                 window.loadUsersList();
+            }
+            if (tab === 'leadermonitor' && typeof window.loadLeaderMonitorLog === 'function') {
+                window.loadLeaderMonitorLog();
             }
             if (tab === 'spreadsheet' && typeof window.loadSpreadsheetStatus === 'function') {
                 window.loadSpreadsheetStatus();
