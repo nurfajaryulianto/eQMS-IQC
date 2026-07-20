@@ -670,7 +670,7 @@ window.handleUserSubmit = async function(e) {
 };
 
 window.editUser = function(nik) {
-    const user = allUsers.find(u => u.nik === nik);
+    const user = allUsers.find(u => String(u.nik) === String(nik));
     if (!user) return;
 
     editingUserNik = nik;
@@ -713,7 +713,7 @@ window.deleteUser = async function(nik) {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
-            allUsers = allUsers.filter(u => u.nik !== nik);
+            allUsers = allUsers.filter(u => String(u.nik) !== String(nik));
             showToast('User berhasil dihapus (simulasi)!', 'success');
         } else {
             const res = await fetch(MATERIAL_GAS_URL, {
