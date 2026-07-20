@@ -734,9 +734,20 @@ function renderLeaderMonitor() {
             </a>`;
         }
 
+        const rawDate = item.TanggalInspection || item.TanggalIncoming || '';
+        let dateFormatted = '—';
+        if (rawDate) {
+            const dateObj = new Date(rawDate);
+            if (!isNaN(dateObj.getTime())) {
+                dateFormatted = dateObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            } else {
+                dateFormatted = rawDate;
+            }
+        }
+
         return `
             <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600">${item.TanggalInspection || item.TanggalIncoming || '—'}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600">${dateFormatted}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${item.Auditor}</td>
                 <td class="px-4 py-3 text-xs text-slate-600">
                     <span class="font-bold text-slate-700 block">${item.Vendor || '—'}</span>
