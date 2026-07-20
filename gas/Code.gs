@@ -85,6 +85,8 @@ const SESSIONS_HEADERS = [
   'Bucket',
   'ApprovedByLeader',
   'EvidenceUrl',
+  'Status',       // 'In Progress' | 'Done' | '' (legacy = Done)
+  'ItemsJSON',    // Full items JSON, stored only for In Progress drafts
 ];
 
 const DEFECT_HEADERS = [
@@ -120,6 +122,108 @@ function doPost(e) {
     if (data && data.action === 'createSpreadsheet') {
       const result = createAndInitializeSpreadsheet();
       return jsonResponse(result);
+    }
+
+      // ── ACTION: Save In Progress draft ─────────────────────────────
+    if (data && data.action === 'saveInProgress') {
+      const ss = SpreadsheetApp.openById(getActiveSpreadsheetId());
+      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
+
+      const baseId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
+        + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+
+      // Write one summary row per item, but mark Status = In Progress and embed full JSON in ItemsJSON column
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (items.length === 0) {
+        return jsonResponse({ status: 'error', message: 'Tidak ada item untuk disimpan.' });
+      }
+      // Write a single representative row with all items serialized in ItemsJSON
+      const sessionRow = [
+        baseId,
+        data.timestamp            || '',
+        data.tanggalIncoming      || '',
+        data.materialType         || '',
+        data.auditor              || '',
+        data.vendor               || '',
+        items.map(function(i) { return i.component; }).join(', '),
+        items.map(function(i) { return i.process; }).join(', '),
+        data.styleNumber          || '',
+        data.modelName            || '',
+        items.reduce(function(s, i) { return s + (i.qtyIncoming || 0); }, 0),
+        0, 0, 0,
+        data.tanggalInspection    || '',
+        data.tanggalBucket        || '',
+        '', '',
+        'In Progress',
+        JSON.stringify(items),
+      ];
+      sessionSheet.appendRow(sessionRow);
+      return jsonResponse({ status: 'ok', message: 'Draft disimpan (In Progress).', sessionId: baseId });
+    }
+
+    // ── ACTION: Update session status to Done (final save from draft) ─
+    if (data && data.action === 'updateSessionStatus' && data.draftSessionId) {
+      const ss = SpreadsheetApp.openById(getActiveSpreadsheetId());
+      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
+      const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
+      const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',    PIVOT_HEADERS);
+
+      // Find and delete the In Progress row
+      const allData = sessionSheet.getDataRange().getValues();
+      const headers = allData[0];
+      const sessionIdCol = headers.indexOf('SessionId');
+      const statusCol = headers.indexOf('Status');
+      let draftRowIndex = -1;
+      for (var r = 1; r < allData.length; r++) {
+        if (String(allData[r][sessionIdCol]) === String(data.draftSessionId)) {
+          draftRowIndex = r + 1; // 1-indexed for GAS
+          break;
+        }
+      }
+      if (draftRowIndex > 0) {
+        sessionSheet.deleteRow(draftRowIndex);
+      }
+
+      // Now write the final Done rows (same as normal submit flow)
+      var evidenceUrl = '';
+      if (data.file_data && data.file_name) {
+        try {
+          var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
+          var parents = spreadsheetFile.getParents();
+          var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+          var subDepartmentFolder = getOrCreateSubfolder(parentFolder, 'IQC Subcont');
+          var fileBlob = Utilities.newBlob(Utilities.base64Decode(data.file_data), data.file_type || 'image/png', data.file_name);
+          var driveFile = subDepartmentFolder.createFile(fileBlob);
+          driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+          evidenceUrl = driveFile.getUrl();
+        } catch (err) {
+          throw new Error('Gagal upload file bukti: ' + err.message);
+        }
+      }
+
+      const baseSessionId = data.draftSessionId + '-DONE';
+      if (Array.isArray(data.items) && data.items.length > 0) {
+        data.items.forEach(function(item, index) {
+          const sessionId = baseSessionId + '-' + (index + 1);
+          const sessionRow = [
+            sessionId, data.timestamp || '', data.tanggalIncoming || '',
+            data.materialType || '', data.auditor || '', data.vendor || '',
+            item.component || '', item.process || '', data.styleNumber || '',
+            data.modelName || '', item.qtyIncoming || 0, item.qtyInspect || 0,
+            item.pass || 0, item.defect || 0, data.tanggalInspection || '',
+            data.tanggalBucket || '', data.approvedByLeader || '', evidenceUrl || '',
+            'Done', '',
+          ];
+          sessionSheet.appendRow(sessionRow);
+          if (Array.isArray(item.defects) && item.defects.length > 0) {
+            item.defects.forEach(function(d) {
+              defectSheet.appendRow([sessionId, data.tanggalIncoming || '', data.vendor || '', item.component || '', d.type || '', d.count || 0]);
+              pivotSheet.appendRow([data.tanggalIncoming || '', data.materialType || '', data.auditor || '', data.vendor || '', item.component || '', item.process || '', d.type || '', d.count || 0]);
+            });
+          }
+        });
+      }
+      return jsonResponse({ status: 'ok', message: 'Semua data berhasil disimpan (Done)!', sessionId: baseSessionId });
     }
 
     const ss   = SpreadsheetApp.openById(getActiveSpreadsheetId());
@@ -174,6 +278,8 @@ function doPost(e) {
           data.tanggalBucket        || '',
           data.approvedByLeader     || '',
           evidenceUrl               || '',
+          'Done',
+          '',
         ];
         sessionSheet.appendRow(sessionRow);
 
@@ -226,6 +332,8 @@ function doPost(e) {
         data.tanggalBucket        || '',
         data.approvedByLeader     || '',
         evidenceUrl               || '',
+        'Done',
+        '',
       ];
       sessionSheet.appendRow(sessionRow);
 
@@ -289,6 +397,81 @@ function doGet(e) {
       });
     }
 
+    // ── ACTION: Get draft sessions for an auditor ─────────────────
+    if (e && e.parameter && e.parameter.action === 'getDraftSessions') {
+      const auditor = e.parameter.auditor || '';
+      const ss = SpreadsheetApp.openById(activeId);
+      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
+      const allData = sessionSheet.getDataRange().getValues();
+      const headers = allData[0];
+      const statusCol = headers.indexOf('Status');
+      const auditorCol = headers.indexOf('Auditor');
+      const vendorCol = headers.indexOf('Vendor');
+      const tanggalCol = headers.indexOf('TanggalIncoming');
+      const sessionIdCol = headers.indexOf('SessionId');
+      const timestampCol = headers.indexOf('Timestamp');
+      const itemsJsonCol = headers.indexOf('ItemsJSON');
+      const drafts = [];
+      for (var r = 1; r < allData.length; r++) {
+        var row = allData[r];
+        if (String(row[statusCol]) === 'In Progress' && String(row[auditorCol]) === auditor) {
+          var items = [];
+          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(e) {}
+          drafts.push({
+            sessionId: String(row[sessionIdCol]),
+            auditor: String(row[auditorCol]),
+            vendor: String(row[vendorCol]),
+            tanggalIncoming: String(row[tanggalCol]),
+            savedAt: String(row[timestampCol]),
+            itemCount: items.length,
+          });
+        }
+      }
+      return jsonResponse({ status: 'ok', drafts: drafts });
+    }
+
+    // ── ACTION: Get full draft detail by sessionId ─────────────────
+    if (e && e.parameter && e.parameter.action === 'getDraftDetail') {
+      const sessionId = e.parameter.sessionId || '';
+      const ss = SpreadsheetApp.openById(activeId);
+      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
+      const allData = sessionSheet.getDataRange().getValues();
+      const headers = allData[0];
+      const sessionIdCol = headers.indexOf('SessionId');
+      const itemsJsonCol = headers.indexOf('ItemsJSON');
+      const auditorCol = headers.indexOf('Auditor');
+      const vendorCol = headers.indexOf('Vendor');
+      const tanggalCol = headers.indexOf('TanggalIncoming');
+      const tanggalInsCol = headers.indexOf('TanggalInspection');
+      const bucketCol = headers.indexOf('Bucket');
+      const styleCol = headers.indexOf('StyleNumber');
+      const modelCol = headers.indexOf('ModelName');
+      const matTypeCol = headers.indexOf('MaterialType');
+      for (var r = 1; r < allData.length; r++) {
+        var row = allData[r];
+        if (String(row[sessionIdCol]) === sessionId) {
+          var items = [];
+          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(e2) {}
+          return jsonResponse({
+            status: 'ok',
+            draft: {
+              sessionId: sessionId,
+              auditor: String(row[auditorCol]),
+              vendor: String(row[vendorCol]),
+              tanggalIncoming: String(row[tanggalCol]),
+              tanggalInspection: String(row[tanggalInsCol]),
+              tanggalBucket: String(row[bucketCol]),
+              styleNumber: String(row[styleCol]),
+              modelName: String(row[modelCol]),
+              materialType: String(row[matTypeCol]),
+              items: items,
+            }
+          });
+        }
+      }
+      return jsonResponse({ status: 'error', error: 'Draft tidak ditemukan.' });
+    }
+
     const ss             = SpreadsheetApp.openById(activeId);
     const sessionSheet   = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet    = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
@@ -296,8 +479,13 @@ function doGet(e) {
     const sessions = sheetToObjects(sessionSheet);
     const defects  = sheetToObjects(defectSheet);
 
+    // Filter out In Progress drafts from analytics data
+    const doneSessions = sessions.filter(function(s) {
+      return s.Status !== 'In Progress';
+    });
+
     // FTT dihitung dari data mentah, bukan disimpan di sheet
-    const sessionsWithFtt = sessions.map(s => ({
+    const sessionsWithFtt = doneSessions.map(s => ({
       ...s,
       FTT:        s.QtyInspect > 0 ? s.Pass / s.QtyInspect : 0,
       DefectRate: s.QtyInspect > 0 ? s.Defect / s.QtyInspect : 0,
@@ -339,11 +527,17 @@ function getOrCreateSheet(ss, name, headers) {
     // Auto-resize kolom
     sheet.autoResizeColumns(1, headers.length);
   } else if (name === 'Sessions') {
-    // Memastikan header di kolom 15-18 selaras dengan urutan data yang disimpan
-    sheet.getRange(1, 15).setValue('TanggalInspection').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
-    sheet.getRange(1, 16).setValue('Bucket').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
-    sheet.getRange(1, 17).setValue('ApprovedByLeader').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
-    sheet.getRange(1, 18).setValue('EvidenceUrl').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
+    // Ensure Status and ItemsJSON headers exist at columns 19-20
+    const firstRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!firstRow.includes('Status')) {
+      const nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue('Status').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
+    }
+    const firstRow2 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (!firstRow2.includes('ItemsJSON')) {
+      const nextCol2 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol2).setValue('ItemsJSON').setFontWeight('bold').setBackground('#1e3a5f').setFontColor('#ffffff');
+    }
   }
   return sheet;
 }

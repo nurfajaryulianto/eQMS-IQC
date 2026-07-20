@@ -21,7 +21,10 @@ let reworkLog = [];
 
 // --- STATE UNTUK MULTI ITEM KOMPONEN & PROSES ---
 let inspectionItems = []; 
-let editingItemIndex = null; 
+let editingItemIndex = null;
+
+// --- STATE UNTUK DRAFT (IN PROGRESS) ---
+let activeDraftSessionId = null; // baseSessionId dari GAS saat ada draft aktif
 
 const qtyInspectOutputs = {
     'pass': 0,
@@ -830,9 +833,12 @@ async function saveData() {
         }
         // ── Akhir UI TESTING MODE ──
 
-        const response = await fetch("https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec", {
+        const response = await fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify(dataToSend),
+            body: JSON.stringify({
+                ...dataToSend,
+                ...(activeDraftSessionId ? { action: 'updateSessionStatus', draftSessionId: activeDraftSessionId } : {})
+            }),
         });
         const resultText = await response.text();
         console.log("Respons server:", resultText);
@@ -840,6 +846,9 @@ async function saveData() {
         try { parsedResult = JSON.parse(resultText); } catch { /* plain text response */ }
         const isSuccess = response.ok && (parsedResult.status === 'ok' || resultText.toLowerCase().includes('berhasil'));
         if (isSuccess) {
+            activeDraftSessionId = null;
+            const indicator = document.getElementById('active-draft-indicator');
+            if (indicator) indicator.classList.add('hidden');
             await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
             resetAllFields();
         } else {
@@ -1241,18 +1250,8 @@ function saveInspectionItem() {
     };
     
     if (editingItemIndex === null) {
-        const duplicate = inspectionItems.some(item => item.component === modalComponent && item.process === modalProcess);
-        if (duplicate) {
-            showAlert(`Kombinasi Component (${modalComponent}) dan Process (${modalProcess}) sudah ada di daftar. Silakan edit item yang ada.`, 'warning', 'Kombinasi Duplikat');
-            return;
-        }
         inspectionItems.push(itemData);
     } else {
-        const duplicate = inspectionItems.some((item, index) => index !== editingItemIndex && item.component === modalComponent && item.process === modalProcess);
-        if (duplicate) {
-            showAlert(`Kombinasi Component (${modalComponent}) dan Process (${modalProcess}) sudah ada di daftar.`, 'warning', 'Kombinasi Duplikat');
-            return;
-        }
         inspectionItems[editingItemIndex] = itemData;
     }
     
@@ -1552,6 +1551,18 @@ async function initApp() {
         btn.addEventListener("click", saveData);
     });
 
+    // --- Wire Simpan Sementara ---
+    const simpanSementaraBtn = document.getElementById('simpan-sementara-btn');
+    if (simpanSementaraBtn) {
+        simpanSementaraBtn.addEventListener('click', handleSaveInProgress);
+    }
+
+    // --- Wire Draft Banner Button ---
+    const draftBannerBtn = document.getElementById('draft-banner-btn');
+    if (draftBannerBtn) {
+        draftBannerBtn.addEventListener('click', () => showDraftSelectModal());
+    }
+
     const statisticButton = document.querySelector('.statistic-button');
     if (statisticButton) {
         statisticButton.addEventListener('click', () => {
@@ -1567,10 +1578,230 @@ async function initApp() {
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
 
+    // Check for in-progress drafts for this inspector
+    checkForDrafts();
+
     console.log("Aplikasi berhasil diinisialisasi.");
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
 
 
+// ===========================================
+// DRAFT / IN-PROGRESS FEATURE
+// ===========================================
 
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec";
+
+/**
+ * Called on init — queries GAS for any In Progress sessions belonging to this inspector.
+ * If found, shows the draft banner.
+ */
+async function checkForDrafts() {
+    if (UI_TEST_MODE) return;
+    const user = getUser();
+    if (!user) return;
+    const auditor = user.user_metadata?.display_name || user.user_metadata?.nik || '';
+    if (!auditor) return;
+
+    try {
+        const url = `${GAS_URL}?action=getDraftSessions&auditor=${encodeURIComponent(auditor)}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.drafts && data.drafts.length > 0) {
+            window.__pendingDrafts = data.drafts;
+            showDraftBanner(data.drafts.length);
+            renderDashboardDraftWidget(data.drafts);
+        }
+    } catch (e) {
+        console.warn('[Draft] Gagal mengecek draft:', e);
+    }
+}
+
+/** Show the amber banner at the top of the dashboard form. */
+function showDraftBanner(count) {
+    const banner = document.getElementById('draft-notification-banner');
+    if (!banner) return;
+    const countEl = document.getElementById('draft-banner-count');
+    if (countEl) countEl.textContent = count;
+    banner.classList.remove('hidden');
+}
+
+/** Hide the draft banner. */
+function hideDraftBanner() {
+    const banner = document.getElementById('draft-notification-banner');
+    if (banner) banner.classList.add('hidden');
+}
+
+/** Render the "Inspeksi Tertunda" widget on the Dashboard page. */
+function renderDashboardDraftWidget(drafts) {
+    const container = document.getElementById('dashboard-draft-list');
+    if (!container) return;
+    const widget = document.getElementById('dashboard-draft-widget');
+    if (widget) widget.classList.remove('hidden');
+    container.innerHTML = drafts.map(d => `
+        <div class="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-800 truncate">${d.vendor || '—'}</p>
+                <p class="text-xs text-slate-500">${d.tanggalIncoming || '—'} · ${d.itemCount || 0} item</p>
+            </div>
+            <button onclick="window.loadDraft('${d.sessionId}')"
+                class="flex-shrink-0 text-xs font-semibold px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg transition-colors cursor-pointer">
+                Lanjutkan
+            </button>
+        </div>
+    `).join('');
+}
+
+/** Open the draft selection modal. */
+function showDraftSelectModal() {
+    const modal = document.getElementById('draft-select-modal');
+    if (!modal) return;
+    const listEl = document.getElementById('draft-modal-list');
+    const drafts = window.__pendingDrafts || [];
+    if (listEl) {
+        if (!drafts.length) {
+            listEl.innerHTML = '<p class="text-sm text-slate-400 text-center py-6">Tidak ada inspeksi yang tertunda.</p>';
+        } else {
+            listEl.innerHTML = drafts.map(d => `
+                <div class="flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-800">${d.vendor || '—'}</p>
+                        <p class="text-xs text-slate-500">${d.tanggalIncoming || '—'} · ${d.itemCount || 0} item · Disimpan: ${d.savedAt ? new Date(d.savedAt).toLocaleString('id-ID') : '—'}</p>
+                    </div>
+                    <button onclick="window.loadDraft('${d.sessionId}'); document.getElementById('draft-select-modal').classList.add('hidden');"
+                        class="flex-shrink-0 text-xs font-semibold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer">
+                        Muat
+                    </button>
+                </div>
+            `).join('');
+        }
+    }
+    modal.classList.remove('hidden');
+}
+
+/**
+ * Load a specific draft session from GAS by sessionId.
+ * Populates the form with the draft data.
+ */
+window.loadDraft = async function(sessionId) {
+    try {
+        const url = `${GAS_URL}?action=getDraftDetail&sessionId=${encodeURIComponent(sessionId)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        if (!data.draft) throw new Error(data.error || 'Draft tidak ditemukan');
+        applyDraftToForm(data.draft, sessionId);
+    } catch (e) {
+        await showAlert(`Gagal memuat draft: ${e.message}`, 'error');
+    }
+};
+
+/** Populates the form from a loaded draft object. */
+function applyDraftToForm(draft, sessionId) {
+    activeDraftSessionId = sessionId;
+
+    // Restore header fields
+    const mtSelect = document.getElementById('material-type');
+    if (mtSelect) { mtSelect.value = draft.materialType || ''; selectedMaterialType = draft.materialType || ''; }
+    renderVendorButtons();
+    
+    // Select vendor button
+    if (draft.vendor) {
+        selectedVendor = draft.vendor;
+        document.querySelectorAll('.vendor-sel-btn').forEach(btn => {
+            btn.classList.toggle('bg-emerald-600', btn.dataset.vendor === draft.vendor);
+            btn.classList.toggle('text-white', btn.dataset.vendor === draft.vendor);
+            btn.classList.toggle('border-emerald-600', btn.dataset.vendor === draft.vendor);
+        });
+        if (addItemBtn) addItemBtn.disabled = false;
+    }
+
+    const tinEl = document.getElementById('tanggal-incoming');
+    if (tinEl && draft.tanggalIncoming) tinEl.value = draft.tanggalIncoming;
+    const tinsEl = document.getElementById('tanggal-inspection');
+    if (tinsEl && draft.tanggalInspection) tinsEl.value = draft.tanggalInspection;
+    const tbEl = document.getElementById('tanggal-bucket');
+    if (tbEl && draft.tanggalBucket) tbEl.value = draft.tanggalBucket;
+    const styleEl = document.getElementById('style-number');
+    if (styleEl && draft.styleNumber) styleEl.value = draft.styleNumber;
+    const modelEl = document.getElementById('model-name');
+    if (modelEl && draft.modelName) modelEl.value = draft.modelName;
+
+    // Restore inspection items
+    if (Array.isArray(draft.items)) {
+        inspectionItems = draft.items;
+    }
+
+    renderInspectedItems();
+    updateTotalQtyInspect();
+    checkInfoCompleteAndLockButtons();
+    hideDraftBanner();
+
+    // Show active draft indicator
+    const indicator = document.getElementById('active-draft-indicator');
+    if (indicator) {
+        indicator.textContent = `Draft aktif: ${draft.vendor || ''} (${draft.tanggalIncoming || ''})`;
+        indicator.classList.remove('hidden');
+    }
+
+    showAlert('Draft berhasil dimuat! Lanjutkan pengisian dan klik SIMPAN jika sudah selesai.', 'success', 'Draft Dimuat');
+}
+
+/**
+ * "Simpan Sementara" handler — sends current form data to GAS with status In Progress.
+ */
+async function handleSaveInProgress() {
+    if (!inspectionItems.length) {
+        await showAlert('Tambahkan minimal 1 item sebelum menyimpan sementara.', 'warning', 'Form Belum Lengkap');
+        return;
+    }
+    const auditor = document.getElementById('auditor')?.value || '';
+    const vendor = selectedVendor;
+    if (!vendor || !auditor) {
+        await showAlert('Pastikan Auditor dan Vendor sudah dipilih.', 'warning', 'Form Belum Lengkap');
+        return;
+    }
+
+    const btn = document.getElementById('simpan-sementara-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+    const payload = {
+        action: 'saveInProgress',
+        timestamp: new Date().toISOString(),
+        auditor,
+        tanggalIncoming: document.getElementById('tanggal-incoming')?.value || '',
+        tanggalInspection: document.getElementById('tanggal-inspection')?.value || '',
+        tanggalBucket: document.getElementById('tanggal-bucket')?.value || '',
+        materialType: selectedMaterialType || '',
+        vendor,
+        styleNumber: document.getElementById('style-number')?.value || '',
+        modelName: document.getElementById('model-name')?.value || '',
+        items: inspectionItems,
+    };
+
+    try {
+        if (UI_TEST_MODE) {
+            await showAlert('[TEST MODE] Draft disimpan secara lokal (simulasi).', 'success', 'Simpan Sementara');
+            activeDraftSessionId = 'TEST-DRAFT-' + Date.now();
+        } else {
+            const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const result = await res.json();
+            if (result.status !== 'ok') throw new Error(result.message || 'Gagal menyimpan');
+            activeDraftSessionId = result.sessionId;
+            // Refresh pending drafts list
+            window.__pendingDrafts = (window.__pendingDrafts || []).filter(d => d.sessionId !== activeDraftSessionId);
+            const indicator = document.getElementById('active-draft-indicator');
+            if (indicator) {
+                indicator.textContent = `Draft aktif: ${vendor} (${payload.tanggalIncoming})`;
+                indicator.classList.remove('hidden');
+            }
+            await showAlert('Inspeksi disimpan sementara! Buka kembali aplikasi besok untuk melanjutkan.', 'success', 'Tersimpan Sementara ✓');
+        }
+    } catch (e) {
+        await showAlert(`Gagal menyimpan sementara: ${e.message}`, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Simpan Sementara'; }
+    }
+}
