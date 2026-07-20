@@ -101,72 +101,7 @@
             }
         }
 
-        /* Announcement popup */
-        #announcement-popup {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 9998;
-            background: rgba(0, 0, 0, 0.5);
-            align-items: center;
-            justify-content: center;
-        }
 
-        #announcement-popup.active {
-            display: flex;
-        }
-
-        .announcement-content {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 480px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-            position: relative;
-        }
-
-        .announcement-date {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            color: #64748b;
-            font-size: 13px;
-        }
-
-        .announcement-nav {
-            background: #f1f5f9;
-            border: none;
-            border-radius: 6px;
-            padding: 4px 10px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .announcement-nav:hover {
-            background: #e2e8f0;
-        }
-
-        .announcement-text {
-            color: #1e293b;
-            font-size: 14px;
-            line-height: 1.6;
-        }
-
-        .close-button {
-            position: absolute;
-            top: 12px;
-            right: 16px;
-            font-size: 22px;
-            cursor: pointer;
-            color: #94a3b8;
-            line-height: 1;
-        }
-
-        .close-button:hover {
-            color: #475569;
-        }
 
         /* Grade counter active state */
         .input-button.active {
@@ -795,10 +730,7 @@
             background: rgba(255, 255, 255, 0.15) !important;
         }
 
-        /* Announcement indicator */
-        #announcement-button {
-            color: white !important;
-        }
+
     </style>
 </head>
 
@@ -808,8 +740,12 @@
     <!-- Top App Bar -->
     <header
         class="flex justify-between items-center px-6 h-16 w-full bg-white border-b border-slate-200 shadow-sm z-50 sticky top-0">
-        <div class="flex items-center gap-4">
-            <div class="text-xl font-bold tracking-tight text-slate-900">E-QMS</div>
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-[26px] text-blue-600">verified</span>
+            <div>
+                <span class="text-sm font-black text-slate-900 tracking-tight block">IQC Subcont</span>
+                <span class="text-[10px] text-slate-400 block -mt-1 font-semibold">Quality Control App</span>
+            </div>
         </div>
         <nav class="hidden md:flex gap-1 items-center h-full">
             <a data-view="dashboard" onclick="showView('dashboard')"
@@ -828,10 +764,6 @@
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
         </nav>
         <div class="flex items-center gap-1">
-            <button id="announcement-button" title="Announcements"
-                class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
-                <span class="material-symbols-outlined text-[20px]">notifications</span>
-            </button>
             <button class="statistic-button p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
                 title="Lihat Statistik Data">
                 <span class="material-symbols-outlined text-[20px]">bar_chart</span>
@@ -847,67 +779,8 @@
     </header>
 
     <div class="flex flex-1 overflow-hidden">
-        <!-- Side Nav -->
-        <aside
-            class="hidden md:flex fixed left-0 top-16 h-[calc(100vh-4rem)] flex-col bg-slate-50 border-r border-slate-200 w-56 z-40 overflow-y-auto">
-            <div class="p-4 border-b border-slate-200">
-                <div class="flex items-center gap-3 mb-3">
-                    <div
-                        class="w-9 h-9 rounded bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
-                        <span class="material-symbols-outlined text-[18px]">shield</span>
-                    </div>
-                    <div>
-                        <div class="text-sm font-bold text-slate-900">Quality Control</div>
-                        <div class="text-[10px] text-slate-400">Plant Floor 01</div>
-                    </div>
-                </div>
-                <button id="new-inspection-btn"
-                    class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium flex items-center justify-center gap-1 transition-colors">
-                    <span class="material-symbols-outlined text-[16px]">add</span> New Inspection
-                </button>
-            </div>
-            <nav class="flex-1 flex flex-col gap-0.5 p-2">
-                <a data-view="dashboard" onclick="showView('dashboard')"
-                    class="sidenav-link active flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">dashboard</span> Dashboard
-                </a>
-                <a data-view="inspections" onclick="showView('inspections')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">fact_check</span> Inspections
-                </a>
-                <a data-view="analytics" onclick="showView('analytics')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">bar_chart</span> Analytics
-                </a>
-                <a data-view="defect-library" onclick="showView('defect-library')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">category</span> Defect Library
-                </a>
-                <a data-view="settings" onclick="showView('settings')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">settings</span> Settings
-                </a>
-                <a data-view="leader-monitor" onclick="showView('leader-monitor')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer"
-                    style="display:none">
-                    <span class="material-symbols-outlined text-[18px]">monitoring</span> Leader Monitor
-                </a>
-                <a data-view="admin" onclick="showView('admin')"
-                    class="sidenav-link flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm cursor-pointer"
-                    style="display:none">
-                    <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin
-                </a>
-            </nav>
-            <div class="border-t border-slate-200 p-2">
-                <a class="flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-200 rounded-sm text-sm transition-colors"
-                    href="#">
-                    <span class="material-symbols-outlined text-[18px]">contact_support</span> Support
-                </a>
-            </div>
-        </aside>
-
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto md:ml-56">
+        <main class="flex-1 overflow-y-auto">
 
             <!-- ====== VIEW: DASHBOARD (Inspection Form) ====== -->
             <div id="view-dashboard" class="app-view p-4 lg:p-6">
@@ -2274,18 +2147,7 @@
         </main>
     </div>
 
-    <!-- Announcement Popup -->
-    <div id="announcement-popup">
-        <div class="announcement-content">
-            <span class="close-button">&times;</span>
-            <div class="announcement-date">
-                <button id="prev-announcement" class="announcement-nav">&lt;</button>
-                <span id="date-text"></span>
-                <button id="next-announcement" class="announcement-nav">&gt;</button>
-            </div>
-            <div id="announcement-text" class="announcement-text"></div>
-        </div>
-    </div>
+
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
