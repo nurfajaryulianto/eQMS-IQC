@@ -1815,10 +1815,7 @@
                                                     Process Name</th>
                                                 <th
                                                     class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                    Component</th>
-                                                <th
-                                                    class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                    Vendor</th>
+                                                    Material Type</th>
                                                 <th
                                                     class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                                     Actions</th>
@@ -1850,10 +1847,19 @@
                                     </div>
                                     <div>
                                         <label
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Process
-                                            Name</label>
+                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Process Name</label>
                                         <input id="process-input-name" type="text" placeholder="e.g. Cementing" required
                                             class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Material Type</label>
+                                        <select id="process-input-material-type"
+                                            class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                            <option value="">Semua (Upper & Bottom)</option>
+                                            <option value="upper">Upper</option>
+                                            <option value="bottom">Bottom</option>
+                                        </select>
                                     </div>
                                     <div class="flex gap-2 pt-1">
                                         <button type="submit"

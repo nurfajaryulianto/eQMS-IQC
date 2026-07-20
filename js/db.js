@@ -177,16 +177,16 @@ export async function dbGetProcesses() {
     return unwrap(await db.from('processes').select('*').order('id'), 'getProcesses');
 }
 
-export async function dbInsertProcess({ name, component_id }) {
+export async function dbInsertProcess({ name, component_id, material_type }) {
     return unwrap(
-        await db.from('processes').insert({ name, component_id: component_id || null }).select().single(),
+        await db.from('processes').insert({ name, component_id: component_id || null, material_type: material_type || null }).select().single(),
         'insertProcess'
     );
 }
 
-export async function dbUpdateProcess(id, { name, component_id }) {
+export async function dbUpdateProcess(id, { name, component_id, material_type }) {
     return unwrap(
-        await db.from('processes').update({ name, component_id: component_id || null }).eq('id', id).select().single(),
+        await db.from('processes').update({ name, component_id: component_id || null, material_type: material_type || null }).eq('id', id).select().single(),
         'updateProcess'
     );
 }

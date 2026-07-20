@@ -177,11 +177,15 @@ function renderModalProcessButtons() {
     if (!container) return;
     container.innerHTML = '';
     const processes = getProcesses();
-    if (!processes.length) {
-        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada process terdaftar —</span>';
+    const filtered = processes.filter(p => {
+        if (!selectedMaterialType) return true;
+        return !p.material_type || p.material_type === selectedMaterialType;
+    });
+    if (!filtered.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada process untuk jenis material ini —</span>';
         return;
     }
-    processes.forEach(p => {
+    filtered.forEach(p => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = p.name;

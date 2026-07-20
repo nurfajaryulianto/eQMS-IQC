@@ -888,18 +888,16 @@ function refreshDropdownsInForm() {
 
 function renderProcessesTab() {
     const processes  = getProcesses();
-    const components = getComponents();
-    const vendors    = getVendors();
     const tbody = document.getElementById('admin-processes-tbody');
     if (!tbody) return;
     const countEl = document.getElementById('admin-processes-count');
     if (countEl) countEl.textContent = `${processes.length} processes`;
     tbody.innerHTML = processes.map(p => {
-        const comp = components.find(c => c.id === p.component_id);
+        const matType = p.material_type ? p.material_type.toUpperCase() : 'ALL';
         return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(p.name)}</td>
-            <td class="px-4 py-2.5 text-sm text-slate-500">${comp ? escHtml(comp.name) : '\u2014'}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-500">${escHtml(matType)}</td>
             <td class="px-4 py-2.5">
                 <div class="flex gap-3">
                     <button onclick="window.__adminEditProcess(${p.id})" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
@@ -913,6 +911,7 @@ function renderProcessesTab() {
 function handleProcessSubmit(e) {
     e.preventDefault();
     const name = document.getElementById('process-input-name').value.trim();
+    const materialType = document.getElementById('process-input-material-type').value || null;
     if (!name) { showAlert('Masukkan nama process.', 'warning', 'Form Tidak Lengkap'); return; }
 
     const btn = e.target.querySelector('button[type="submit"]');
@@ -921,9 +920,9 @@ function handleProcessSubmit(e) {
     const finish = async () => {
         try {
             if (editingProcessId !== null) {
-                await dbUpdateProcess(editingProcessId, { name, component_id: null });
+                await dbUpdateProcess(editingProcessId, { name, component_id: null, material_type: materialType });
             } else {
-                await dbInsertProcess({ name, component_id: null });
+                await dbInsertProcess({ name, component_id: null, material_type: materialType });
             }
             const fresh = await dbGetProcesses();
             saveProcesses(fresh);
@@ -944,6 +943,7 @@ window.__adminEditProcess = function(id) {
     if (!proc) return;
     editingProcessId = id;
     document.getElementById('process-input-name').value = proc.name;
+    document.getElementById('process-input-material-type').value = proc.material_type || '';
     document.getElementById('admin-process-form-title').textContent = 'Edit Process';
     document.getElementById('admin-process-cancel').classList.remove('hidden');
     document.getElementById('process-input-name').focus();
@@ -966,9 +966,7 @@ window.__adminDeleteProcess = async function(id) {
 function cancelProcessEdit() {
     editingProcessId = null;
     document.getElementById('admin-process-form').reset();
-    const procVendorSel = document.getElementById('process-input-vendor');
-    if (procVendorSel) procVendorSel.value = '';
-    _populateProcessFormComponent('');
+    document.getElementById('process-input-material-type').value = '';
     document.getElementById('admin-process-form-title').textContent = 'Add Process';
     document.getElementById('admin-process-cancel').classList.add('hidden');
 }
