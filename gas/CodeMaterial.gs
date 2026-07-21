@@ -333,8 +333,6 @@ function updateMasterDataStatus(ss, poNumber, newStatus) {
   }
 }
 
-// ─── BULK UPSERT MASTER DATA ──────────────────────────────────
-
 function bulkUpsertMasterData(payload) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -355,14 +353,14 @@ function bulkUpsertMasterData(payload) {
     for (var i = 1; i < data.length; i++) {
       var poKey = String(data[i][12]).trim();
       if (poKey) {
-        existingMap[poKey] = i + 1; // 1-indexed row number
+        existingMap[poKey] = true;
       }
     }
 
     var now        = new Date().toISOString();
     var uploaded   = payload.uploader_nik || 'admin';
     var insertRows = [];
-    var updateCount = 0;
+    var rejectedPOs = [];
 
     rows.forEach(function(row) {
       // Maps keys from the uploaded ADF Layout Excel template exactly
@@ -414,11 +412,9 @@ function bulkUpsertMasterData(payload) {
       });
 
       if (existingMap[po]) {
-        var existingNo = sheet.getRange(existingMap[po], 1).getValue();
-        newRow[0] = existingNo || (existingMap[po] - 1);
-        sheet.getRange(existingMap[po], 1, 1, newRow.length).setValues([newRow]);
-        updateCount++;
+        rejectedPOs.push(po);
       } else {
+        existingMap[po] = true;
         insertRows.push(newRow);
       }
     });
@@ -434,9 +430,9 @@ function bulkUpsertMasterData(payload) {
 
     return {
       status:  'ok',
-      message: `Upload selesai: ${insertRows.length} baru, ${updateCount} diperbarui.`,
+      message: `Upload selesai: ${insertRows.length} baru, ${rejectedPOs.length} duplikat ditolak.`,
       inserted: insertRows.length,
-      updated:  updateCount,
+      rejected: rejectedPOs,
     };
 
   } finally {

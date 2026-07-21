@@ -3,6 +3,7 @@
 // ============================================================
 
 import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
+import { showAlert } from '../dialog.js';
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
@@ -241,49 +242,74 @@ window.clearFile = function () {
 window.confirmUpload = async function () {
     if (!parsedFileData.length) { showToast('Tidak ada data untuk diupload.', 'error'); return; }
 
-    if (!confirm(`Upload ${parsedFileData.length} baris data ke Spreadsheet? Data yang sudah ada (PO sama) akan diperbarui.`)) return;
+    if (!confirm(`Upload ${parsedFileData.length} baris data ke Spreadsheet? Data dengan nomor PO yang sudah terdaftar di database akan ditolak/diabaikan.`)) return;
 
     setLoading(true, `Mengupload ${parsedFileData.length} baris...`);
 
     try {
+        let inserted = 0;
+        let rejected = [];
+
         if (MATERIAL_TEST_MODE) {
             await delay(1500);
-            // Simulate adding to allMasterData
+            
+            // Map existing POs in cache to check duplicates
+            const existingMap = {};
+            allMasterData.forEach(d => {
+                if (d.po_number) existingMap[d.po_number] = true;
+            });
+
             parsedFileData.forEach(row => {
                 const po = String(row['PO Number'] || row.po_number || '').trim();
                 if (!po) return;
-                const existing = allMasterData.findIndex(d => d.po_number === po);
-                const newItem = {
-                    po_number: po,
-                    material_name: row['Material Name'] || row.material_name || '',
-                    vendor_name: row['Supplier'] || row.vendor_name || '',
-                    uom: row['UOM'] || row.uom || '',
-                    planned_qty: Number(row['Batch Size'] || row.planned_qty) || 0,
-                    status: 'pending'
-                };
-                if (existing >= 0) allMasterData[existing] = newItem;
-                else allMasterData.push(newItem);
+                
+                if (existingMap[po]) {
+                    rejected.push(po);
+                } else {
+                    existingMap[po] = true;
+                    inserted++;
+                    allMasterData.push({
+                        po_number: po,
+                        material_name: row['Material Name'] || row.material_name || '',
+                        vendor_name: row['Supplier'] || row.vendor_name || '',
+                        uom: row['UOM'] || row.uom || '',
+                        planned_qty: Number(row['Batch Size'] || row.planned_qty) || 0,
+                        status: 'pending'
+                    });
+                }
             });
             setLoading(false);
-            showToast(`Upload berhasil: ${parsedFileData.length} baris diproses. (simulasi)`, 'success');
-            clearFile();
-            renderMasterTable();
-            return;
+        } else {
+            const payload = {
+                action: 'bulkUpsertMasterData',
+                rows: parsedFileData,
+                uploader_nik: currentUser?.nik || 'admin',
+            };
+            const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+
+            inserted = json.inserted || 0;
+            rejected = json.rejected || [];
+            setLoading(false);
         }
 
-        const payload = {
-            action: 'bulkUpsertMasterData',
-            rows: parsedFileData,
-            uploader_nik: currentUser?.nik || 'admin',
-        };
-        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-
-        setLoading(false);
-        showToast(json.message || 'Upload berhasil!', 'success');
+        // Show status dialog popUp
+        let alertMessage = `${inserted} data PO baru berhasil dimasukkan ke database.`;
+        let alertType = 'success';
+        if (rejected.length > 0) {
+            alertMessage += `\n\n⚠️ ${rejected.length} data duplikat ditolak oleh sistem karena Nomor PO sudah ada di database:\n${rejected.join(', ')}`;
+            alertType = 'warning';
+        }
+        
         clearFile();
-        await loadMasterData();
+        if (MATERIAL_TEST_MODE) {
+            renderMasterTable();
+        } else {
+            await loadMasterData();
+        }
+
+        await showAlert(alertMessage, alertType, 'Status Upload Master Data');
 
     } catch (err) {
         setLoading(false);
