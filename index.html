@@ -915,7 +915,8 @@
                                         <input type="text" id="model-name" placeholder="Enter model name" readonly
                                             class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm px-3 py-2 focus:outline-none cursor-default">
                                     </div>
-                                    <div>
+                                    <!-- Approved By Leader: only visible on desktop; mobile version is in the mobile save card below -->
+                                    <div class="hidden lg:block">
                                         <label for="approved-by-leader"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved by Leader <span class="text-[10px] text-slate-400 normal-case">(Opsional)</span></label>
                                         <select id="approved-by-leader"
@@ -1055,6 +1056,23 @@
 
                         <!-- MOBILE SAVE BUTTON CARD -->
                         <div class="col-span-1 lg:hidden bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-2 space-y-2">
+                            <!-- Approved By Leader: mobile-only, syncs to the real select via JS -->
+                            <div class="pb-2 border-b border-slate-100">
+                                <label for="approved-by-leader-mobile"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved by Leader <span class="text-[10px] text-slate-400 normal-case">(Opsional)</span></label>
+                                <select id="approved-by-leader-mobile"
+                                    class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="">— Tanpa Persetujuan —</option>
+                                </select>
+                                <!-- Evidence Upload (mobile) -->
+                                <div id="evidence-upload-container-mobile" class="hidden mt-2" style="background: rgba(255,255,255,0.02); border: 1.5px dashed rgba(0,0,0,0.12); border-radius: 10px; padding: 10px;">
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Upload Evidence <span class="text-red-500">*</span></label>
+                                    <input type="file" id="evidence-file-mobile" accept="image/*,application/pdf"
+                                        class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                        onchange="(function(f){var r=document.getElementById('evidence-file');if(r&&f.files[0]){var dt=new DataTransfer();dt.items.add(f.files[0]);r.files=dt.files;r.dispatchEvent(new Event('change'));}})(this)">
+                                    <p class="text-[10px] text-slate-400 mt-1">Wajib diunggah sebagai bukti persetujuan leader.</p>
+                                </div>
+                            </div>
                             <button
                                 class="save-button w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
                                 <span class="material-symbols-outlined text-[16px]">check_circle</span>

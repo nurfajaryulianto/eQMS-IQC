@@ -1386,33 +1386,64 @@ async function initApp() {
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
 
-    // Populate Approved by Leader Select Options
+    // Populate Approved by Leader Select Options (Desktop and Mobile)
     const leaderSelect = document.getElementById('approved-by-leader');
-    if (leaderSelect) {
-        leaderSelect.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
+    const leaderSelectMobile = document.getElementById('approved-by-leader-mobile');
+    
+    function populateSelect(selectEl) {
+        if (!selectEl) return;
+        selectEl.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
         try {
             const leaders = getUsers().filter(u => u.role === 'supervisor' || u.role === 'manager');
             leaders.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u.display_name || u.nik;
                 opt.textContent = `${u.display_name || u.nik} (${u.role})`;
-                leaderSelect.appendChild(opt);
+                selectEl.appendChild(opt);
             });
         } catch (e) {
             console.error('Failed to populate leaders select:', e);
         }
+    }
+
+    populateSelect(leaderSelect);
+    populateSelect(leaderSelectMobile);
+
+    function syncLeaderState(val) {
+        const desktopSelect = document.getElementById('approved-by-leader');
+        const mobileSelect = document.getElementById('approved-by-leader-mobile');
+        const desktopContainer = document.getElementById('evidence-upload-container');
+        const mobileContainer = document.getElementById('evidence-upload-container-mobile');
         
-        leaderSelect.addEventListener('change', () => {
-            const container = document.getElementById('evidence-upload-container');
-            const fileInput = document.getElementById('evidence-file');
-            if (container) {
-                if (leaderSelect.value) {
-                    container.classList.remove('hidden');
-                } else {
-                    container.classList.add('hidden');
-                    if (fileInput) fileInput.value = '';
-                }
+        if (desktopSelect && desktopSelect.value !== val) desktopSelect.value = val;
+        if (mobileSelect && mobileSelect.value !== val) mobileSelect.value = val;
+        
+        if (desktopContainer) {
+            if (val) desktopContainer.classList.remove('hidden');
+            else {
+                desktopContainer.classList.add('hidden');
+                const fileInput = document.getElementById('evidence-file');
+                if (fileInput) fileInput.value = '';
             }
+        }
+        if (mobileContainer) {
+            if (val) mobileContainer.classList.remove('hidden');
+            else {
+                mobileContainer.classList.add('hidden');
+                const fileInputMobile = document.getElementById('evidence-file-mobile');
+                if (fileInputMobile) fileInputMobile.value = '';
+            }
+        }
+    }
+
+    if (leaderSelect) {
+        leaderSelect.addEventListener('change', () => {
+            syncLeaderState(leaderSelect.value);
+        });
+    }
+    if (leaderSelectMobile) {
+        leaderSelectMobile.addEventListener('change', () => {
+            syncLeaderState(leaderSelectMobile.value);
         });
     }
 
