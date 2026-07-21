@@ -368,7 +368,7 @@ window.filterPOList = function () {
 
     filteredPO = allPOData.filter(po => {
         const matchSearch = !search || [
-            po.po_number, po.material_name, po.vendor_name, po.style, po.model_shoe
+            po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
         const matchStatus = status === 'all' || po.status === status;
