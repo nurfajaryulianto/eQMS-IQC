@@ -124,108 +124,6 @@ function doPost(e) {
       return jsonResponse(result);
     }
 
-      // ── ACTION: Save In Progress draft ─────────────────────────────
-    if (data && data.action === 'saveInProgress') {
-      const ss = SpreadsheetApp.openById(getActiveSpreadsheetId());
-      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
-
-      const baseId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
-        + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
-
-      // Write one summary row per item, but mark Status = In Progress and embed full JSON in ItemsJSON column
-      const items = Array.isArray(data.items) ? data.items : [];
-      if (items.length === 0) {
-        return jsonResponse({ status: 'error', message: 'Tidak ada item untuk disimpan.' });
-      }
-      // Write a single representative row with all items serialized in ItemsJSON
-      const sessionRow = [
-        baseId,
-        data.timestamp            || '',
-        data.tanggalIncoming      || '',
-        data.materialType         || '',
-        data.auditor              || '',
-        data.vendor               || '',
-        items.map(function(i) { return i.component; }).join(', '),
-        items.map(function(i) { return i.process; }).join(', '),
-        data.styleNumber          || '',
-        data.modelName            || '',
-        items.reduce(function(s, i) { return s + (i.qtyIncoming || 0); }, 0),
-        0, 0, 0,
-        data.tanggalInspection    || '',
-        data.tanggalBucket        || '',
-        '', '',
-        'In Progress',
-        JSON.stringify(items),
-      ];
-      sessionSheet.appendRow(sessionRow);
-      return jsonResponse({ status: 'ok', message: 'Draft disimpan (In Progress).', sessionId: baseId });
-    }
-
-    // ── ACTION: Update session status to Done (final save from draft) ─
-    if (data && data.action === 'updateSessionStatus' && data.draftSessionId) {
-      const ss = SpreadsheetApp.openById(getActiveSpreadsheetId());
-      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
-      const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
-      const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',    PIVOT_HEADERS);
-
-      // Find and delete the In Progress row
-      const allData = sessionSheet.getDataRange().getValues();
-      const headers = allData[0];
-      const sessionIdCol = headers.indexOf('SessionId');
-      const statusCol = headers.indexOf('Status');
-      let draftRowIndex = -1;
-      for (var r = 1; r < allData.length; r++) {
-        if (String(allData[r][sessionIdCol]) === String(data.draftSessionId)) {
-          draftRowIndex = r + 1; // 1-indexed for GAS
-          break;
-        }
-      }
-      if (draftRowIndex > 0) {
-        sessionSheet.deleteRow(draftRowIndex);
-      }
-
-      // Now write the final Done rows (same as normal submit flow)
-      var evidenceUrl = '';
-      if (data.file_data && data.file_name) {
-        try {
-          var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
-          var parents = spreadsheetFile.getParents();
-          var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-          var subDepartmentFolder = getOrCreateSubfolder(parentFolder, 'IQC Subcont');
-          var fileBlob = Utilities.newBlob(Utilities.base64Decode(data.file_data), data.file_type || 'image/png', data.file_name);
-          var driveFile = subDepartmentFolder.createFile(fileBlob);
-          driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
-          evidenceUrl = driveFile.getUrl();
-        } catch (err) {
-          throw new Error('Gagal upload file bukti: ' + err.message);
-        }
-      }
-
-      const baseSessionId = data.draftSessionId + '-DONE';
-      if (Array.isArray(data.items) && data.items.length > 0) {
-        data.items.forEach(function(item, index) {
-          const sessionId = baseSessionId + '-' + (index + 1);
-          const sessionRow = [
-            sessionId, data.timestamp || '', data.tanggalIncoming || '',
-            data.materialType || '', data.auditor || '', data.vendor || '',
-            item.component || '', item.process || '', data.styleNumber || '',
-            data.modelName || '', item.qtyIncoming || 0, item.qtyInspect || 0,
-            item.pass || 0, item.defect || 0, data.tanggalInspection || '',
-            data.tanggalBucket || '', data.approvedByLeader || '', evidenceUrl || '',
-            'Done', '',
-          ];
-          sessionSheet.appendRow(sessionRow);
-          if (Array.isArray(item.defects) && item.defects.length > 0) {
-            item.defects.forEach(function(d) {
-              defectSheet.appendRow([sessionId, data.tanggalIncoming || '', data.vendor || '', item.component || '', d.type || '', d.count || 0]);
-              pivotSheet.appendRow([data.tanggalIncoming || '', data.materialType || '', data.auditor || '', data.vendor || '', item.component || '', item.process || '', d.type || '', d.count || 0]);
-            });
-          }
-        });
-      }
-      return jsonResponse({ status: 'ok', message: 'Semua data berhasil disimpan (Done)!', sessionId: baseSessionId });
-    }
-
     const ss   = SpreadsheetApp.openById(getActiveSpreadsheetId());
 
     // Save evidence file if uploaded
@@ -249,6 +147,9 @@ function doPost(e) {
     const sessionSheet = getOrCreateSheet(ss, 'Sessions',      SESSIONS_HEADERS);
     const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
     const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',     PIVOT_HEADERS);
+
+    const statusVal = data.status || 'Done';
+    const itemsJsonStr = Array.isArray(data.items) ? JSON.stringify(data.items) : '';
 
     // Buat sessionId unik: tanggal + random 4 karakter
     const baseSessionId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
@@ -278,12 +179,12 @@ function doPost(e) {
           data.tanggalBucket        || '',
           data.approvedByLeader     || '',
           evidenceUrl               || '',
-          'Done',
-          '',
+          statusVal,
+          itemsJsonStr,
         ];
         sessionSheet.appendRow(sessionRow);
 
-        // Tulis baris per defect ke DefectDetails & PivotReady
+        // Tulis baris per defect ke DefectDetails & PivotReady (hanya jika Done atau jika ada defect)
         if (Array.isArray(item.defects) && item.defects.length > 0) {
           item.defects.forEach(d => {
             defectSheet.appendRow([
@@ -309,7 +210,7 @@ function doPost(e) {
         }
       });
 
-      return jsonResponse({ status: 'ok', message: 'Semua data item inspeksi berhasil disimpan!', sessionId: baseSessionId });
+      return jsonResponse({ status: 'ok', message: 'Data inspeksi berhasil disimpan!', sessionId: baseSessionId });
     } else {
       // Backward compatibility flow (single session)
       const sessionId = baseSessionId;
@@ -332,8 +233,8 @@ function doPost(e) {
         data.tanggalBucket        || '',
         data.approvedByLeader     || '',
         evidenceUrl               || '',
-        'Done',
-        '',
+        statusVal,
+        itemsJsonStr,
       ];
       sessionSheet.appendRow(sessionRow);
 
@@ -397,9 +298,8 @@ function doGet(e) {
       });
     }
 
-    // ── ACTION: Get draft sessions for an auditor ─────────────────
-    if (e && e.parameter && e.parameter.action === 'getDraftSessions') {
-      const auditor = e.parameter.auditor || '';
+    // ── ACTION: Get all In-Progress sessions ─────────────────
+    if (e && e.parameter && e.parameter.action === 'getInProgressSessions') {
       const ss = SpreadsheetApp.openById(activeId);
       const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
       const allData = sessionSheet.getDataRange().getValues();
@@ -408,68 +308,44 @@ function doGet(e) {
       const auditorCol = headers.indexOf('Auditor');
       const vendorCol = headers.indexOf('Vendor');
       const tanggalCol = headers.indexOf('TanggalIncoming');
-      const sessionIdCol = headers.indexOf('SessionId');
-      const timestampCol = headers.indexOf('Timestamp');
-      const itemsJsonCol = headers.indexOf('ItemsJSON');
-      const drafts = [];
-      for (var r = 1; r < allData.length; r++) {
-        var row = allData[r];
-        if (String(row[statusCol]) === 'In Progress' && String(row[auditorCol]) === auditor) {
-          var items = [];
-          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(e) {}
-          drafts.push({
-            sessionId: String(row[sessionIdCol]),
-            auditor: String(row[auditorCol]),
-            vendor: String(row[vendorCol]),
-            tanggalIncoming: String(row[tanggalCol]),
-            savedAt: String(row[timestampCol]),
-            itemCount: items.length,
-          });
-        }
-      }
-      return jsonResponse({ status: 'ok', drafts: drafts });
-    }
-
-    // ── ACTION: Get full draft detail by sessionId ─────────────────
-    if (e && e.parameter && e.parameter.action === 'getDraftDetail') {
-      const sessionId = e.parameter.sessionId || '';
-      const ss = SpreadsheetApp.openById(activeId);
-      const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
-      const allData = sessionSheet.getDataRange().getValues();
-      const headers = allData[0];
-      const sessionIdCol = headers.indexOf('SessionId');
-      const itemsJsonCol = headers.indexOf('ItemsJSON');
-      const auditorCol = headers.indexOf('Auditor');
-      const vendorCol = headers.indexOf('Vendor');
-      const tanggalCol = headers.indexOf('TanggalIncoming');
       const tanggalInsCol = headers.indexOf('TanggalInspection');
       const bucketCol = headers.indexOf('Bucket');
       const styleCol = headers.indexOf('StyleNumber');
       const modelCol = headers.indexOf('ModelName');
       const matTypeCol = headers.indexOf('MaterialType');
+      const sessionIdCol = headers.indexOf('SessionId');
+      const timestampCol = headers.indexOf('Timestamp');
+      const itemsJsonCol = headers.indexOf('ItemsJSON');
+
+      const sessionsMap = {};
       for (var r = 1; r < allData.length; r++) {
         var row = allData[r];
-        if (String(row[sessionIdCol]) === sessionId) {
-          var items = [];
-          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(e2) {}
-          return jsonResponse({
-            status: 'ok',
-            draft: {
-              sessionId: sessionId,
-              auditor: String(row[auditorCol]),
-              vendor: String(row[vendorCol]),
-              tanggalIncoming: String(row[tanggalCol]),
-              tanggalInspection: String(row[tanggalInsCol]),
-              tanggalBucket: String(row[bucketCol]),
-              styleNumber: String(row[styleCol]),
-              modelName: String(row[modelCol]),
-              materialType: String(row[matTypeCol]),
+        var st = String(row[statusCol] || '').trim();
+        if (st === 'In-Progress' || st === 'In Progress') {
+          var sid = String(row[sessionIdCol]);
+          if (!sessionsMap[sid]) {
+            var items = [];
+            try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(errItems) {}
+            sessionsMap[sid] = {
+              sessionId: sid,
+              timestamp: String(row[timestampCol] || ''),
+              tanggalIncoming: String(row[tanggalCol] || ''),
+              tanggalInspection: String(row[tanggalInsCol] || ''),
+              tanggalBucket: String(row[bucketCol] || ''),
+              materialType: String(row[matTypeCol] || ''),
+              auditor: String(row[auditorCol] || ''),
+              vendor: String(row[vendorCol] || ''),
+              styleNumber: String(row[styleCol] || ''),
+              modelName: String(row[modelCol] || ''),
+              status: st,
               items: items,
-            }
-          });
+            };
+          }
         }
       }
-      return jsonResponse({ status: 'error', error: 'Draft tidak ditemukan.' });
+
+      var sessionList = Object.keys(sessionsMap).map(function(k) { return sessionsMap[k]; });
+      return jsonResponse({ status: 'ok', sessions: sessionList });
     }
 
     const ss             = SpreadsheetApp.openById(activeId);

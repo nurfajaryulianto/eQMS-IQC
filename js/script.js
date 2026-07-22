@@ -23,9 +23,6 @@ let reworkLog = [];
 let inspectionItems = []; 
 let editingItemIndex = null;
 
-// --- STATE UNTUK DRAFT (IN PROGRESS) ---
-let activeDraftSessionId = null; // baseSessionId dari GAS saat ada draft aktif
-
 const qtyInspectOutputs = {
     'pass': 0,
     'defect': 0
@@ -804,6 +801,7 @@ async function saveData() {
         "pass": qtyInspectOutputs['pass'],
         "defect": qtyInspectOutputs['defect'],
         approvedByLeader: leaderSelect ? leaderSelect.value : '',
+        status: document.getElementById('inspection-status')?.value || 'Done',
         file_data: fileData,
         file_name: fileName,
         file_type: fileType,
@@ -835,10 +833,7 @@ async function saveData() {
 
         const response = await fetch(GAS_URL, {
             method: "POST",
-            body: JSON.stringify({
-                ...dataToSend,
-                ...(activeDraftSessionId ? { action: 'updateSessionStatus', draftSessionId: activeDraftSessionId } : {})
-            }),
+            body: JSON.stringify(dataToSend),
         });
         const resultText = await response.text();
         console.log("Respons server:", resultText);
@@ -846,9 +841,6 @@ async function saveData() {
         try { parsedResult = JSON.parse(resultText); } catch { /* plain text response */ }
         const isSuccess = response.ok && (parsedResult.status === 'ok' || resultText.toLowerCase().includes('berhasil'));
         if (isSuccess) {
-            activeDraftSessionId = null;
-            const indicator = document.getElementById('active-draft-indicator');
-            if (indicator) indicator.classList.add('hidden');
             await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
             resetAllFields();
         } else {
@@ -1582,16 +1574,14 @@ async function initApp() {
         btn.addEventListener("click", saveData);
     });
 
-    // --- Wire Simpan Sementara ---
-    const simpanSementaraBtn = document.getElementById('simpan-sementara-btn');
-    if (simpanSementaraBtn) {
-        simpanSementaraBtn.addEventListener('click', handleSaveInProgress);
+    const refreshInProgBtn = document.getElementById('in-progress-refresh-btn');
+    if (refreshInProgBtn) {
+        refreshInProgBtn.addEventListener('click', () => window.loadInProgressSessions());
     }
 
-    // --- Wire Draft Banner Button ---
-    const draftBannerBtn = document.getElementById('draft-banner-btn');
-    if (draftBannerBtn) {
-        draftBannerBtn.addEventListener('click', () => showDraftSelectModal());
+    const inProgSearch = document.getElementById('in-progress-search');
+    if (inProgSearch) {
+        inProgSearch.addEventListener('input', () => renderInProgressTable(allInProgressSessions));
     }
 
     const statisticButton = document.querySelector('.statistic-button');
@@ -1609,9 +1599,6 @@ async function initApp() {
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
 
-    // Check for in-progress drafts for this inspector
-    checkForDrafts();
-
     console.log("Aplikasi berhasil diinisialisasi.");
 }
 
@@ -1619,220 +1606,147 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 
 // ===========================================
-// DRAFT / IN-PROGRESS FEATURE
+// IN-PROGRESS MONITORING FEATURE
 // ===========================================
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec";
 
-/**
- * Called on init — queries GAS for any In Progress sessions belonging to this inspector.
- * If found, shows the draft banner.
- */
-async function checkForDrafts() {
-    if (UI_TEST_MODE) return;
-    const user = getUser();
-    if (!user) return;
-    const auditor = user.user_metadata?.display_name || user.user_metadata?.nik || '';
-    if (!auditor) return;
+let allInProgressSessions = [];
+
+/** Load all In-Progress sessions from GAS or mock data */
+window.loadInProgressSessions = async function() {
+    const tbody = document.getElementById('in-progress-tbody');
+    const badge = document.getElementById('in-progress-count-badge');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Memuat data In-Progress...</td></tr>';
 
     try {
-        const url = `${GAS_URL}?action=getDraftSessions&auditor=${encodeURIComponent(auditor)}`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.drafts && data.drafts.length > 0) {
-            window.__pendingDrafts = data.drafts;
-            showDraftBanner(data.drafts.length);
-            renderDashboardDraftWidget(data.drafts);
-        }
-    } catch (e) {
-        console.warn('[Draft] Gagal mengecek draft:', e);
-    }
-}
-
-/** Show the amber banner at the top of the dashboard form. */
-function showDraftBanner(count) {
-    const banner = document.getElementById('draft-notification-banner');
-    if (!banner) return;
-    const countEl = document.getElementById('draft-banner-count');
-    if (countEl) countEl.textContent = count;
-    banner.classList.remove('hidden');
-}
-
-/** Hide the draft banner. */
-function hideDraftBanner() {
-    const banner = document.getElementById('draft-notification-banner');
-    if (banner) banner.classList.add('hidden');
-}
-
-/** Render the "Inspeksi Tertunda" widget on the Dashboard page. */
-function renderDashboardDraftWidget(drafts) {
-    const container = document.getElementById('dashboard-draft-list');
-    if (!container) return;
-    const widget = document.getElementById('dashboard-draft-widget');
-    if (widget) widget.classList.remove('hidden');
-    container.innerHTML = drafts.map(d => `
-        <div class="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
-            <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-slate-800 truncate">${d.vendor || '—'}</p>
-                <p class="text-xs text-slate-500">${d.tanggalIncoming || '—'} · ${d.itemCount || 0} item</p>
-            </div>
-            <button onclick="window.loadDraft('${d.sessionId}')"
-                class="flex-shrink-0 text-xs font-semibold px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg transition-colors cursor-pointer">
-                Lanjutkan
-            </button>
-        </div>
-    `).join('');
-}
-
-/** Open the draft selection modal. */
-function showDraftSelectModal() {
-    const modal = document.getElementById('draft-select-modal');
-    if (!modal) return;
-    const listEl = document.getElementById('draft-modal-list');
-    const drafts = window.__pendingDrafts || [];
-    if (listEl) {
-        if (!drafts.length) {
-            listEl.innerHTML = '<p class="text-sm text-slate-400 text-center py-6">Tidak ada inspeksi yang tertunda.</p>';
+        if (UI_TEST_MODE) {
+            allInProgressSessions = [
+                {
+                    sessionId: 'SESS-INSP-001',
+                    tanggalIncoming: '2026-07-20',
+                    vendor: 'PT Forward Subcont',
+                    materialType: 'upper',
+                    styleNumber: 'NK-DYN-01',
+                    modelName: 'NIKE DYNAMO FREE',
+                    auditor: 'Administrator',
+                    status: 'In-Progress',
+                    items: [
+                        { component: 'Vamp', process: 'Stitching', qtyIncoming: 500, qtyInspect: 100, pass: 95, defect: 5 }
+                    ]
+                }
+            ];
         } else {
-            listEl.innerHTML = drafts.map(d => `
-                <div class="flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-slate-800">${d.vendor || '—'}</p>
-                        <p class="text-xs text-slate-500">${d.tanggalIncoming || '—'} · ${d.itemCount || 0} item · Disimpan: ${d.savedAt ? new Date(d.savedAt).toLocaleString('id-ID') : '—'}</p>
-                    </div>
-                    <button onclick="window.loadDraft('${d.sessionId}'); document.getElementById('draft-select-modal').classList.add('hidden');"
-                        class="flex-shrink-0 text-xs font-semibold px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer">
-                        Muat
-                    </button>
-                </div>
-            `).join('');
+            const url = `${GAS_URL}?action=getInProgressSessions`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Gagal mengambil data dari server');
+            const data = await res.json();
+            allInProgressSessions = data.sessions || [];
         }
-    }
-    modal.classList.remove('hidden');
-}
 
-/**
- * Load a specific draft session from GAS by sessionId.
- * Populates the form with the draft data.
- */
-window.loadDraft = async function(sessionId) {
-    try {
-        const url = `${GAS_URL}?action=getDraftDetail&sessionId=${encodeURIComponent(sessionId)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Server error');
-        const data = await res.json();
-        if (!data.draft) throw new Error(data.error || 'Draft tidak ditemukan');
-        applyDraftToForm(data.draft, sessionId);
+        renderInProgressTable(allInProgressSessions);
+
     } catch (e) {
-        await showAlert(`Gagal memuat draft: ${e.message}`, 'error');
+        console.error('[In-Progress] Gagal memuat:', e);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500 text-xs">Gagal memuat data: ${e.message}</td></tr>`;
     }
 };
 
-/** Populates the form from a loaded draft object. */
-function applyDraftToForm(draft, sessionId) {
-    activeDraftSessionId = sessionId;
+/** Render in-progress sessions table */
+function renderInProgressTable(sessions) {
+    const tbody = document.getElementById('in-progress-tbody');
+    const badge = document.getElementById('in-progress-count-badge');
+    const searchVal = (document.getElementById('in-progress-search')?.value || '').toLowerCase().trim();
 
-    // Restore header fields
+    const filtered = sessions.filter(s => {
+        if (!searchVal) return true;
+        return (s.vendor || '').toLowerCase().includes(searchVal) ||
+               (s.auditor || '').toLowerCase().includes(searchVal) ||
+               (s.styleNumber || '').toLowerCase().includes(searchVal) ||
+               (s.modelName || '').toLowerCase().includes(searchVal);
+    });
+
+    if (badge) badge.textContent = `${filtered.length} item In-Progress`;
+    if (!tbody) return;
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada sesi inspeksi In-Progress.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(s => `
+        <tr class="hover:bg-slate-50/80 transition-colors">
+            <td class="px-4 py-3 font-medium text-slate-900">${s.tanggalIncoming || '—'}</td>
+            <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
+            <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
+            <td class="px-4 py-3 text-slate-600">${s.styleNumber || '—'} / ${s.modelName || '—'}</td>
+            <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
+            <td class="px-4 py-3 text-center">
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    ${s.status || 'In-Progress'}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-right">
+                <button onclick="window.continueInProgressSession('${s.sessionId}')"
+                    class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs">
+                    <span class="material-symbols-outlined text-[14px]">edit_note</span>
+                    Muat & Lanjutkan
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+/** Continue/Load an in-progress session back into the form */
+window.continueInProgressSession = function(sessionId) {
+    const session = allInProgressSessions.find(s => String(s.sessionId) === String(sessionId));
+    if (!session) {
+        showAlert('Data sesi tidak ditemukan.', 'error');
+        return;
+    }
+
+    // Set header fields
     const mtSelect = document.getElementById('material-type');
-    if (mtSelect) { mtSelect.value = draft.materialType || ''; selectedMaterialType = draft.materialType || ''; }
+    if (mtSelect) { mtSelect.value = session.materialType || ''; selectedMaterialType = session.materialType || ''; }
     renderVendorButtons();
-    
-    // Select vendor button
-    if (draft.vendor) {
-        selectedVendor = draft.vendor;
+
+    if (session.vendor) {
+        selectedVendor = session.vendor;
         document.querySelectorAll('.vendor-sel-btn').forEach(btn => {
-            btn.classList.toggle('bg-emerald-600', btn.dataset.vendor === draft.vendor);
-            btn.classList.toggle('text-white', btn.dataset.vendor === draft.vendor);
-            btn.classList.toggle('border-emerald-600', btn.dataset.vendor === draft.vendor);
+            btn.classList.toggle('bg-emerald-600', btn.dataset.vendor === session.vendor);
+            btn.classList.toggle('text-white', btn.dataset.vendor === session.vendor);
+            btn.classList.toggle('border-emerald-600', btn.dataset.vendor === session.vendor);
         });
         if (addItemBtn) addItemBtn.disabled = false;
     }
 
     const tinEl = document.getElementById('tanggal-incoming');
-    if (tinEl && draft.tanggalIncoming) tinEl.value = draft.tanggalIncoming;
+    if (tinEl && session.tanggalIncoming) tinEl.value = session.tanggalIncoming;
     const tinsEl = document.getElementById('tanggal-inspection');
-    if (tinsEl && draft.tanggalInspection) tinsEl.value = draft.tanggalInspection;
+    if (tinsEl && session.tanggalInspection) tinsEl.value = session.tanggalInspection;
     const tbEl = document.getElementById('tanggal-bucket');
-    if (tbEl && draft.tanggalBucket) tbEl.value = draft.tanggalBucket;
+    if (tbEl && session.tanggalBucket) tbEl.value = session.tanggalBucket;
     const styleEl = document.getElementById('style-number');
-    if (styleEl && draft.styleNumber) styleEl.value = draft.styleNumber;
+    if (styleEl && session.styleNumber) styleEl.value = session.styleNumber;
     const modelEl = document.getElementById('model-name');
-    if (modelEl && draft.modelName) modelEl.value = draft.modelName;
+    if (modelEl && session.modelName) modelEl.value = session.modelName;
 
-    // Restore inspection items
-    if (Array.isArray(draft.items)) {
-        inspectionItems = draft.items;
+    const statusSelect = document.getElementById('inspection-status');
+    if (statusSelect) statusSelect.value = 'In-Progress';
+
+    if (Array.isArray(session.items)) {
+        inspectionItems = session.items;
     }
 
     renderInspectedItems();
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
-    hideDraftBanner();
 
-    // Show active draft indicator
-    const indicator = document.getElementById('active-draft-indicator');
-    if (indicator) {
-        indicator.textContent = `Draft aktif: ${draft.vendor || ''} (${draft.tanggalIncoming || ''})`;
-        indicator.classList.remove('hidden');
+    // Switch view to dashboard (Inspection Form)
+    if (typeof window.showView === 'function') {
+        window.showView('dashboard');
     }
 
-    showAlert('Draft berhasil dimuat! Lanjutkan pengisian dan klik SIMPAN jika sudah selesai.', 'success', 'Draft Dimuat');
-}
-
-/**
- * "Simpan Sementara" handler — sends current form data to GAS with status In Progress.
- */
-async function handleSaveInProgress() {
-    if (!inspectionItems.length) {
-        await showAlert('Tambahkan minimal 1 item sebelum menyimpan sementara.', 'warning', 'Form Belum Lengkap');
-        return;
-    }
-    const auditor = document.getElementById('auditor')?.value || '';
-    const vendor = selectedVendor;
-    if (!vendor || !auditor) {
-        await showAlert('Pastikan Auditor dan Vendor sudah dipilih.', 'warning', 'Form Belum Lengkap');
-        return;
-    }
-
-    const btn = document.getElementById('simpan-sementara-btn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
-
-    const payload = {
-        action: 'saveInProgress',
-        timestamp: new Date().toISOString(),
-        auditor,
-        tanggalIncoming: document.getElementById('tanggal-incoming')?.value || '',
-        tanggalInspection: document.getElementById('tanggal-inspection')?.value || '',
-        tanggalBucket: document.getElementById('tanggal-bucket')?.value || '',
-        materialType: selectedMaterialType || '',
-        vendor,
-        styleNumber: document.getElementById('style-number')?.value || '',
-        modelName: document.getElementById('model-name')?.value || '',
-        items: inspectionItems,
-    };
-
-    try {
-        if (UI_TEST_MODE) {
-            await showAlert('[TEST MODE] Draft disimpan secara lokal (simulasi).', 'success', 'Simpan Sementara');
-            activeDraftSessionId = 'TEST-DRAFT-' + Date.now();
-        } else {
-            const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const result = await res.json();
-            if (result.status !== 'ok') throw new Error(result.message || 'Gagal menyimpan');
-            activeDraftSessionId = result.sessionId;
-            // Refresh pending drafts list
-            window.__pendingDrafts = (window.__pendingDrafts || []).filter(d => d.sessionId !== activeDraftSessionId);
-            const indicator = document.getElementById('active-draft-indicator');
-            if (indicator) {
-                indicator.textContent = `Draft aktif: ${vendor} (${payload.tanggalIncoming})`;
-                indicator.classList.remove('hidden');
-            }
-            await showAlert('Inspeksi disimpan sementara! Buka kembali aplikasi besok untuk melanjutkan.', 'success', 'Tersimpan Sementara ✓');
-        }
-    } catch (e) {
-        await showAlert(`Gagal menyimpan sementara: ${e.message}`, 'error');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Simpan Sementara'; }
-    }
-}
+    showAlert(`Sesi inspeksi ${session.vendor} berhasil dimuat ke form!`, 'success', 'Sesi Dimuat');
+};
