@@ -239,15 +239,6 @@ function setSyncStatus(text, state) {
     if (iconEl) iconEl.textContent = s.icon;
 }
 
-function getMaterialDisplayName(po) {
-    if (!po) return '—';
-    let rawMat = (po.material_name || '').trim();
-    let rawDesc = (po.item_description || '').trim();
-    if (!rawMat || rawMat === 'RM.' || rawMat === 'RM') {
-        return rawDesc || rawMat || '—';
-    }
-    return rawMat;
-}
 
 // ─── RENDER PO LIST ───────────────────────────────────────────
 
@@ -294,8 +285,6 @@ function renderPOList(data) {
             card.style.cursor = 'default';
         }
 
-        const matDisplay = getMaterialDisplayName(po);
-
         card.innerHTML = `
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px;">
                 <div>
@@ -304,7 +293,7 @@ function renderPOList(data) {
                 </div>
                 <span style="font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap; flex-shrink:0;" class="${badgeClass}">${badgeText}</span>
             </div>
-            <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(matDisplay)}</div>
+            <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_name)}</div>
             <div style="font-size:11px; color:rgba(255, 255, 255, 0.5); margin-bottom:8px;">${esc(po.item_description)}</div>
             <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7);">
                 <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
@@ -359,7 +348,7 @@ function selectPO(po, cardEl) {
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
-                ${row('Material', getMaterialDisplayName(po))}
+                ${row('Material', po.material_name)}
                 ${row('Deskripsi', po.item_description)}
                 ${row('UOM', po.uom)}
                 ${row('Vendor', po.vendor_name)}

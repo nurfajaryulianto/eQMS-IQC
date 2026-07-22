@@ -136,8 +136,6 @@ function login(payload) {
   throw new Error('NIK atau password salah.');
 }
 
-// ─── GET MASTER DATA ──────────────────────────────────────────
-
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
   var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -146,91 +144,53 @@ function getMasterData(params) {
 
   var data        = sheet.getDataRange().getValues();
   var displayData = sheet.getDataRange().getDisplayValues();
-  if (data.length < 2) return { data: [] }; // 1 header row
+  if (data.length < 2) return { data: [] };
 
-  var headers = data[0];
-
-  function findColIndex(candList, fallbackIdx) {
-    for (var c = 0; c < candList.length; c++) {
-      var target = String(candList[c]).toLowerCase().replace(/[^a-z0-9]/g, '');
-      for (var i = 0; i < headers.length; i++) {
-        var h = String(headers[i] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (h === target) return i;
-      }
-    }
-    return fallbackIdx;
-  }
-
-  var poCol       = findColIndex(['po_number', 'ponumber', 'po_no', 'pono'], 12);
-  var matCol      = findColIndex(['material_name', 'materialname', 'material_nama', 'item_name'], 1);
-  var descCol     = findColIndex(['material_description', 'item_description', 'description', 'deskripsi'], 2);
-  var uomCol      = findColIndex(['uom'], 3);
-  var suppCol     = findColIndex(['supplier_name', 'supplier', 'vendor_name', 'vendor'], 4);
-  var codeCol     = findColIndex(['product_code', 'style', 'style_number'], 8);
-  var modelCol    = findColIndex(['model_name', 'model_shoe', 'shoe_model'], 9);
-  var batchCol    = findColIndex(['batch_size', 'planned_qty', 'qty'], 7);
-  var rDateCol    = findColIndex(['receive_date', 'received_date', 'tanggal_receive', 'tanggal_terima', 'incoming_date', 'tanggal_incoming'], 11);
-  var statusCol   = findColIndex(['status'], 18);
+  // Column indices are FIXED — they match MASTER_DATA_HEADERS exactly:
+  // 0:no  1:material_name  2:material_description  3:uom  4:supplier
+  // 5:supplier_name  6:po_area  7:batch_size  8:product_code  9:model_name
+  // 10:bucket  11:receive_date  12:po_number  13:shipment_number
+  // 14:no_bc  15:bc_type  16:receive_number  17:material_type
+  // 18:status  19:uploaded_by  20:uploaded_at
 
   var result = [];
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
-    var dispRow = displayData[r];
+    var disp = displayData[r];
 
-    function getStr(cIdx) {
-      if (cIdx === -1) return '';
-      var val = row[cIdx];
-      var disp = (dispRow && dispRow[cIdx] != null) ? String(dispRow[cIdx]).trim() : '';
+    var poVal = String(row[12] || '').trim();
+    if (!poVal) continue; // skip rows without PO number
 
-      if (val instanceof Date) {
-        try {
-          return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        } catch(err) {
-          return val.toISOString().split('T')[0];
-        }
-      }
-      if (disp && disp !== 'null' && disp !== 'undefined' && disp !== '—') {
-        if (disp.includes('T')) return disp.split('T')[0];
-        return disp;
-      }
-      if (val != null && val !== '') {
-        var str = String(val).trim();
-        if (str.includes('T')) return str.split('T')[0];
-        return str;
-      }
-      return '';
-    }
-
-    var st = (getStr(statusCol) || 'pending').toLowerCase();
+    var st = String(row[18] || 'pending').toLowerCase().trim();
     if (statusFilter !== 'all' && st !== statusFilter) continue;
 
-    var poVal = getStr(poCol) || getStr(12);
-    if (!poVal && getStr(matCol) === '' && getStr(1) === '') continue; // skip completely empty rows
-
-    var rawMat = getStr(matCol) || getStr(1);
-    var rawDesc = getStr(descCol) || getStr(2);
-    
-    // If material_name is 'RM.' or 'RM' or empty, fallback to material_description
-    var finalMatName = rawMat;
-    if (!finalMatName || finalMatName.trim() === 'RM.' || finalMatName.trim() === 'RM') {
-      finalMatName = rawDesc || rawMat || '—';
+    // For receive_date: prefer formatted display value, handle Date objects
+    var rdRaw = row[11];
+    var rdVal = '';
+    if (rdRaw instanceof Date) {
+      try {
+        rdVal = Utilities.formatDate(rdRaw, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } catch(e) {
+        rdVal = rdRaw.toISOString().split('T')[0];
+      }
+    } else if (disp[11] && disp[11] !== '' && disp[11] !== 'null') {
+      rdVal = disp[11];
+    } else if (rdRaw != null && rdRaw !== '') {
+      rdVal = String(rdRaw).trim();
     }
 
-    var rDateVal = getStr(rDateCol) || getStr(11);
-    var vendorVal = getStr(suppCol) || getStr(5) || getStr(4);
-
     result.push({
-      po_number: poVal,
-      material_name: finalMatName,
-      item_description: rawDesc,
-      uom: getStr(uomCol) || getStr(3),
-      vendor_name: vendorVal,
-      style: getStr(codeCol) || getStr(8),
-      model_shoe: getStr(modelCol) || getStr(9),
-      planned_qty: Number(row[batchCol !== -1 ? batchCol : 7]) || 0,
-      receive_date: rDateVal,
-      status: st,
+      po_number:        poVal,
+      material_name:    String(row[1] || '').trim(),
+      item_description: String(row[2] || '').trim(),
+      uom:              String(row[3] || '').trim(),
+      vendor_name:      String(row[5] || row[4] || '').trim(),
+      style:            String(row[8] || '').trim(),
+      model_shoe:       String(row[9] || '').trim(),
+      planned_qty:      Number(row[7]) || 0,
+      receive_date:     rdVal,
+      status:           st,
     });
   }
 
