@@ -303,43 +303,105 @@ function doGet(e) {
       const ss = SpreadsheetApp.openById(activeId);
       const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
       const allData = sessionSheet.getDataRange().getValues();
+      if (!allData || allData.length < 2) {
+        return jsonResponse({ status: 'ok', sessions: [] });
+      }
+
       const headers = allData[0];
-      const statusCol = headers.indexOf('Status');
-      const auditorCol = headers.indexOf('Auditor');
-      const vendorCol = headers.indexOf('Vendor');
-      const tanggalCol = headers.indexOf('TanggalIncoming');
-      const tanggalInsCol = headers.indexOf('TanggalInspection');
-      const bucketCol = headers.indexOf('Bucket');
-      const styleCol = headers.indexOf('StyleNumber');
-      const modelCol = headers.indexOf('ModelName');
-      const matTypeCol = headers.indexOf('MaterialType');
-      const sessionIdCol = headers.indexOf('SessionId');
-      const timestampCol = headers.indexOf('Timestamp');
-      const itemsJsonCol = headers.indexOf('ItemsJSON');
+      
+      // Helper function for flexible, case-insensitive column matching
+      function findColIndex(candList) {
+        for (var c = 0; c < candList.length; c++) {
+          var target = String(candList[c]).toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (var i = 0; i < headers.length; i++) {
+            var h = String(headers[i] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (h === target) return i;
+          }
+        }
+        return -1;
+      }
+
+      const sessionIdCol  = findColIndex(['SessionId', 'SessionID', 'ID']);
+      const timestampCol  = findColIndex(['Timestamp', 'timeStamp', 'Time']);
+      const tanggalCol    = findColIndex(['TanggalIncoming', 'Date', 'Tanggal', 'Tanggal Incoming']);
+      const matTypeCol    = findColIndex(['MaterialType', 'Material Type']);
+      const auditorCol    = findColIndex(['Auditor', 'User Login', 'UserLogin', 'User']);
+      const vendorCol     = findColIndex(['Vendor']);
+      const styleCol      = findColIndex(['StyleNumber', 'Style Number', 'Style']);
+      const modelCol      = findColIndex(['ModelName', 'Model']);
+      const componentCol  = findColIndex(['Component']);
+      const processCol    = findColIndex(['Process']);
+      const qtyIncCol     = findColIndex(['Qty Incoming', 'QtyIncoming']);
+      const qtyInspCol    = findColIndex(['Qty Inspect', 'QtyInspect']);
+      const passCol       = findColIndex(['Qty Pass', 'QtyPass', 'Pass']);
+      const defectCol     = findColIndex(['Qty Defect', 'QtyDefect', 'Defect']);
+      const tanggalInsCol = findColIndex(['TanggalInspection', 'TanggalInspect']);
+      const bucketCol     = findColIndex(['Bucket', 'TanggalInspectBucket']);
+      const statusCol     = findColIndex(['Status']);
+      const itemsJsonCol  = findColIndex(['ItemsJSON']);
 
       const sessionsMap = {};
       for (var r = 1; r < allData.length; r++) {
         var row = allData[r];
-        var st = String(row[statusCol] || '').trim();
+        
+        var rawSid = sessionIdCol !== -1 ? String(row[sessionIdCol] || '').trim() : '';
+        var sid = rawSid || ('ROW-' + r);
+
+        var st = statusCol !== -1 ? String(row[statusCol] || '').trim() : 'Done';
         if (!st) st = 'Done';
-        var sid = String(row[sessionIdCol]);
+
         if (!sessionsMap[sid]) {
           var items = [];
-          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(errItems) {}
+          if (itemsJsonCol !== -1 && row[itemsJsonCol]) {
+            try { items = JSON.parse(String(row[itemsJsonCol])); } catch(errItems) {}
+          }
+          
           sessionsMap[sid] = {
             sessionId: sid,
-            timestamp: String(row[timestampCol] || ''),
-            tanggalIncoming: String(row[tanggalCol] || ''),
-            tanggalInspection: String(row[tanggalInsCol] || ''),
-            tanggalBucket: String(row[bucketCol] || ''),
-            materialType: String(row[matTypeCol] || ''),
-            auditor: String(row[auditorCol] || ''),
-            vendor: String(row[vendorCol] || ''),
-            styleNumber: String(row[styleCol] || ''),
-            modelName: String(row[modelCol] || ''),
+            timestamp: timestampCol !== -1 ? String(row[timestampCol] || '') : '',
+            tanggalIncoming: tanggalCol !== -1 ? String(row[tanggalCol] || '') : '',
+            tanggalInspection: tanggalInsCol !== -1 ? String(row[tanggalInsCol] || '') : '',
+            tanggalBucket: bucketCol !== -1 ? String(row[bucketCol] || '') : '',
+            materialType: matTypeCol !== -1 ? String(row[matTypeCol] || '') : '',
+            auditor: auditorCol !== -1 ? String(row[auditorCol] || '') : '',
+            vendor: vendorCol !== -1 ? String(row[vendorCol] || '') : '',
+            styleNumber: styleCol !== -1 ? String(row[styleCol] || '') : '',
+            modelName: modelCol !== -1 ? String(row[modelCol] || '') : '',
             status: st,
             items: items,
           };
+        } else {
+          // Update missing fields if subsequent rows have details
+          if (!sessionsMap[sid].styleNumber && styleCol !== -1 && row[styleCol]) sessionsMap[sid].styleNumber = String(row[styleCol]);
+          if (!sessionsMap[sid].modelName && modelCol !== -1 && row[modelCol]) sessionsMap[sid].modelName = String(row[modelCol]);
+          if (!sessionsMap[sid].auditor && auditorCol !== -1 && row[auditorCol]) sessionsMap[sid].auditor = String(row[auditorCol]);
+          if (!sessionsMap[sid].tanggalIncoming && tanggalCol !== -1 && row[tanggalCol]) sessionsMap[sid].tanggalIncoming = String(row[tanggalCol]);
+          if (!sessionsMap[sid].materialType && matTypeCol !== -1 && row[matTypeCol]) sessionsMap[sid].materialType = String(row[matTypeCol]);
+        }
+
+        // If row contains item details (flat sheet format), push item
+        if (componentCol !== -1 && row[componentCol]) {
+          var comp = String(row[componentCol] || '');
+          var proc = processCol !== -1 ? String(row[processCol] || '') : '';
+          var qInc = qtyIncCol !== -1 ? Number(row[qtyIncCol]) || 0 : 0;
+          var qInsp = qtyInspCol !== -1 ? Number(row[qtyInspCol]) || 0 : 0;
+          var qPass = passCol !== -1 ? Number(row[passCol]) || 0 : 0;
+          var qDef = defectCol !== -1 ? Number(row[defectCol]) || 0 : 0;
+
+          var exists = sessionsMap[sid].items.some(function(it) {
+            return it.component === comp && it.process === proc;
+          });
+
+          if (!exists) {
+            sessionsMap[sid].items.push({
+              component: comp,
+              process: proc,
+              qtyIncoming: qInc,
+              qtyInspect: qInsp,
+              pass: qPass,
+              defect: qDef
+            });
+          }
         }
       }
 

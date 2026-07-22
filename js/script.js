@@ -1747,12 +1747,25 @@ function renderInspectionResultTable(sessions) {
             <span class="text-xs text-slate-400 font-medium">Tersimpan</span>
         `;
 
+        let rawDate = s.tanggalIncoming || '';
+        let cleanDate = '—';
+        if (rawDate) {
+            if (typeof rawDate === 'string' && rawDate.includes('T')) {
+                cleanDate = rawDate.split('T')[0];
+            } else {
+                cleanDate = String(rawDate).slice(0, 10);
+            }
+        }
+
+        const styleStr = s.styleNumber || (s.items && s.items[0] && s.items[0].styleNumber) || '—';
+        const modelStr = s.modelName || (s.items && s.items[0] && s.items[0].modelName) || '—';
+
         return `
             <tr class="hover:bg-slate-50/80 transition-colors">
-                <td class="px-4 py-3 font-medium text-slate-900">${s.tanggalIncoming || '—'}</td>
+                <td class="px-4 py-3 font-medium text-slate-900">${cleanDate}</td>
                 <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
                 <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
-                <td class="px-4 py-3 text-slate-600">${s.styleNumber || '—'} / ${s.modelName || '—'}</td>
+                <td class="px-4 py-3 text-slate-600">${styleStr} / ${modelStr}</td>
                 <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
                 <td class="px-4 py-3 text-center">${statusBadgeHTML}</td>
                 <td class="px-4 py-3 text-right">${actionBtnHTML}</td>
