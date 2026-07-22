@@ -1647,18 +1647,20 @@ let allInspectionSessions = [];
 window.loadInspectionResults = async function() {
     const tbody = document.getElementById('inspection-result-tbody');
     const badge = document.getElementById('inspection-result-count-badge');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Memuat data Inspection Result...</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs italic">Memuat data Inspection Result...</td></tr>';
 
     try {
         if (UI_TEST_MODE) {
             allInspectionSessions = [
                 {
                     sessionId: 'SESS-INSP-001',
-                    tanggalIncoming: '2026-07-20',
+                    tanggalInspection: '2026-07-20',
                     vendor: 'PT Forward Subcont',
                     materialType: 'upper',
                     styleNumber: 'NK-DYN-01',
                     modelName: 'NIKE DYNAMO FREE',
+                    component: 'Vamp',
+                    process: 'Stitching, Emboss',
                     auditor: 'Administrator',
                     status: 'In-Progress',
                     items: [
@@ -1667,11 +1669,13 @@ window.loadInspectionResults = async function() {
                 },
                 {
                     sessionId: 'SESS-INSP-002',
-                    tanggalIncoming: '2026-07-19',
+                    tanggalInspection: '2026-07-19',
                     vendor: 'PT Victory Leather',
                     materialType: 'bottom',
                     styleNumber: 'NK-AIR-90',
                     modelName: 'AIR MAX 90',
+                    component: 'Outsole',
+                    process: 'Cementing',
                     auditor: 'Administrator',
                     status: 'Done',
                     items: [
@@ -1691,7 +1695,7 @@ window.loadInspectionResults = async function() {
 
     } catch (e) {
         console.error('[Inspection Result] Gagal memuat:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500 text-xs">Gagal memuat data: ${e.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-500 text-xs">Gagal memuat data: ${e.message}</td></tr>`;
     }
 };
 
@@ -1703,11 +1707,20 @@ function renderInspectionResultTable(sessions) {
     const statusFilter = document.getElementById('inspection-result-status-filter')?.value || 'all';
 
     const filtered = sessions.filter(s => {
+        let compStr = s.component || '';
+        let procStr = s.process || '';
+        if (s.items && s.items.length > 0) {
+            if (!compStr) compStr = [...new Set(s.items.map(i => i.component).filter(Boolean))].join(', ');
+            if (!procStr) procStr = [...new Set(s.items.map(i => i.process).filter(Boolean))].join(', ');
+        }
+
         const matchesSearch = !searchVal || 
                (s.vendor || '').toLowerCase().includes(searchVal) ||
                (s.auditor || '').toLowerCase().includes(searchVal) ||
                (s.styleNumber || '').toLowerCase().includes(searchVal) ||
-               (s.modelName || '').toLowerCase().includes(searchVal);
+               (s.modelName || '').toLowerCase().includes(searchVal) ||
+               (compStr || '').toLowerCase().includes(searchVal) ||
+               (procStr || '').toLowerCase().includes(searchVal);
 
         const matchesStatus = statusFilter === 'all' || 
                (s.status || '').toLowerCase() === statusFilter.toLowerCase();
@@ -1719,7 +1732,7 @@ function renderInspectionResultTable(sessions) {
     if (!tbody) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada data hasil inspeksi.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada data hasil inspeksi.</td></tr>';
         return;
     }
 
@@ -1737,17 +1750,7 @@ function renderInspectionResultTable(sessions) {
             </span>
         `;
 
-        const actionBtnHTML = isInProgress ? `
-            <button onclick="window.continueInProgressSession('${s.sessionId}')"
-                class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs">
-                <span class="material-symbols-outlined text-[14px]">edit_note</span>
-                Muat & Lanjutkan
-            </button>
-        ` : `
-            <span class="text-xs text-slate-400 font-medium">Tersimpan</span>
-        `;
-
-        let rawDate = s.tanggalIncoming || '';
+        let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
         let cleanDate = '—';
         if (rawDate) {
             if (typeof rawDate === 'string' && rawDate.includes('T')) {
@@ -1760,15 +1763,25 @@ function renderInspectionResultTable(sessions) {
         const styleStr = s.styleNumber || (s.items && s.items[0] && s.items[0].styleNumber) || '—';
         const modelStr = s.modelName || (s.items && s.items[0] && s.items[0].modelName) || '—';
 
+        let compStr = s.component || '';
+        let procStr = s.process || '';
+        if (s.items && s.items.length > 0) {
+            if (!compStr) compStr = [...new Set(s.items.map(i => i.component).filter(Boolean))].join(', ');
+            if (!procStr) procStr = [...new Set(s.items.map(i => i.process).filter(Boolean))].join(', ');
+        }
+        if (!compStr) compStr = '—';
+        if (!procStr) procStr = '—';
+
         return `
             <tr class="hover:bg-slate-50/80 transition-colors">
                 <td class="px-4 py-3 font-medium text-slate-900">${cleanDate}</td>
                 <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
                 <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
                 <td class="px-4 py-3 text-slate-600">${styleStr} / ${modelStr}</td>
+                <td class="px-4 py-3 text-slate-600 font-medium">${compStr}</td>
+                <td class="px-4 py-3 text-slate-600 font-medium">${procStr}</td>
                 <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
                 <td class="px-4 py-3 text-center">${statusBadgeHTML}</td>
-                <td class="px-4 py-3 text-right">${actionBtnHTML}</td>
             </tr>
         `;
     }).join('');

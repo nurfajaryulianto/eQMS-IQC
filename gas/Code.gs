@@ -355,18 +355,25 @@ function doGet(e) {
           if (itemsJsonCol !== -1 && row[itemsJsonCol]) {
             try { items = JSON.parse(String(row[itemsJsonCol])); } catch(errItems) {}
           }
+
+          var tIns = tanggalInsCol !== -1 ? String(row[tanggalInsCol] || '') : '';
+          var tInc = tanggalCol !== -1 ? String(row[tanggalCol] || '') : '';
+          var tTime = timestampCol !== -1 ? String(row[timestampCol] || '') : '';
+          var tInspDate = tIns || tInc || tTime;
           
           sessionsMap[sid] = {
             sessionId: sid,
-            timestamp: timestampCol !== -1 ? String(row[timestampCol] || '') : '',
-            tanggalIncoming: tanggalCol !== -1 ? String(row[tanggalCol] || '') : '',
-            tanggalInspection: tanggalInsCol !== -1 ? String(row[tanggalInsCol] || '') : '',
+            timestamp: tTime,
+            tanggalIncoming: tInc,
+            tanggalInspection: tInspDate,
             tanggalBucket: bucketCol !== -1 ? String(row[bucketCol] || '') : '',
             materialType: matTypeCol !== -1 ? String(row[matTypeCol] || '') : '',
             auditor: auditorCol !== -1 ? String(row[auditorCol] || '') : '',
             vendor: vendorCol !== -1 ? String(row[vendorCol] || '') : '',
             styleNumber: styleCol !== -1 ? String(row[styleCol] || '') : '',
             modelName: modelCol !== -1 ? String(row[modelCol] || '') : '',
+            component: componentCol !== -1 ? String(row[componentCol] || '') : '',
+            process: processCol !== -1 ? String(row[processCol] || '') : '',
             status: st,
             items: items,
           };
@@ -376,7 +383,12 @@ function doGet(e) {
           if (!sessionsMap[sid].modelName && modelCol !== -1 && row[modelCol]) sessionsMap[sid].modelName = String(row[modelCol]);
           if (!sessionsMap[sid].auditor && auditorCol !== -1 && row[auditorCol]) sessionsMap[sid].auditor = String(row[auditorCol]);
           if (!sessionsMap[sid].tanggalIncoming && tanggalCol !== -1 && row[tanggalCol]) sessionsMap[sid].tanggalIncoming = String(row[tanggalCol]);
+          if (!sessionsMap[sid].tanggalInspection && (tanggalInsCol !== -1 && row[tanggalInsCol] || tanggalCol !== -1 && row[tanggalCol])) {
+            sessionsMap[sid].tanggalInspection = String((tanggalInsCol !== -1 && row[tanggalInsCol]) || row[tanggalCol]);
+          }
           if (!sessionsMap[sid].materialType && matTypeCol !== -1 && row[matTypeCol]) sessionsMap[sid].materialType = String(row[matTypeCol]);
+          if (!sessionsMap[sid].component && componentCol !== -1 && row[componentCol]) sessionsMap[sid].component = String(row[componentCol]);
+          if (!sessionsMap[sid].process && processCol !== -1 && row[processCol]) sessionsMap[sid].process = String(row[processCol]);
         }
 
         // If row contains item details (flat sheet format), push item
