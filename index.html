@@ -765,7 +765,7 @@
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
         </nav>
         <div class="flex items-center gap-1">
-            <button onclick="toggleMobileDrawer()" class="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors" title="Buka Menu">
+            <button onclick="toggleMobileDrawer()" class="mobile-drawer-toggle md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer" title="Buka Menu">
                 <span class="material-symbols-outlined text-[22px]">menu</span>
             </button>
             <button class="statistic-button p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
@@ -2240,6 +2240,12 @@
 
     <!-- SPA Navigation controller -->
     <script>
+        window.toggleMobileDrawer = function() {
+            const drawer = document.getElementById('mobile-drawer');
+            if (drawer) {
+                drawer.classList.toggle('hidden');
+            }
+        };
         let analyticsReady = false;
         let adminReady = false;
         const VIEW_ROLES = { 
@@ -2428,14 +2434,14 @@
             <span class="material-symbols-outlined text-[20px]">fact_check</span>
             <span class="text-[10px] font-semibold mt-0.5">Result</span>
         </button>
-        <button onclick="toggleMobileDrawer()" class="flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+        <button onclick="toggleMobileDrawer()" class="mobile-drawer-toggle flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
             <span class="material-symbols-outlined text-[20px]">menu</span>
             <span class="text-[10px] font-semibold mt-0.5">Menu</span>
         </button>
     </nav>
 
     <!-- ====== MOBILE DRAWER MENU ====== -->
-    <div id="mobile-drawer" onclick="if(event.target === this) toggleMobileDrawer()" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-xs flex justify-end transition-opacity">
+    <div id="mobile-drawer" onclick="if(event.target === this) toggleMobileDrawer()" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm flex justify-end transition-opacity">
         <div class="bg-white w-4/5 max-w-xs h-full shadow-2xl flex flex-col p-5 space-y-4" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div class="flex items-center gap-2">
@@ -2471,15 +2477,6 @@
             </div>
         </div>
     </div>
-
-    <script>
-        window.toggleMobileDrawer = function() {
-            const drawer = document.getElementById('mobile-drawer');
-            if (drawer) {
-                drawer.classList.toggle('hidden');
-            }
-        };
-    </script>
 
     <script src="js/script.js" type="module"></script>
 </body>
