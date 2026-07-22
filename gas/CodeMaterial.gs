@@ -329,6 +329,35 @@ function bulkUpsertMasterData(payload) {
         else newRow.push('');
       });
 
+      if (existingMap[po]) {
+        rejectedPOs.push(po);
+      } else {
+        existingMap[po] = true;
+        insertRows.push(newRow);
+      }
+    });
+
+    if (insertRows.length) {
+      var currentLastRow = sheet.getLastRow();
+      var startingNo = Math.max(0, currentLastRow - 1) + 1;
+      insertRows.forEach(function(r, idx) {
+        r[0] = startingNo + idx;
+      });
+      sheet.getRange(currentLastRow + 1, 1, insertRows.length, insertRows[0].length).setValues(insertRows);
+    }
+
+    return {
+      status:  'ok',
+      message: `Upload selesai: ${insertRows.length} baru, ${rejectedPOs.length} duplikat ditolak.`,
+      inserted: insertRows.length,
+      rejected: rejectedPOs,
+    };
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ─── GET INSPECTION DATA (untuk Dashboard) ────────────────────
 
 function getInspectionData(params) {
