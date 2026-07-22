@@ -165,19 +165,19 @@ function getMasterData(params) {
     var st = String(row[18] || 'pending').toLowerCase().trim();
     if (statusFilter !== 'all' && st !== statusFilter) continue;
 
-    // For receive_date: prefer formatted display value, handle Date objects
-    var rdRaw = row[11];
-    var rdVal = '';
-    if (rdRaw instanceof Date) {
+    // receive_date: use display value directly (most reliable for dates in Sheets)
+    var rdVal = disp[11] || '';
+    // If display value is empty but raw value exists, try to format it
+    if (!rdVal && row[11] != null && row[11] !== '') {
       try {
-        rdVal = Utilities.formatDate(rdRaw, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        if (row[11] instanceof Date || (typeof row[11] === 'object' && row[11].getTime)) {
+          rdVal = Utilities.formatDate(row[11], Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        } else {
+          rdVal = String(row[11]).trim();
+        }
       } catch(e) {
-        rdVal = rdRaw.toISOString().split('T')[0];
+        rdVal = String(row[11]).trim();
       }
-    } else if (disp[11] && disp[11] !== '' && disp[11] !== 'null') {
-      rdVal = disp[11];
-    } else if (rdRaw != null && rdRaw !== '') {
-      rdVal = String(rdRaw).trim();
     }
 
     result.push({
