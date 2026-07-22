@@ -1368,6 +1368,12 @@ async function initApp() {
     const viewParam = urlParams.get('view');
     if (viewParam && typeof window.showView === 'function') {
         window.showView(viewParam);
+    } else {
+        // Refresh inspection results if currently on results view to apply correct default filters
+        const activeLink = document.querySelector('.nav-link.active');
+        if (activeLink && activeLink.dataset.view === 'inspection-result') {
+            window.loadInspectionResults();
+        }
     }
 
     // Tombol logout
@@ -1688,6 +1694,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec";
 
 let allInspectionSessions = [];
+let filterOptionsInitialized = false;
 
 /** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
 window.loadInspectionResults = async function() {
@@ -1777,17 +1784,17 @@ function populateFilterOptions() {
             auditorSelect.appendChild(opt);
         });
 
-        // Set default to current user if first load
-        if (!currentVal || currentVal === 'all') {
+        // Set default to current user only on first initialization
+        if (!filterOptionsInitialized) {
             const userDisplayName = window.__eqmsDisplayName || '';
-            const matched = auditors.find(a => a.toLowerCase() === userDisplayName.toLowerCase());
+            const matched = auditors.find(a => a.trim().toLowerCase() === userDisplayName.trim().toLowerCase());
             if (matched) {
                 auditorSelect.value = matched;
             } else {
                 auditorSelect.value = 'all';
             }
         } else {
-            if ([...auditorSelect.options].some(o => o.value === currentVal)) {
+            if (currentVal && [...auditorSelect.options].some(o => o.value === currentVal)) {
                 auditorSelect.value = currentVal;
             } else {
                 auditorSelect.value = 'all';
@@ -1812,6 +1819,8 @@ function populateFilterOptions() {
             vendorSelect.value = 'all';
         }
     }
+
+    filterOptionsInitialized = true;
 }
 
 /** Render inspection results gallery with status filter grouped by style/model */

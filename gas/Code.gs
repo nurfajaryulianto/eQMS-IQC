@@ -341,11 +341,11 @@ function doGet(e) {
       const statusCol     = findColIndex(['Status']);
       const itemsJsonCol  = findColIndex(['ItemsJSON']);
 
-      function getCellStr(rIndex, cIndex) {
+      function getCellStr(rIndex, cIndex, isDate) {
         if (cIndex === -1) return '';
         var disp = (displayData[rIndex] && displayData[rIndex][cIndex] != null) ? String(displayData[rIndex][cIndex]).trim() : '';
         if (disp) {
-          if (disp.includes('T')) return disp.split('T')[0];
+          if (isDate && disp.includes('T')) return disp.split('T')[0];
           return disp;
         }
         var val = allData[rIndex][cIndex];
@@ -358,7 +358,7 @@ function doGet(e) {
           }
         }
         var str = String(val).trim();
-        if (str.includes('T')) return str.split('T')[0];
+        if (isDate && str.includes('T')) return str.split('T')[0];
         return str;
       }
 
@@ -377,9 +377,9 @@ function doGet(e) {
             try { items = JSON.parse(String(row[itemsJsonCol])); } catch(errItems) {}
           }
 
-          var tIns = getCellStr(r, tanggalInsCol);
-          var tInc = getCellStr(r, tanggalCol);
-          var tTime = getCellStr(r, timestampCol);
+          var tIns = getCellStr(r, tanggalInsCol, true);
+          var tInc = getCellStr(r, tanggalCol, true);
+          var tTime = getCellStr(r, timestampCol, true);
           var tInspDate = tIns || tInc || tTime;
           
           sessionsMap[sid] = {
@@ -387,7 +387,7 @@ function doGet(e) {
             timestamp: tTime,
             tanggalIncoming: tInc,
             tanggalInspection: tInspDate,
-            tanggalBucket: getCellStr(r, bucketCol),
+            tanggalBucket: getCellStr(r, bucketCol, true),
             materialType: getCellStr(r, matTypeCol),
             auditor: getCellStr(r, auditorCol),
             vendor: getCellStr(r, vendorCol),
@@ -403,9 +403,9 @@ function doGet(e) {
           if (!sessionsMap[sid].styleNumber) sessionsMap[sid].styleNumber = getCellStr(r, styleCol);
           if (!sessionsMap[sid].modelName) sessionsMap[sid].modelName = getCellStr(r, modelCol);
           if (!sessionsMap[sid].auditor) sessionsMap[sid].auditor = getCellStr(r, auditorCol);
-          if (!sessionsMap[sid].tanggalIncoming) sessionsMap[sid].tanggalIncoming = getCellStr(r, tanggalCol);
+          if (!sessionsMap[sid].tanggalIncoming) sessionsMap[sid].tanggalIncoming = getCellStr(r, tanggalCol, true);
           if (!sessionsMap[sid].tanggalInspection) {
-            sessionsMap[sid].tanggalInspection = getCellStr(r, tanggalInsCol) || getCellStr(r, tanggalCol) || getCellStr(r, timestampCol);
+            sessionsMap[sid].tanggalInspection = getCellStr(r, tanggalInsCol, true) || getCellStr(r, tanggalCol, true) || getCellStr(r, timestampCol, true);
           }
           if (!sessionsMap[sid].materialType) sessionsMap[sid].materialType = getCellStr(r, matTypeCol);
           if (!sessionsMap[sid].component) sessionsMap[sid].component = getCellStr(r, componentCol);
