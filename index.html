@@ -765,18 +765,11 @@
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
         </nav>
         <div class="flex items-center gap-1">
-            <button onclick="toggleMobileDrawer()" class="mobile-drawer-toggle md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer" title="Buka Menu">
-                <span class="material-symbols-outlined text-[22px]">menu</span>
-            </button>
-            <button class="statistic-button p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
-                title="Lihat Statistik Data">
-                <span class="material-symbols-outlined text-[20px]">bar_chart</span>
-            </button>
             <span id="user-display" class="text-sm text-slate-600 font-medium px-2 hidden sm:inline"></span>
             <span id="user-role-badge"
                 class="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize"></span>
             <button id="logout-button" title="Logout"
-                class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+                class="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
                 <span class="material-symbols-outlined text-[20px]">logout</span>
             </button>
         </div>
@@ -2423,7 +2416,7 @@
     </div>
 
     <!-- ====== MOBILE BOTTOM NAVIGATION (Gestalt Principle) ====== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-2">
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-1">
         <button onclick="showView('dashboard')" data-view="dashboard" class="mobile-nav-link active flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
             <span class="material-symbols-outlined text-[20px]">edit_document</span>
             <span class="text-[10px] font-semibold mt-0.5">Form</span>
@@ -2436,49 +2429,15 @@
             <span class="material-symbols-outlined text-[20px]">fact_check</span>
             <span class="text-[10px] font-semibold mt-0.5">Result</span>
         </button>
-        <button onclick="toggleMobileDrawer()" class="mobile-drawer-toggle flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
-            <span class="material-symbols-outlined text-[20px]">menu</span>
-            <span class="text-[10px] font-semibold mt-0.5">Menu</span>
+        <button onclick="showView('defect-library')" data-view="defect-library" class="mobile-nav-link flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">menu_book</span>
+            <span class="text-[10px] font-semibold mt-0.5">Library</span>
+        </button>
+        <button onclick="showView('settings')" data-view="settings" class="mobile-nav-link flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">settings</span>
+            <span class="text-[10px] font-semibold mt-0.5">Settings</span>
         </button>
     </nav>
-
-    <!-- ====== MOBILE DRAWER MENU ====== -->
-    <div id="mobile-drawer" onclick="if(event.target === this) toggleMobileDrawer()" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-sm flex justify-end transition-opacity">
-        <div class="bg-white w-4/5 max-w-xs h-full shadow-2xl flex flex-col p-5 space-y-4" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-blue-600">verified</span>
-                    <span class="font-bold text-sm text-slate-900">IQC Subcont Menu</span>
-                </div>
-                <button onclick="toggleMobileDrawer()" class="text-slate-400 hover:text-slate-600 cursor-pointer p-1">
-                    <span class="material-symbols-outlined text-[20px]">close</span>
-                </button>
-            </div>
-            <div class="flex flex-col gap-1.5 pt-2 flex-1 overflow-y-auto">
-                <button onclick="showView('dashboard'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">edit_document</span> Inspection Form
-                </button>
-                <button onclick="showView('analytics'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">bar_chart</span> Dashboard
-                </button>
-                <button onclick="showView('inspection-result'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">fact_check</span> Inspection Result
-                </button>
-                <button onclick="showView('defect-library'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">menu_book</span> Defect Library
-                </button>
-                <button data-view="settings" onclick="showView('settings'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">settings</span> Settings
-                </button>
-                <button data-view="leader-monitor" onclick="showView('leader-monitor'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer" style="display:none">
-                    <span class="material-symbols-outlined text-[18px]">supervisor_account</span> Leader Monitor
-                </button>
-                <button data-view="admin" onclick="showView('admin'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer" style="display:none">
-                    <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin
-                </button>
-            </div>
-        </div>
-    </div>
 
     <script src="js/script.js" type="module"></script>
 </body>

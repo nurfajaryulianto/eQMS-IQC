@@ -1599,21 +1599,6 @@ async function initApp() {
         btn.addEventListener("click", saveData);
     });
 
-    // Mobile Drawer Toggle Handler
-    window.toggleMobileDrawer = function() {
-        const drawer = document.getElementById('mobile-drawer');
-        if (drawer) {
-            drawer.classList.toggle('hidden');
-        }
-    };
-
-    document.querySelectorAll('.mobile-drawer-toggle').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.toggleMobileDrawer();
-        });
-    });
-
     const refreshResultBtn = document.getElementById('inspection-result-refresh-btn');
     if (refreshResultBtn) {
         refreshResultBtn.addEventListener('click', () => window.loadInspectionResults());
