@@ -298,8 +298,8 @@ function doGet(e) {
       });
     }
 
-    // ── ACTION: Get all In-Progress sessions ─────────────────
-    if (e && e.parameter && e.parameter.action === 'getInProgressSessions') {
+    // ── ACTION: Get all Inspection Results (Done & In-Progress) ──
+    if (e && e.parameter && (e.parameter.action === 'getInspectionResults' || e.parameter.action === 'getInProgressSessions')) {
       const ss = SpreadsheetApp.openById(activeId);
       const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
       const allData = sessionSheet.getDataRange().getValues();
@@ -321,26 +321,25 @@ function doGet(e) {
       for (var r = 1; r < allData.length; r++) {
         var row = allData[r];
         var st = String(row[statusCol] || '').trim();
-        if (st === 'In-Progress' || st === 'In Progress') {
-          var sid = String(row[sessionIdCol]);
-          if (!sessionsMap[sid]) {
-            var items = [];
-            try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(errItems) {}
-            sessionsMap[sid] = {
-              sessionId: sid,
-              timestamp: String(row[timestampCol] || ''),
-              tanggalIncoming: String(row[tanggalCol] || ''),
-              tanggalInspection: String(row[tanggalInsCol] || ''),
-              tanggalBucket: String(row[bucketCol] || ''),
-              materialType: String(row[matTypeCol] || ''),
-              auditor: String(row[auditorCol] || ''),
-              vendor: String(row[vendorCol] || ''),
-              styleNumber: String(row[styleCol] || ''),
-              modelName: String(row[modelCol] || ''),
-              status: st,
-              items: items,
-            };
-          }
+        if (!st) st = 'Done';
+        var sid = String(row[sessionIdCol]);
+        if (!sessionsMap[sid]) {
+          var items = [];
+          try { items = JSON.parse(String(row[itemsJsonCol]) || '[]'); } catch(errItems) {}
+          sessionsMap[sid] = {
+            sessionId: sid,
+            timestamp: String(row[timestampCol] || ''),
+            tanggalIncoming: String(row[tanggalCol] || ''),
+            tanggalInspection: String(row[tanggalInsCol] || ''),
+            tanggalBucket: String(row[bucketCol] || ''),
+            materialType: String(row[matTypeCol] || ''),
+            auditor: String(row[auditorCol] || ''),
+            vendor: String(row[vendorCol] || ''),
+            styleNumber: String(row[styleCol] || ''),
+            modelName: String(row[modelCol] || ''),
+            status: st,
+            items: items,
+          };
         }
       }
 

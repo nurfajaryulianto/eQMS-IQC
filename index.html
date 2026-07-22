@@ -753,8 +753,8 @@
                 class="nav-link active h-full flex items-center px-3 text-sm cursor-pointer">Inspection Form</a>
             <a data-view="analytics" onclick="showView('analytics')"
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Dashboard</a>
-            <a data-view="in-progress" onclick="showView('in-progress')"
-                class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">In-Progress Monitor</a>
+            <a data-view="inspection-result" onclick="showView('inspection-result')"
+                class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Inspection Result</a>
             <a data-view="defect-library" onclick="showView('defect-library')"
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer">Defect Library</a>
             <a data-view="settings" onclick="showView('settings')"
@@ -765,6 +765,9 @@
                 class="nav-link h-full flex items-center px-3 text-sm cursor-pointer" style="display:none">Admin</a>
         </nav>
         <div class="flex items-center gap-1">
+            <button onclick="toggleMobileDrawer()" class="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors" title="Buka Menu">
+                <span class="material-symbols-outlined text-[22px]">menu</span>
+            </button>
             <button class="statistic-button p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
                 title="Lihat Statistik Data">
                 <span class="material-symbols-outlined text-[20px]">bar_chart</span>
@@ -1495,35 +1498,42 @@
                 </div>
             </div>
 
-            <!-- ====== VIEW: IN-PROGRESS MONITOR ====== -->
-            <div id="view-in-progress" class="app-view hidden p-4 lg:p-6">
+            <!-- ====== VIEW: INSPECTION RESULT ====== -->
+            <div id="view-inspection-result" class="app-view hidden p-4 lg:p-6 pb-20 md:pb-6">
                 <div class="max-w-[1400px] mx-auto flex flex-col gap-6">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-xl font-bold text-slate-900">In-Progress Monitoring Panel</h2>
-                            <p class="text-sm text-slate-500 mt-1">Monitor dan lanjutkan hasil pengecekan yang belum selesai.</p>
+                            <h2 class="text-xl font-bold text-slate-900">Inspection Result Panel</h2>
+                            <p class="text-sm text-slate-500 mt-1">Monitor hasil pengecekan yang sudah selesai (Done) maupun belum selesai (In-Progress).</p>
                         </div>
-                        <button id="in-progress-refresh-btn" class="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
+                        <button id="inspection-result-refresh-btn" class="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                             <span class="material-symbols-outlined text-[15px]">refresh</span> Refresh Data
                         </button>
                     </div>
 
-                    <!-- Search & Counter Card -->
+                    <!-- Search & Status Filter Card -->
                     <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-wrap gap-4 items-center justify-between">
                         <div class="flex items-center gap-3 flex-1 min-w-[240px]">
                             <div class="relative w-full max-w-xs">
                                 <span class="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">search</span>
-                                <input type="text" id="in-progress-search" placeholder="Cari Vendor, Auditor, Style..."
+                                <input type="text" id="inspection-result-search" placeholder="Cari Vendor, Auditor, Style, Model..."
                                     class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </div>
+                            <div class="min-w-[140px]">
+                                <select id="inspection-result-status-filter" class="w-full border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="all">Semua Status</option>
+                                    <option value="Done">Done (Selesai)</option>
+                                    <option value="In-Progress">In-Progress</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                            <span class="material-symbols-outlined text-[16px]">pending_actions</span>
-                            <span id="in-progress-count-badge">0 item In-Progress</span>
+                        <div class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px]">fact_check</span>
+                            <span id="inspection-result-count-badge">0 Hasil Inspeksi</span>
                         </div>
                     </div>
 
-                    <!-- In-Progress Table Card -->
+                    <!-- Inspection Result Table Card -->
                     <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
@@ -1538,10 +1548,10 @@
                                         <th class="px-4 py-3 text-right">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody id="in-progress-tbody" class="divide-y divide-slate-100 text-sm">
+                                <tbody id="inspection-result-tbody" class="divide-y divide-slate-100 text-sm">
                                     <tr>
                                         <td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">
-                                            Memuat data In-Progress...
+                                            Memuat data Inspection Result...
                                         </td>
                                     </tr>
                                 </tbody>
@@ -2247,6 +2257,7 @@
             if (view) view.classList.remove('hidden');
             document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
             document.querySelectorAll('.sidenav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
+            document.querySelectorAll('.mobile-nav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
             if (name === 'analytics' && !analyticsReady) {
                 analyticsReady = true;
                 import('./js/dashboard.js').then(m => m.initDashboard()).catch(e => console.error('Analytics init failed:', e));
@@ -2258,8 +2269,8 @@
                 adminReady = true;
                 import('./js/admin.js').then(m => m.initAdminPanel()).catch(e => console.error('Admin init failed:', e));
             }
-            if (name === 'in-progress') {
-                if (typeof window.loadInProgressSessions === 'function') window.loadInProgressSessions();
+            if (name === 'inspection-result') {
+                if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
             }
             if (name === 'settings') populateSettingsView();
         }
@@ -2342,11 +2353,20 @@
                             <option value="percent_1">Percentage (1%)</option>
                             <option value="percent_5">Percentage (5%)</option>
                             <option value="percent_20">Percentage (20%)</option>
+                            <option value="custom_pct">Custom Percentage (%)</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
+                    <div id="modal-custom-pct-container" class="hidden">
+                        <label for="modal-custom-pct" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Custom % Value</label>
+                        <div class="relative">
+                            <input type="number" id="modal-custom-pct" min="0" max="100" step="0.1" value="10" placeholder="e.g. 15"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 pr-7 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                            <span class="absolute right-3 top-2 text-xs text-slate-400 font-semibold">%</span>
+                        </div>
+                    </div>
                     <div>
                         <label for="modal-qty-inspect" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect</label>
                         <input type="number" id="modal-qty-inspect" min="0" value="0"
@@ -2394,7 +2414,70 @@
                 <button type="button" id="modal-save-item-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer">Simpan Item</button>
             </div>
         </div>
+    <!-- ====== MOBILE BOTTOM NAVIGATION (Gestalt Principle) ====== -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-2">
+        <button onclick="showView('dashboard')" data-view="dashboard" class="mobile-nav-link active flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">edit_document</span>
+            <span class="text-[10px] font-semibold mt-0.5">Form</span>
+        </button>
+        <button onclick="showView('analytics')" data-view="analytics" class="mobile-nav-link flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">bar_chart</span>
+            <span class="text-[10px] font-semibold mt-0.5">Dashboard</span>
+        </button>
+        <button onclick="showView('inspection-result')" data-view="inspection-result" class="mobile-nav-link flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">fact_check</span>
+            <span class="text-[10px] font-semibold mt-0.5">Result</span>
+        </button>
+        <button onclick="toggleMobileDrawer()" class="flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">menu</span>
+            <span class="text-[10px] font-semibold mt-0.5">Menu</span>
+        </button>
+    </nav>
+
+    <!-- ====== MOBILE DRAWER MENU ====== -->
+    <div id="mobile-drawer" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex justify-end">
+        <div class="bg-white w-4/5 max-w-xs h-full shadow-2xl flex flex-col p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600">verified</span>
+                    <span class="font-bold text-sm text-slate-900">IQC Subcont Menu</span>
+                </div>
+                <button onclick="toggleMobileDrawer()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            <div class="flex flex-col gap-1.5 pt-2 flex-1">
+                <button onclick="showView('dashboard'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">edit_document</span> Inspection Form
+                </button>
+                <button onclick="showView('analytics'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">bar_chart</span> Dashboard
+                </button>
+                <button onclick="showView('inspection-result'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">fact_check</span> Inspection Result
+                </button>
+                <button onclick="showView('defect-library'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">menu_book</span> Defect Library
+                </button>
+                <button onclick="showView('settings'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">settings</span> Settings
+                </button>
+                <button data-view="leader-monitor" onclick="showView('leader-monitor'); toggleMobileDrawer();" class="hidden flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">supervisor_account</span> Leader Monitor
+                </button>
+                <button data-view="admin" onclick="showView('admin'); toggleMobileDrawer();" class="hidden flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin
+                </button>
+            </div>
+        </div>
     </div>
+
+    <script>
+        window.toggleMobileDrawer = function() {
+            const drawer = document.getElementById('mobile-drawer');
+            if (drawer) drawer.classList.toggle('hidden');
+        };
+    </script>
 
     <script src="js/script.js" type="module"></script>
 </body>

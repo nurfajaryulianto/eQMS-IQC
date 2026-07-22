@@ -188,16 +188,23 @@ function renderModalProcessButtons() {
     filtered.forEach(p => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = p.name;
         btn.dataset.value = p.name;
-        btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
         
-        if (modalProcess === p.name) {
-            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
+        const isSelected = modalProcesses.includes(p.name);
+        if (isSelected) {
+            btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">check</span> ${p.name}`;
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer flex items-center gap-1';
+        } else {
+            btn.textContent = p.name;
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer flex items-center gap-1';
         }
         
         btn.addEventListener('click', () => {
-            modalProcess = p.name;
+            if (modalProcesses.includes(p.name)) {
+                modalProcesses = modalProcesses.filter(val => val !== p.name);
+            } else {
+                modalProcesses.push(p.name);
+            }
             updateModalProcessButtonsActiveState();
         });
         container.appendChild(btn);
@@ -206,10 +213,14 @@ function renderModalProcessButtons() {
 
 function updateModalProcessButtonsActiveState() {
     document.querySelectorAll('.modal-proc-btn').forEach(btn => {
-        if (btn.dataset.value === modalProcess) {
-            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
+        const val = btn.dataset.value;
+        const isSelected = modalProcesses.includes(val);
+        if (isSelected) {
+            btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">check</span> ${val}`;
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer flex items-center gap-1';
         } else {
-            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+            btn.textContent = val;
+            btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer flex items-center gap-1';
         }
     });
 }
@@ -998,9 +1009,9 @@ function renderInspectedItems() {
 
 // Modal Form State Variables
 let modalComponent = '';
-let modalProcess = '';
+let modalProcesses = [];
 let modalSelectedComponent = '';
-let modalSelectedProcess = '';
+let modalSelectedProcesses = [];
 let modalItemDefects = {}; 
 let modalPassVal = 0;
 let modalDefectVal = 0;
@@ -1018,7 +1029,7 @@ function openInspectionItemModal(index = null) {
     if (index === null) {
         modalTitle.textContent = 'Tambah Item Inspeksi';
         modalSelectedComponent = '';
-        modalSelectedProcess = '';
+        modalSelectedProcesses = [];
         modalItemDefects = {};
         modalPassVal = 0;
         modalDefectVal = 0;
@@ -1033,7 +1044,7 @@ function openInspectionItemModal(index = null) {
         modalTitle.textContent = 'Edit Item Inspeksi';
         const item = inspectionItems[index];
         modalSelectedComponent = item.component;
-        modalSelectedProcess = item.process;
+        modalSelectedProcesses = item.process ? item.process.split(',').map(s => s.trim()) : [];
         modalQtyIncomingVal = item.qtyIncoming || 0;
         modalQtyInspectVal = item.qtyInspect || 0;
         modalPassVal = item.pass || 0;
@@ -1057,6 +1068,10 @@ function openInspectionItemModal(index = null) {
     
     const inspectInput = document.getElementById('modal-qty-inspect');
     if (inspectInput) inspectInput.value = modalQtyInspectVal;
+
+    const customPctContainer = document.getElementById('modal-custom-pct-container');
+    const customPctInput = document.getElementById('modal-custom-pct');
+    if (customPctContainer) customPctContainer.classList.add('hidden');
     
     // Handle calculations inside modal
     const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
@@ -1066,14 +1081,21 @@ function openInspectionItemModal(index = null) {
         const incoming = parseInt(incomingInput.value, 10) || 0;
         
         if (mode === 'manual') {
+            if (customPctContainer) customPctContainer.classList.add('hidden');
             inspectInput.readOnly = false;
+        } else if (mode === 'custom_pct') {
+            if (customPctContainer) customPctContainer.classList.remove('hidden');
+            inspectInput.readOnly = true;
+            const pctVal = parseFloat(customPctInput?.value) || 0;
+            inspectInput.value = Math.ceil(incoming * (pctVal / 100));
         } else {
+            if (customPctContainer) customPctContainer.classList.add('hidden');
             inspectInput.readOnly = true;
             let pct = 0.10;
             if (mode === 'percent_1') pct = 0.01;
             else if (mode === 'percent_5') pct = 0.05;
             else if (mode === 'percent_20') pct = 0.20;
-            inspectInput.value = Math.round(incoming * pct);
+            inspectInput.value = Math.ceil(incoming * pct);
         }
         modalQtyIncomingVal = incoming;
         modalQtyInspectVal = parseInt(inspectInput.value, 10) || 0;
@@ -1086,6 +1108,9 @@ function openInspectionItemModal(index = null) {
     if (incomingInput) {
         incomingInput.oninput = updateModalQtyInspect;
     }
+    if (customPctInput) {
+        customPctInput.oninput = updateModalQtyInspect;
+    }
     if (inspectInput) {
         inspectInput.oninput = () => {
             modalQtyInspectVal = parseInt(inspectInput.value, 10) || 0;
@@ -1095,7 +1120,7 @@ function openInspectionItemModal(index = null) {
     
     // Render Modal Components Buttons
     modalComponent = modalSelectedComponent;
-    modalProcess = modalSelectedProcess;
+    modalProcesses = [...modalSelectedProcesses];
     renderModalComponentButtons(selectedVendor);
     renderModalProcessButtons();
     
@@ -1210,8 +1235,8 @@ function saveInspectionItem() {
         showAlert('Silakan pilih Component terlebih dahulu.', 'warning', 'Peringatan');
         return;
     }
-    if (!modalProcess) {
-        showAlert('Silakan pilih Process terlebih dahulu.', 'warning', 'Peringatan');
+    if (!modalProcesses || modalProcesses.length === 0) {
+        showAlert('Silakan pilih minimal 1 Process terlebih dahulu.', 'warning', 'Peringatan');
         return;
     }
     if (modalQtyIncomingVal <= 0) {
@@ -1233,7 +1258,7 @@ function saveInspectionItem() {
     
     const itemData = {
         component: modalComponent,
-        process: modalProcess,
+        process: modalProcesses.join(', '),
         qtyIncoming: modalQtyIncomingVal,
         qtyInspect: modalQtyInspectVal,
         pass: modalPassVal,
@@ -1574,14 +1599,19 @@ async function initApp() {
         btn.addEventListener("click", saveData);
     });
 
-    const refreshInProgBtn = document.getElementById('in-progress-refresh-btn');
-    if (refreshInProgBtn) {
-        refreshInProgBtn.addEventListener('click', () => window.loadInProgressSessions());
+    const refreshResultBtn = document.getElementById('inspection-result-refresh-btn');
+    if (refreshResultBtn) {
+        refreshResultBtn.addEventListener('click', () => window.loadInspectionResults());
     }
 
-    const inProgSearch = document.getElementById('in-progress-search');
-    if (inProgSearch) {
-        inProgSearch.addEventListener('input', () => renderInProgressTable(allInProgressSessions));
+    const resultSearch = document.getElementById('inspection-result-search');
+    if (resultSearch) {
+        resultSearch.addEventListener('input', () => renderInspectionResultTable(allInspectionSessions));
+    }
+
+    const resultStatusFilter = document.getElementById('inspection-result-status-filter');
+    if (resultStatusFilter) {
+        resultStatusFilter.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
     }
 
     const statisticButton = document.querySelector('.statistic-button');
@@ -1606,22 +1636,22 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 
 // ===========================================
-// IN-PROGRESS MONITORING FEATURE
+// INSPECTION RESULT FEATURE (DONE & IN-PROGRESS)
 // ===========================================
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec";
 
-let allInProgressSessions = [];
+let allInspectionSessions = [];
 
-/** Load all In-Progress sessions from GAS or mock data */
-window.loadInProgressSessions = async function() {
-    const tbody = document.getElementById('in-progress-tbody');
-    const badge = document.getElementById('in-progress-count-badge');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Memuat data In-Progress...</td></tr>';
+/** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
+window.loadInspectionResults = async function() {
+    const tbody = document.getElementById('inspection-result-tbody');
+    const badge = document.getElementById('inspection-result-count-badge');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Memuat data Inspection Result...</td></tr>';
 
     try {
         if (UI_TEST_MODE) {
-            allInProgressSessions = [
+            allInspectionSessions = [
                 {
                     sessionId: 'SESS-INSP-001',
                     tanggalIncoming: '2026-07-20',
@@ -1632,75 +1662,108 @@ window.loadInProgressSessions = async function() {
                     auditor: 'Administrator',
                     status: 'In-Progress',
                     items: [
-                        { component: 'Vamp', process: 'Stitching', qtyIncoming: 500, qtyInspect: 100, pass: 95, defect: 5 }
+                        { component: 'Vamp', process: 'Stitching, Emboss', qtyIncoming: 500, qtyInspect: 100, pass: 95, defect: 5 }
+                    ]
+                },
+                {
+                    sessionId: 'SESS-INSP-002',
+                    tanggalIncoming: '2026-07-19',
+                    vendor: 'PT Victory Leather',
+                    materialType: 'bottom',
+                    styleNumber: 'NK-AIR-90',
+                    modelName: 'AIR MAX 90',
+                    auditor: 'Administrator',
+                    status: 'Done',
+                    items: [
+                        { component: 'Outsole', process: 'Cementing', qtyIncoming: 1000, qtyInspect: 100, pass: 100, defect: 0 }
                     ]
                 }
             ];
         } else {
-            const url = `${GAS_URL}?action=getInProgressSessions`;
+            const url = `${GAS_URL}?action=getInspectionResults`;
             const res = await fetch(url);
             if (!res.ok) throw new Error('Gagal mengambil data dari server');
             const data = await res.json();
-            allInProgressSessions = data.sessions || [];
+            allInspectionSessions = data.sessions || [];
         }
 
-        renderInProgressTable(allInProgressSessions);
+        renderInspectionResultTable(allInspectionSessions);
 
     } catch (e) {
-        console.error('[In-Progress] Gagal memuat:', e);
+        console.error('[Inspection Result] Gagal memuat:', e);
         if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500 text-xs">Gagal memuat data: ${e.message}</td></tr>`;
     }
 };
 
-/** Render in-progress sessions table */
-function renderInProgressTable(sessions) {
-    const tbody = document.getElementById('in-progress-tbody');
-    const badge = document.getElementById('in-progress-count-badge');
-    const searchVal = (document.getElementById('in-progress-search')?.value || '').toLowerCase().trim();
+/** Render inspection results table with status filter */
+function renderInspectionResultTable(sessions) {
+    const tbody = document.getElementById('inspection-result-tbody');
+    const badge = document.getElementById('inspection-result-count-badge');
+    const searchVal = (document.getElementById('inspection-result-search')?.value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('inspection-result-status-filter')?.value || 'all';
 
     const filtered = sessions.filter(s => {
-        if (!searchVal) return true;
-        return (s.vendor || '').toLowerCase().includes(searchVal) ||
+        const matchesSearch = !searchVal || 
+               (s.vendor || '').toLowerCase().includes(searchVal) ||
                (s.auditor || '').toLowerCase().includes(searchVal) ||
                (s.styleNumber || '').toLowerCase().includes(searchVal) ||
                (s.modelName || '').toLowerCase().includes(searchVal);
+
+        const matchesStatus = statusFilter === 'all' || 
+               (s.status || '').toLowerCase() === statusFilter.toLowerCase();
+
+        return matchesSearch && matchesStatus;
     });
 
-    if (badge) badge.textContent = `${filtered.length} item In-Progress`;
+    if (badge) badge.textContent = `${filtered.length} Hasil Inspeksi`;
     if (!tbody) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada sesi inspeksi In-Progress.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada data hasil inspeksi.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = filtered.map(s => `
-        <tr class="hover:bg-slate-50/80 transition-colors">
-            <td class="px-4 py-3 font-medium text-slate-900">${s.tanggalIncoming || '—'}</td>
-            <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
-            <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
-            <td class="px-4 py-3 text-slate-600">${s.styleNumber || '—'} / ${s.modelName || '—'}</td>
-            <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
-            <td class="px-4 py-3 text-center">
-                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                    ${s.status || 'In-Progress'}
-                </span>
-            </td>
-            <td class="px-4 py-3 text-right">
-                <button onclick="window.continueInProgressSession('${s.sessionId}')"
-                    class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs">
-                    <span class="material-symbols-outlined text-[14px]">edit_note</span>
-                    Muat & Lanjutkan
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = filtered.map(s => {
+        const isInProgress = (s.status || '').toLowerCase() === 'in-progress' || (s.status || '').toLowerCase() === 'in progress';
+        const statusBadgeHTML = isInProgress ? `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                In-Progress
+            </span>
+        ` : `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Done
+            </span>
+        `;
+
+        const actionBtnHTML = isInProgress ? `
+            <button onclick="window.continueInProgressSession('${s.sessionId}')"
+                class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs">
+                <span class="material-symbols-outlined text-[14px]">edit_note</span>
+                Muat & Lanjutkan
+            </button>
+        ` : `
+            <span class="text-xs text-slate-400 font-medium">Tersimpan</span>
+        `;
+
+        return `
+            <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="px-4 py-3 font-medium text-slate-900">${s.tanggalIncoming || '—'}</td>
+                <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
+                <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
+                <td class="px-4 py-3 text-slate-600">${s.styleNumber || '—'} / ${s.modelName || '—'}</td>
+                <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
+                <td class="px-4 py-3 text-center">${statusBadgeHTML}</td>
+                <td class="px-4 py-3 text-right">${actionBtnHTML}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 /** Continue/Load an in-progress session back into the form */
 window.continueInProgressSession = function(sessionId) {
-    const session = allInProgressSessions.find(s => String(s.sessionId) === String(sessionId));
+    const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
     if (!session) {
         showAlert('Data sesi tidak ditemukan.', 'error');
         return;
