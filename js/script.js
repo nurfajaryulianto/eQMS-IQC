@@ -1681,9 +1681,16 @@ let allInspectionSessions = [];
 
 /** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
 window.loadInspectionResults = async function() {
-    const tbody = document.getElementById('inspection-result-tbody');
+    const gallery = document.getElementById('inspection-result-gallery');
     const badge = document.getElementById('inspection-result-count-badge');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs italic">Memuat data Inspection Result...</td></tr>';
+    if (gallery) {
+        gallery.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
+                <span class="material-symbols-outlined text-4xl animate-spin mb-3 text-emerald-400">sync</span>
+                <span class="text-sm italic">Memuat data Inspection Result...</span>
+            </div>
+        `;
+    }
 
     try {
         if (UI_TEST_MODE) {
@@ -1731,13 +1738,20 @@ window.loadInspectionResults = async function() {
 
     } catch (e) {
         console.error('[Inspection Result] Gagal memuat:', e);
-        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-red-500 text-xs">Gagal memuat data: ${e.message}</td></tr>`;
+        if (gallery) {
+            gallery.innerHTML = `
+                <div class="col-span-full flex flex-col items-center justify-center py-16 text-red-400">
+                    <span class="material-symbols-outlined text-4xl mb-3">error</span>
+                    <span class="text-sm font-semibold">Gagal memuat data: ${e.message}</span>
+                </div>
+            `;
+        }
     }
 };
 
-/** Render inspection results table with status filter */
+/** Render inspection results gallery with status filter */
 function renderInspectionResultTable(sessions) {
-    const tbody = document.getElementById('inspection-result-tbody');
+    const gallery = document.getElementById('inspection-result-gallery');
     const badge = document.getElementById('inspection-result-count-badge');
     const searchVal = (document.getElementById('inspection-result-search')?.value || '').toLowerCase().trim();
     const statusFilter = document.getElementById('inspection-result-status-filter')?.value || 'all';
@@ -1793,24 +1807,29 @@ function renderInspectionResultTable(sessions) {
         return matchesSearch && matchesStatus && matchesDate;
     });
 
-    if (badge) badge.textContent = `${filtered.length} Hasil Inspeksi`;
-    if (!tbody) return;
+    if (badge) badge.textContent = `${filtered.length} Sesi Inspeksi`;
+    if (!gallery) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400 text-xs italic">Tidak ada data hasil inspeksi.</td></tr>';
+        gallery.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-16 text-slate-500">
+                <span class="material-symbols-outlined text-4xl mb-2">find_in_page</span>
+                <span class="text-sm italic">Tidak ada data hasil inspeksi yang cocok.</span>
+            </div>
+        `;
         return;
     }
 
-    tbody.innerHTML = filtered.map(s => {
+    gallery.innerHTML = filtered.map(s => {
         const isInProgress = (s.status || '').toLowerCase() === 'in-progress' || (s.status || '').toLowerCase() === 'in progress';
         const statusBadgeHTML = isInProgress ? `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
                 In-Progress
             </span>
         ` : `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                 Done
             </span>
         `;
@@ -1848,17 +1867,98 @@ function renderInspectionResultTable(sessions) {
         if (!compStr) compStr = '—';
         if (!procStr) procStr = '—';
 
+        // Aggregate quantities
+        let totalIncoming = 0;
+        let totalInspect = 0;
+        let totalPass = 0;
+        let totalDefect = 0;
+
+        if (s.items && s.items.length > 0) {
+            s.items.forEach(it => {
+                totalIncoming += Number(it.qtyIncoming || 0);
+                totalInspect += Number(it.qtyInspect || 0);
+                totalPass += Number(it.pass || 0);
+                totalDefect += Number(it.defect || 0);
+            });
+        } else {
+            totalIncoming = Number(s.qtyIncoming || 0);
+            totalInspect = Number(s.qtyInspect || 0);
+            totalPass = Number(s.pass || 0);
+            totalDefect = Number(s.defect || 0);
+        }
+
+        // Percentage for progress bar
+        const barBase = Math.max(totalInspect, totalPass + totalDefect);
+        const passPercent = barBase > 0 ? (totalPass / barBase) * 100 : 0;
+        const defectPercent = barBase > 0 ? (totalDefect / barBase) * 100 : 0;
+
         return `
-            <tr class="hover:bg-slate-50/80 transition-colors">
-                <td class="px-4 py-3 font-medium text-slate-900">${cleanDate}</td>
-                <td class="px-4 py-3 font-semibold text-slate-800">${s.vendor || '—'}</td>
-                <td class="px-4 py-3 text-slate-600 capitalize">${s.materialType || '—'}</td>
-                <td class="px-4 py-3 text-slate-600">${styleStr} / ${modelStr}</td>
-                <td class="px-4 py-3 text-slate-600 font-medium">${compStr}</td>
-                <td class="px-4 py-3 text-slate-600 font-medium">${procStr}</td>
-                <td class="px-4 py-3 text-slate-600">${s.auditor || '—'}</td>
-                <td class="px-4 py-3 text-center">${statusBadgeHTML}</td>
-            </tr>
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${isInProgress ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 280px;">
+                <!-- Decorative top bar -->
+                <div class="h-1.5 w-full ${isInProgress ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
+                
+                <div class="p-5 flex-1 flex flex-col justify-between gap-3.5">
+                    <!-- Session and status row -->
+                    <div class="flex items-center justify-between text-[11px] text-slate-400">
+                        <span class="font-bold tracking-wider uppercase">SESSION: #${s.sessionId}</span>
+                        ${statusBadgeHTML}
+                    </div>
+
+                    <!-- Style and model name -->
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-100 leading-tight mb-0.5">${modelStr}</h3>
+                        <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${styleStr}</span></p>
+                    </div>
+
+                    <!-- Specs details -->
+                    <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-slate-700/20 pt-3 text-[11px]">
+                        <div>
+                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">MATERIAL</span>
+                            <span class="text-slate-300 font-medium capitalize">${s.materialType || '—'}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">COMPONENT</span>
+                            <span class="text-slate-300 font-medium truncate block" title="${compStr}">${compStr}</span>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">VENDOR / PROCESS</span>
+                            <span class="text-slate-300 font-medium truncate block" title="${s.vendor || '—'} / ${procStr}">${s.vendor || '—'} <span class="text-slate-400 text-[10px] font-normal">(${procStr})</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Progress bar visualizer -->
+                    <div class="border-t border-slate-700/20 pt-3">
+                        <div class="flex justify-between text-[10px] text-slate-400 mb-1.5">
+                            <span>Incoming: <strong class="text-slate-200">${totalIncoming.toLocaleString('id-ID')}</strong></span>
+                            <span>Inspected: <strong class="text-slate-200">${totalInspect.toLocaleString('id-ID')}</strong></span>
+                        </div>
+                        <div class="w-full h-2.5 bg-slate-800/80 rounded-full overflow-hidden flex mb-1 border border-slate-700/20">
+                            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style="width: ${passPercent}%" title="Pass: ${totalPass}"></div>
+                            <div class="bg-gradient-to-r from-rose-500 to-red-600 transition-all duration-500" style="width: ${defectPercent}%" title="Defect: ${totalDefect}"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] font-bold mt-1">
+                            <span class="text-emerald-400">${totalPass.toLocaleString('id-ID')} Pass</span>
+                            <span class="text-rose-400">${totalDefect.toLocaleString('id-ID')} Defect</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer area -->
+                <div class="px-5 py-3 bg-slate-900/20 border-t border-slate-800/30 flex justify-between items-center text-[11px] text-slate-400">
+                    <div class="flex items-center gap-1.5 font-medium">
+                        <span class="material-symbols-outlined text-[14px]">person</span>
+                        <span class="truncate max-w-[80px]" title="${s.auditor || '—'}">${s.auditor || '—'}</span>
+                        <span class="text-slate-600">•</span>
+                        <span>${cleanDate}</span>
+                    </div>
+
+                    ${isInProgress ? `
+                    <button onclick="window.continueInProgressSession('${s.sessionId}')" class="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg font-bold transition-all duration-150 cursor-pointer text-[10px]">
+                        <span class="material-symbols-outlined text-[13px]">play_arrow</span> Continue
+                    </button>
+                    ` : ''}
+                </div>
+            </div>
         `;
     }).join('');
 }

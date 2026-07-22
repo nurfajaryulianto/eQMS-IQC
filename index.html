@@ -1548,30 +1548,11 @@
                         </div>
                     </div>
 
-                    <!-- Inspection Result Table Card -->
-                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                        <th class="px-4 py-3">Tgl Inspection</th>
-                                        <th class="px-4 py-3">Vendor</th>
-                                        <th class="px-4 py-3">Tipe Material</th>
-                                        <th class="px-4 py-3">Style / Model</th>
-                                        <th class="px-4 py-3">Komponen</th>
-                                        <th class="px-4 py-3">Proses</th>
-                                        <th class="px-4 py-3">Auditor</th>
-                                        <th class="px-4 py-3 text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="inspection-result-tbody" class="divide-y divide-slate-100 text-sm">
-                                    <tr>
-                                        <td colspan="8" class="text-center py-8 text-slate-400 text-xs italic">
-                                            Memuat data Inspection Result...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <!-- Inspection Result Gallery Container -->
+                    <div id="inspection-result-gallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
+                            <span class="material-symbols-outlined text-4xl animate-spin mb-3 text-emerald-400">sync</span>
+                            <span class="text-sm italic">Memuat data Inspection Result...</span>
                         </div>
                     </div>
                 </div>
