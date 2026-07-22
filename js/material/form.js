@@ -24,6 +24,7 @@ const MOCK_MASTER_DATA = [
         vendor_name: 'PT Sumber Makmur',
         style: 'NK-DYN-001',
         model_shoe: 'NIKE DYNAMO FREE',
+        receive_date: '2026-07-22',
         planned_qty: 500,
         status: 'pending',
     },
@@ -35,6 +36,7 @@ const MOCK_MASTER_DATA = [
         vendor_name: 'CV Karet Nusantara',
         style: 'NK-DYN-001',
         model_shoe: 'NIKE DYNAMO FREE',
+        receive_date: '2026-07-21',
         planned_qty: 300,
         status: 'pending',
     },
@@ -46,6 +48,7 @@ const MOCK_MASTER_DATA = [
         vendor_name: 'PT Foam Indo',
         style: 'NK-TC-002',
         model_shoe: 'WMNS TENNIS CLASSIC',
+        receive_date: '2026-07-20',
         planned_qty: 200,
         status: 'done',
     },
@@ -57,6 +60,7 @@ const MOCK_MASTER_DATA = [
         vendor_name: 'PT Sumber Makmur',
         style: 'NK-TC-002',
         model_shoe: 'WMNS TENNIS CLASSIC',
+        receive_date: '2026-07-20',
         planned_qty: 400,
         status: 'pending',
     },
@@ -68,6 +72,7 @@ const MOCK_MASTER_DATA = [
         vendor_name: 'CV Benang Jaya',
         style: 'MULTI',
         model_shoe: 'Multiple Models',
+        receive_date: '2026-07-19',
         planned_qty: 150,
         status: 'pending',
     },
@@ -310,7 +315,7 @@ function showPOEmpty() {
     if (emptyEl) emptyEl.style.display = 'flex';
 }
 
-// ─── SELECT PO ───────────────────────────────────────────────
+// ─── SELECT PO ────────────────────────────────────────────────
 
 function selectPO(po, cardEl) {
     // Deselect all
@@ -332,6 +337,7 @@ function selectPO(po, cardEl) {
                 ${row('Vendor', po.vendor_name)}
                 ${row('Style', po.style)}
                 ${row('Model Sepatu', po.model_shoe)}
+                ${row('Received Date', formatReceiveDate(po.receive_date))}
                 ${row('Planned Qty', `${po.planned_qty.toLocaleString('id-ID')} ${po.uom}`)}
             </div>
         `;
