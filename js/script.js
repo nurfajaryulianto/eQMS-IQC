@@ -1614,6 +1614,16 @@ async function initApp() {
         resultStatusFilter.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
     }
 
+    const resultAuditorFilter = document.getElementById('inspection-result-auditor-filter');
+    if (resultAuditorFilter) {
+        resultAuditorFilter.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
+    }
+
+    const resultVendorFilter = document.getElementById('inspection-result-vendor-filter');
+    if (resultVendorFilter) {
+        resultVendorFilter.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
+    }
+
     const dateStartInput = document.getElementById('inspection-result-date-start');
     const dateEndInput = document.getElementById('inspection-result-date-end');
     if (dateStartInput) dateStartInput.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
@@ -1704,7 +1714,7 @@ window.loadInspectionResults = async function() {
                     modelName: 'NIKE DYNAMO FREE',
                     component: 'Vamp',
                     process: 'Stitching, Emboss',
-                    auditor: 'Administrator',
+                    auditor: 'Ninik Mulyani',
                     status: 'In-Progress',
                     items: [
                         { component: 'Vamp', process: 'Stitching, Emboss', qtyIncoming: 500, qtyInspect: 100, pass: 95, defect: 5 }
@@ -1719,7 +1729,7 @@ window.loadInspectionResults = async function() {
                     modelName: 'AIR MAX 90',
                     component: 'Outsole',
                     process: 'Cementing',
-                    auditor: 'Administrator',
+                    auditor: 'Ninik Mulyani',
                     status: 'Done',
                     items: [
                         { component: 'Outsole', process: 'Cementing', qtyIncoming: 1000, qtyInspect: 100, pass: 100, defect: 0 }
@@ -1734,6 +1744,7 @@ window.loadInspectionResults = async function() {
             allInspectionSessions = data.sessions || [];
         }
 
+        populateFilterOptions();
         renderInspectionResultTable(allInspectionSessions);
 
     } catch (e) {
@@ -1749,12 +1760,68 @@ window.loadInspectionResults = async function() {
     }
 };
 
-/** Render inspection results gallery with status filter */
+/** Populate unique Auditor and Vendor dropdown filters */
+function populateFilterOptions() {
+    const auditors = [...new Set(allInspectionSessions.map(s => s.auditor).filter(Boolean))].sort();
+    const vendors = [...new Set(allInspectionSessions.map(s => s.vendor).filter(Boolean))].sort();
+
+    // Populate Auditor filter
+    const auditorSelect = document.getElementById('inspection-result-auditor-filter');
+    if (auditorSelect) {
+        const currentVal = auditorSelect.value;
+        auditorSelect.innerHTML = '<option value="all">Semua Auditor</option>';
+        auditors.forEach(aud => {
+            const opt = document.createElement('option');
+            opt.value = aud;
+            opt.textContent = aud;
+            auditorSelect.appendChild(opt);
+        });
+
+        // Set default to current user if first load
+        if (!currentVal || currentVal === 'all') {
+            const userDisplayName = window.__eqmsDisplayName || '';
+            const matched = auditors.find(a => a.toLowerCase() === userDisplayName.toLowerCase());
+            if (matched) {
+                auditorSelect.value = matched;
+            } else {
+                auditorSelect.value = 'all';
+            }
+        } else {
+            if ([...auditorSelect.options].some(o => o.value === currentVal)) {
+                auditorSelect.value = currentVal;
+            } else {
+                auditorSelect.value = 'all';
+            }
+        }
+    }
+
+    // Populate Vendor filter
+    const vendorSelect = document.getElementById('inspection-result-vendor-filter');
+    if (vendorSelect) {
+        const currentVal = vendorSelect.value;
+        vendorSelect.innerHTML = '<option value="all">Semua Vendor</option>';
+        vendors.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            vendorSelect.appendChild(opt);
+        });
+        if (currentVal && [...vendorSelect.options].some(o => o.value === currentVal)) {
+            vendorSelect.value = currentVal;
+        } else {
+            vendorSelect.value = 'all';
+        }
+    }
+}
+
+/** Render inspection results gallery with status filter grouped by style/model */
 function renderInspectionResultTable(sessions) {
     const gallery = document.getElementById('inspection-result-gallery');
     const badge = document.getElementById('inspection-result-count-badge');
     const searchVal = (document.getElementById('inspection-result-search')?.value || '').toLowerCase().trim();
     const statusFilter = document.getElementById('inspection-result-status-filter')?.value || 'all';
+    const auditorFilter = document.getElementById('inspection-result-auditor-filter')?.value || 'all';
+    const vendorFilter = document.getElementById('inspection-result-vendor-filter')?.value || 'all';
     const dateStart = document.getElementById('inspection-result-date-start')?.value || '';
     const dateEnd = document.getElementById('inspection-result-date-end')?.value || '';
 
@@ -1776,6 +1843,12 @@ function renderInspectionResultTable(sessions) {
 
         const matchesStatus = statusFilter === 'all' || 
                (s.status || '').toLowerCase() === statusFilter.toLowerCase();
+
+        const matchesAuditor = auditorFilter === 'all' || 
+               (s.auditor || '').toLowerCase() === auditorFilter.toLowerCase();
+
+        const matchesVendor = vendorFilter === 'all' || 
+               (s.vendor || '').toLowerCase() === vendorFilter.toLowerCase();
 
         let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
         let cleanDate = '';
@@ -1804,7 +1877,7 @@ function renderInspectionResultTable(sessions) {
             matchesDate = matchesDate && (cleanDate <= dateEnd);
         }
 
-        return matchesSearch && matchesStatus && matchesDate;
+        return matchesSearch && matchesStatus && matchesDate && matchesAuditor && matchesVendor;
     });
 
     if (badge) badge.textContent = `${filtered.length} Sesi Inspeksi`;
@@ -1820,22 +1893,34 @@ function renderInspectionResultTable(sessions) {
         return;
     }
 
-    gallery.innerHTML = filtered.map(s => {
-        const isInProgress = (s.status || '').toLowerCase() === 'in-progress' || (s.status || '').toLowerCase() === 'in progress';
-        const statusBadgeHTML = isInProgress ? `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                In-Progress
-            </span>
-        ` : `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                Done
-            </span>
-        `;
+    // Group filtered sessions by style number & model name
+    const grouped = {};
+    filtered.forEach(s => {
+        const styleStr = (s.styleNumber || '—').trim();
+        const modelStr = (s.modelName || '—').trim();
+        const key = `${styleStr}|${modelStr}`;
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                styleNumber: styleStr,
+                modelName: modelStr,
+                vendors: new Set(),
+                materials: new Set(),
+                auditors: new Set(),
+                dates: new Set(),
+                statuses: new Set(),
+                items: []
+            };
+        }
+
+        const g = grouped[key];
+        if (s.vendor) g.vendors.add(s.vendor);
+        if (s.materialType) g.materials.add(s.materialType);
+        if (s.auditor) g.auditors.add(s.auditor);
+        if (s.status) g.statuses.add(s.status.toLowerCase().trim());
 
         let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
-        let cleanDate = '—';
+        let cleanDate = '';
         if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
             const str = String(rawDate).trim();
             if (str.includes('T')) {
@@ -1849,114 +1934,172 @@ function renderInspectionResultTable(sessions) {
                     const m = String(parsed.getMonth() + 1).padStart(2, '0');
                     const d = String(parsed.getDate()).padStart(2, '0');
                     cleanDate = `${y}-${m}-${d}`;
-                } else {
-                    cleanDate = str;
                 }
             }
         }
-
-        const styleStr = s.styleNumber || (s.items && s.items[0] && s.items[0].styleNumber) || '—';
-        const modelStr = s.modelName || (s.items && s.items[0] && s.items[0].modelName) || '—';
-
-        let compStr = s.component || '';
-        let procStr = s.process || '';
-        if (s.items && s.items.length > 0) {
-            if (!compStr) compStr = [...new Set(s.items.map(i => i.component).filter(Boolean))].join(', ');
-            if (!procStr) procStr = [...new Set(s.items.map(i => i.process).filter(Boolean))].join(', ');
-        }
-        if (!compStr) compStr = '—';
-        if (!procStr) procStr = '—';
-
-        // Aggregate quantities
-        let totalIncoming = 0;
-        let totalInspect = 0;
-        let totalPass = 0;
-        let totalDefect = 0;
+        if (cleanDate) g.dates.add(cleanDate);
 
         if (s.items && s.items.length > 0) {
             s.items.forEach(it => {
-                totalIncoming += Number(it.qtyIncoming || 0);
-                totalInspect += Number(it.qtyInspect || 0);
-                totalPass += Number(it.pass || 0);
-                totalDefect += Number(it.defect || 0);
+                g.items.push({
+                    sessionId: s.sessionId,
+                    component: it.component || '—',
+                    process: it.process || '—',
+                    qtyIncoming: Number(it.qtyIncoming || 0),
+                    qtyInspect: Number(it.qtyInspect || 0),
+                    pass: Number(it.pass || 0),
+                    defect: Number(it.defect || 0),
+                    status: s.status || 'Done'
+                });
             });
         } else {
-            totalIncoming = Number(s.qtyIncoming || 0);
-            totalInspect = Number(s.qtyInspect || 0);
-            totalPass = Number(s.pass || 0);
-            totalDefect = Number(s.defect || 0);
+            g.items.push({
+                sessionId: s.sessionId,
+                component: s.component || '—',
+                process: s.process || '—',
+                qtyIncoming: Number(s.qtyIncoming || 0),
+                qtyInspect: Number(s.qtyInspect || 0),
+                pass: Number(s.pass || 0),
+                defect: Number(s.defect || 0),
+                status: s.status || 'Done'
+            });
         }
+    });
 
-        // Percentage for progress bar
-        const barBase = Math.max(totalInspect, totalPass + totalDefect);
-        const passPercent = barBase > 0 ? (totalPass / barBase) * 100 : 0;
-        const defectPercent = barBase > 0 ? (totalDefect / barBase) * 100 : 0;
+    gallery.innerHTML = Object.values(grouped).map(g => {
+        const hasInProgress = [...g.statuses].some(st => st.includes('progress') || st.includes('in-progress') || st.includes('in progress'));
+        const statusBadgeHTML = hasInProgress ? `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                In-Progress
+            </span>
+        ` : `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Done
+            </span>
+        `;
+
+        const dateArr = [...g.dates].sort();
+        const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length-1]}` : (dateArr[0] || '—');
+
+        // Aggregate items by component and process
+        const itemAgg = {};
+        g.items.forEach(it => {
+            const itemKey = `${it.component}|${it.process}`;
+            if (!itemAgg[itemKey]) {
+                itemAgg[itemKey] = {
+                    component: it.component,
+                    process: it.process,
+                    qtyIncoming: 0,
+                    qtyInspect: 0,
+                    pass: 0,
+                    defect: 0,
+                    sessions: new Set()
+                };
+            }
+            const agg = itemAgg[itemKey];
+            agg.qtyIncoming += it.qtyIncoming;
+            agg.qtyInspect += it.qtyInspect;
+            agg.pass += it.pass;
+            agg.defect += it.defect;
+            agg.sessions.add(it.sessionId);
+        });
+        const aggregatedItems = Object.values(itemAgg);
 
         return `
-            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${isInProgress ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 280px;">
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${hasInProgress ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 320px;">
                 <!-- Decorative top bar -->
-                <div class="h-1.5 w-full ${isInProgress ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
+                <div class="h-1.5 w-full ${hasInProgress ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
                 
-                <div class="p-5 flex-1 flex flex-col justify-between gap-3.5">
-                    <!-- Session and status row -->
-                    <div class="flex items-center justify-between text-[11px] text-slate-400">
-                        <span class="font-bold tracking-wider uppercase">SESSION: #${s.sessionId}</span>
+                <div class="p-5 flex-1 flex flex-col gap-4">
+                    <!-- Style and model name & Status -->
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-100 leading-tight mb-0.5">${g.modelName}</h3>
+                            <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${g.styleNumber}</span></p>
+                        </div>
                         ${statusBadgeHTML}
                     </div>
 
-                    <!-- Style and model name -->
-                    <div>
-                        <h3 class="text-base font-extrabold text-slate-100 leading-tight mb-0.5">${modelStr}</h3>
-                        <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${styleStr}</span></p>
-                    </div>
-
-                    <!-- Specs details -->
+                    <!-- Meta details -->
                     <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-slate-700/20 pt-3 text-[11px]">
                         <div>
                             <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">MATERIAL</span>
-                            <span class="text-slate-300 font-medium capitalize">${s.materialType || '—'}</span>
+                            <span class="text-slate-300 font-medium truncate block capitalize" title="${[...g.materials].join(', ')}">${[...g.materials].join(', ') || '—'}</span>
                         </div>
                         <div>
-                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">COMPONENT</span>
-                            <span class="text-slate-300 font-medium truncate block" title="${compStr}">${compStr}</span>
-                        </div>
-                        <div class="col-span-2">
-                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">VENDOR / PROCESS</span>
-                            <span class="text-slate-300 font-medium truncate block" title="${s.vendor || '—'} / ${procStr}">${s.vendor || '—'} <span class="text-slate-400 text-[10px] font-normal">(${procStr})</span></span>
+                            <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">VENDOR</span>
+                            <span class="text-slate-300 font-medium truncate block capitalize" title="${[...g.vendors].join(', ')}">${[...g.vendors].join(', ') || '—'}</span>
                         </div>
                     </div>
 
-                    <!-- Progress bar visualizer -->
-                    <div class="border-t border-slate-700/20 pt-3">
-                        <div class="flex justify-between text-[10px] text-slate-400 mb-1.5">
-                            <span>Incoming: <strong class="text-slate-200">${totalIncoming.toLocaleString('id-ID')}</strong></span>
-                            <span>Inspected: <strong class="text-slate-200">${totalInspect.toLocaleString('id-ID')}</strong></span>
-                        </div>
-                        <div class="w-full h-2.5 bg-slate-800/80 rounded-full overflow-hidden flex mb-1 border border-slate-700/20">
-                            <div class="bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style="width: ${passPercent}%" title="Pass: ${totalPass}"></div>
-                            <div class="bg-gradient-to-r from-rose-500 to-red-600 transition-all duration-500" style="width: ${defectPercent}%" title="Defect: ${totalDefect}"></div>
-                        </div>
-                        <div class="flex justify-between text-[10px] font-bold mt-1">
-                            <span class="text-emerald-400">${totalPass.toLocaleString('id-ID')} Pass</span>
-                            <span class="text-rose-400">${totalDefect.toLocaleString('id-ID')} Defect</span>
+                    <!-- Component Details Table -->
+                    <div class="border-t border-slate-700/20 pt-3 flex-1 flex flex-col justify-between">
+                        <span class="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">INSPECTION DETAILS</span>
+                        <div class="overflow-x-auto border border-slate-700/20 rounded-lg bg-slate-900/10 max-h-[160px] thin-scroll">
+                            <table class="w-full text-left border-collapse text-[10px]">
+                                <thead>
+                                    <tr class="bg-slate-800/40 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-700/20">
+                                        <th class="px-2.5 py-1.5">Component / Process</th>
+                                        <th class="px-2 py-1.5 text-right">Inc</th>
+                                        <th class="px-2 py-1.5 text-right">Insp</th>
+                                        <th class="px-2 py-1.5 text-right text-emerald-400">Pass</th>
+                                        <th class="px-2 py-1.5 text-right text-rose-400">Def</th>
+                                        <th class="px-2.5 py-1.5 text-center">Act</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/10 text-slate-300">
+                                    ${aggregatedItems.map(item => {
+                                        let actionHTML = '';
+                                        const sessionIds = [...item.sessions];
+                                        
+                                        // Find if any session for this item is in-progress
+                                        const activeInProgSession = sessionIds.find(sid => {
+                                            const sObj = sessions.find(sess => sess.sessionId === sid);
+                                            return sObj && (sObj.status || '').toLowerCase().includes('progress');
+                                        });
+
+                                        if (activeInProgSession) {
+                                            actionHTML = `
+                                                <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
+                                                        title="Continue Sesi ${activeInProgSession}" 
+                                                        class="inline-flex items-center justify-center p-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded cursor-pointer transition-all duration-150">
+                                                    <span class="material-symbols-outlined text-[12px]">play_arrow</span>
+                                                </button>
+                                            `;
+                                        } else {
+                                            actionHTML = `<span class="text-[9px] text-slate-500 font-bold">Done</span>`;
+                                        }
+
+                                        return `
+                                            <tr class="hover:bg-slate-700/10 transition-colors">
+                                                <td class="px-2.5 py-1.5 font-medium">
+                                                    <span class="text-slate-200 block">${item.component}</span>
+                                                    <span class="text-slate-400 text-[9px] block">${item.process}</span>
+                                                </td>
+                                                <td class="px-2 py-1.5 text-right">${item.qtyIncoming.toLocaleString('id-ID')}</td>
+                                                <td class="px-2 py-1.5 text-right">${item.qtyInspect.toLocaleString('id-ID')}</td>
+                                                <td class="px-2 py-1.5 text-right text-emerald-400 font-semibold">${item.pass.toLocaleString('id-ID')}</td>
+                                                <td class="px-2 py-1.5 text-right text-rose-400 font-semibold">${item.defect.toLocaleString('id-ID')}</td>
+                                                <td class="px-2.5 py-1.5 text-center">${actionHTML}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
                 <!-- Footer area -->
                 <div class="px-5 py-3 bg-slate-900/20 border-t border-slate-800/30 flex justify-between items-center text-[11px] text-slate-400">
-                    <div class="flex items-center gap-1.5 font-medium">
+                    <div class="flex items-center gap-1.5 font-medium truncate w-full" title="Auditor: ${[...g.auditors].join(', ')}">
                         <span class="material-symbols-outlined text-[14px]">person</span>
-                        <span class="truncate max-w-[80px]" title="${s.auditor || '—'}">${s.auditor || '—'}</span>
+                        <span class="truncate max-w-[120px]">${[...g.auditors].join(', ')}</span>
                         <span class="text-slate-600">•</span>
-                        <span>${cleanDate}</span>
+                        <span class="truncate">${dateStr}</span>
                     </div>
-
-                    ${isInProgress ? `
-                    <button onclick="window.continueInProgressSession('${s.sessionId}')" class="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg font-bold transition-all duration-150 cursor-pointer text-[10px]">
-                        <span class="material-symbols-outlined text-[13px]">play_arrow</span> Continue
-                    </button>
-                    ` : ''}
                 </div>
             </div>
         `;
