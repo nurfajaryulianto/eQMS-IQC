@@ -1504,25 +1504,47 @@
                         </button>
                     </div>
 
-                    <!-- Search & Status Filter Card -->
-                    <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-                        <div class="flex items-center gap-3 flex-1 min-w-[240px]">
-                            <div class="relative w-full max-w-xs">
-                                <span class="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">search</span>
-                                <input type="text" id="inspection-result-search" placeholder="Cari Vendor, Auditor, Style, Model..."
-                                    class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- Search, Status & Date Filter Card -->
+                    <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col gap-3">
+                        <div class="flex flex-wrap gap-3 items-center justify-between">
+                            <!-- Search & Status -->
+                            <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                                <div class="relative w-full sm:w-64">
+                                    <span class="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-[18px]">search</span>
+                                    <input type="text" id="inspection-result-search" placeholder="Cari Vendor, Auditor, Style, Model..."
+                                        class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="w-full sm:w-44">
+                                    <select id="inspection-result-status-filter" class="w-full border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="all">Semua Status</option>
+                                        <option value="Done">Done (Selesai)</option>
+                                        <option value="In-Progress">In-Progress</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="min-w-[140px]">
-                                <select id="inspection-result-status-filter" class="w-full border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="all">Semua Status</option>
-                                    <option value="Done">Done (Selesai)</option>
-                                    <option value="In-Progress">In-Progress</option>
-                                </select>
+
+                            <!-- Count Badge -->
+                            <div class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
+                                <span class="material-symbols-outlined text-[16px]">fact_check</span>
+                                <span id="inspection-result-count-badge">0 Hasil Inspeksi</span>
                             </div>
                         </div>
-                        <div class="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                            <span class="material-symbols-outlined text-[16px]">fact_check</span>
-                            <span id="inspection-result-count-badge">0 Hasil Inspeksi</span>
+
+                        <!-- Date Range & Preset Filter Row -->
+                        <div class="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-100 text-xs">
+                            <span class="font-semibold text-slate-500 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[16px]">calendar_today</span> Filter Tanggal:
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <input type="date" id="inspection-result-date-start" title="Tanggal Mulai" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                                <span class="text-slate-400 font-medium">s/d</span>
+                                <input type="date" id="inspection-result-date-end" title="Tanggal Akhir" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="btn-filter-today" class="px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 font-medium rounded-md transition-colors cursor-pointer">Hari Ini</button>
+                                <button type="button" id="btn-filter-7days" class="px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 font-medium rounded-md transition-colors cursor-pointer">7 Hari Terakhir</button>
+                                <button type="button" id="btn-filter-reset-date" class="px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-600 font-medium rounded-md transition-colors cursor-pointer">Reset Date</button>
+                            </div>
                         </div>
                     </div>
 

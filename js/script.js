@@ -1614,6 +1614,42 @@ async function initApp() {
         resultStatusFilter.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
     }
 
+    const dateStartInput = document.getElementById('inspection-result-date-start');
+    const dateEndInput = document.getElementById('inspection-result-date-end');
+    if (dateStartInput) dateStartInput.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
+    if (dateEndInput) dateEndInput.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
+
+    const btnToday = document.getElementById('btn-filter-today');
+    if (btnToday) {
+        btnToday.addEventListener('click', () => {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (dateStartInput) dateStartInput.value = todayStr;
+            if (dateEndInput) dateEndInput.value = todayStr;
+            renderInspectionResultTable(allInspectionSessions);
+        });
+    }
+
+    const btn7Days = document.getElementById('btn-filter-7days');
+    if (btn7Days) {
+        btn7Days.addEventListener('click', () => {
+            const today = new Date();
+            const past7 = new Date();
+            past7.setDate(today.getDate() - 6);
+            if (dateStartInput) dateStartInput.value = past7.toISOString().split('T')[0];
+            if (dateEndInput) dateEndInput.value = today.toISOString().split('T')[0];
+            renderInspectionResultTable(allInspectionSessions);
+        });
+    }
+
+    const btnResetDate = document.getElementById('btn-filter-reset-date');
+    if (btnResetDate) {
+        btnResetDate.addEventListener('click', () => {
+            if (dateStartInput) dateStartInput.value = '';
+            if (dateEndInput) dateEndInput.value = '';
+            renderInspectionResultTable(allInspectionSessions);
+        });
+    }
+
     const statisticButton = document.querySelector('.statistic-button');
     if (statisticButton) {
         statisticButton.addEventListener('click', () => {
@@ -1705,6 +1741,8 @@ function renderInspectionResultTable(sessions) {
     const badge = document.getElementById('inspection-result-count-badge');
     const searchVal = (document.getElementById('inspection-result-search')?.value || '').toLowerCase().trim();
     const statusFilter = document.getElementById('inspection-result-status-filter')?.value || 'all';
+    const dateStart = document.getElementById('inspection-result-date-start')?.value || '';
+    const dateEnd = document.getElementById('inspection-result-date-end')?.value || '';
 
     const filtered = sessions.filter(s => {
         let compStr = s.component || '';
@@ -1725,7 +1763,34 @@ function renderInspectionResultTable(sessions) {
         const matchesStatus = statusFilter === 'all' || 
                (s.status || '').toLowerCase() === statusFilter.toLowerCase();
 
-        return matchesSearch && matchesStatus;
+        let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
+        let cleanDate = '';
+        if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
+            const str = String(rawDate).trim();
+            if (str.includes('T')) {
+                cleanDate = str.split('T')[0];
+            } else if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+                cleanDate = str.slice(0, 10);
+            } else {
+                const parsed = new Date(str);
+                if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const d = String(parsed.getDate()).padStart(2, '0');
+                    cleanDate = `${y}-${m}-${d}`;
+                }
+            }
+        }
+
+        let matchesDate = true;
+        if (dateStart && cleanDate) {
+            matchesDate = matchesDate && (cleanDate >= dateStart);
+        }
+        if (dateEnd && cleanDate) {
+            matchesDate = matchesDate && (cleanDate <= dateEnd);
+        }
+
+        return matchesSearch && matchesStatus && matchesDate;
     });
 
     if (badge) badge.textContent = `${filtered.length} Hasil Inspeksi`;
