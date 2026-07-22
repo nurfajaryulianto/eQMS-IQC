@@ -303,6 +303,7 @@ function doGet(e) {
       const ss = SpreadsheetApp.openById(activeId);
       const sessionSheet = getOrCreateSheet(ss, 'Sessions', SESSIONS_HEADERS);
       const allData = sessionSheet.getDataRange().getValues();
+      const displayData = sessionSheet.getDataRange().getDisplayValues();
       if (!allData || allData.length < 2) {
         return jsonResponse({ status: 'ok', sessions: [] });
       }
@@ -340,15 +341,35 @@ function doGet(e) {
       const statusCol     = findColIndex(['Status']);
       const itemsJsonCol  = findColIndex(['ItemsJSON']);
 
+      function getCellStr(rIndex, cIndex) {
+        if (cIndex === -1) return '';
+        var disp = (displayData[rIndex] && displayData[rIndex][cIndex] != null) ? String(displayData[rIndex][cIndex]).trim() : '';
+        if (disp) {
+          if (disp.includes('T')) return disp.split('T')[0];
+          return disp;
+        }
+        var val = allData[rIndex][cIndex];
+        if (!val) return '';
+        if (val instanceof Date) {
+          try {
+            return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          } catch(err) {
+            return val.toISOString().split('T')[0];
+          }
+        }
+        var str = String(val).trim();
+        if (str.includes('T')) return str.split('T')[0];
+        return str;
+      }
+
       const sessionsMap = {};
       for (var r = 1; r < allData.length; r++) {
         var row = allData[r];
         
-        var rawSid = sessionIdCol !== -1 ? String(row[sessionIdCol] || '').trim() : '';
+        var rawSid = getCellStr(r, sessionIdCol);
         var sid = rawSid || ('ROW-' + r);
 
-        var st = statusCol !== -1 ? String(row[statusCol] || '').trim() : 'Done';
-        if (!st) st = 'Done';
+        var st = getCellStr(r, statusCol) || 'Done';
 
         if (!sessionsMap[sid]) {
           var items = [];
@@ -356,9 +377,9 @@ function doGet(e) {
             try { items = JSON.parse(String(row[itemsJsonCol])); } catch(errItems) {}
           }
 
-          var tIns = tanggalInsCol !== -1 ? String(row[tanggalInsCol] || '') : '';
-          var tInc = tanggalCol !== -1 ? String(row[tanggalCol] || '') : '';
-          var tTime = timestampCol !== -1 ? String(row[timestampCol] || '') : '';
+          var tIns = getCellStr(r, tanggalInsCol);
+          var tInc = getCellStr(r, tanggalCol);
+          var tTime = getCellStr(r, timestampCol);
           var tInspDate = tIns || tInc || tTime;
           
           sessionsMap[sid] = {
@@ -366,29 +387,29 @@ function doGet(e) {
             timestamp: tTime,
             tanggalIncoming: tInc,
             tanggalInspection: tInspDate,
-            tanggalBucket: bucketCol !== -1 ? String(row[bucketCol] || '') : '',
-            materialType: matTypeCol !== -1 ? String(row[matTypeCol] || '') : '',
-            auditor: auditorCol !== -1 ? String(row[auditorCol] || '') : '',
-            vendor: vendorCol !== -1 ? String(row[vendorCol] || '') : '',
-            styleNumber: styleCol !== -1 ? String(row[styleCol] || '') : '',
-            modelName: modelCol !== -1 ? String(row[modelCol] || '') : '',
-            component: componentCol !== -1 ? String(row[componentCol] || '') : '',
-            process: processCol !== -1 ? String(row[processCol] || '') : '',
+            tanggalBucket: getCellStr(r, bucketCol),
+            materialType: getCellStr(r, matTypeCol),
+            auditor: getCellStr(r, auditorCol),
+            vendor: getCellStr(r, vendorCol),
+            styleNumber: getCellStr(r, styleCol),
+            modelName: getCellStr(r, modelCol),
+            component: getCellStr(r, componentCol),
+            process: getCellStr(r, processCol),
             status: st,
             items: items,
           };
         } else {
           // Update missing fields if subsequent rows have details
-          if (!sessionsMap[sid].styleNumber && styleCol !== -1 && row[styleCol]) sessionsMap[sid].styleNumber = String(row[styleCol]);
-          if (!sessionsMap[sid].modelName && modelCol !== -1 && row[modelCol]) sessionsMap[sid].modelName = String(row[modelCol]);
-          if (!sessionsMap[sid].auditor && auditorCol !== -1 && row[auditorCol]) sessionsMap[sid].auditor = String(row[auditorCol]);
-          if (!sessionsMap[sid].tanggalIncoming && tanggalCol !== -1 && row[tanggalCol]) sessionsMap[sid].tanggalIncoming = String(row[tanggalCol]);
-          if (!sessionsMap[sid].tanggalInspection && (tanggalInsCol !== -1 && row[tanggalInsCol] || tanggalCol !== -1 && row[tanggalCol])) {
-            sessionsMap[sid].tanggalInspection = String((tanggalInsCol !== -1 && row[tanggalInsCol]) || row[tanggalCol]);
+          if (!sessionsMap[sid].styleNumber) sessionsMap[sid].styleNumber = getCellStr(r, styleCol);
+          if (!sessionsMap[sid].modelName) sessionsMap[sid].modelName = getCellStr(r, modelCol);
+          if (!sessionsMap[sid].auditor) sessionsMap[sid].auditor = getCellStr(r, auditorCol);
+          if (!sessionsMap[sid].tanggalIncoming) sessionsMap[sid].tanggalIncoming = getCellStr(r, tanggalCol);
+          if (!sessionsMap[sid].tanggalInspection) {
+            sessionsMap[sid].tanggalInspection = getCellStr(r, tanggalInsCol) || getCellStr(r, tanggalCol) || getCellStr(r, timestampCol);
           }
-          if (!sessionsMap[sid].materialType && matTypeCol !== -1 && row[matTypeCol]) sessionsMap[sid].materialType = String(row[matTypeCol]);
-          if (!sessionsMap[sid].component && componentCol !== -1 && row[componentCol]) sessionsMap[sid].component = String(row[componentCol]);
-          if (!sessionsMap[sid].process && processCol !== -1 && row[processCol]) sessionsMap[sid].process = String(row[processCol]);
+          if (!sessionsMap[sid].materialType) sessionsMap[sid].materialType = getCellStr(r, matTypeCol);
+          if (!sessionsMap[sid].component) sessionsMap[sid].component = getCellStr(r, componentCol);
+          if (!sessionsMap[sid].process) sessionsMap[sid].process = getCellStr(r, processCol);
         }
 
         // If row contains item details (flat sheet format), push item

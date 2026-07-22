@@ -1752,11 +1752,22 @@ function renderInspectionResultTable(sessions) {
 
         let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
         let cleanDate = '—';
-        if (rawDate) {
-            if (typeof rawDate === 'string' && rawDate.includes('T')) {
-                cleanDate = rawDate.split('T')[0];
+        if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
+            const str = String(rawDate).trim();
+            if (str.includes('T')) {
+                cleanDate = str.split('T')[0];
+            } else if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+                cleanDate = str.slice(0, 10);
             } else {
-                cleanDate = String(rawDate).slice(0, 10);
+                const parsed = new Date(str);
+                if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                    const d = String(parsed.getDate()).padStart(2, '0');
+                    cleanDate = `${y}-${m}-${d}`;
+                } else {
+                    cleanDate = str;
+                }
             }
         }
 
