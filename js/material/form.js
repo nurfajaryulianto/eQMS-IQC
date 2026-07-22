@@ -206,6 +206,7 @@ async function fetchMasterData() {
             style: row.style || row.Style || '',
             model_shoe: row.model_shoe || row.ModelShoe || '',
             planned_qty: Number(row.planned_qty || row.PlannedQty) || 0,
+            receive_date: row.receive_date || row.ReceiveDate || '',
             status: (row.status || row.Status || 'pending').toLowerCase(),
         }));
 
