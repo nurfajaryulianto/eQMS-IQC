@@ -165,7 +165,7 @@ function getMasterData(params) {
   var matCol      = findColIndex(['material_name', 'materialname', 'material_nama', 'item_name'], 1);
   var descCol     = findColIndex(['material_description', 'item_description', 'description', 'deskripsi'], 2);
   var uomCol      = findColIndex(['uom'], 3);
-  var suppCol     = findColIndex(['supplier', 'vendor_name', 'vendor', 'supplier_name'], 4);
+  var suppCol     = findColIndex(['supplier_name', 'supplier', 'vendor_name', 'vendor'], 4);
   var codeCol     = findColIndex(['product_code', 'style', 'style_number'], 8);
   var modelCol    = findColIndex(['model_name', 'model_shoe', 'shoe_model'], 9);
   var batchCol    = findColIndex(['batch_size', 'planned_qty', 'qty'], 7);
@@ -208,15 +208,24 @@ function getMasterData(params) {
     var poVal = getStr(poCol) || getStr(12);
     if (!poVal && getStr(matCol) === '' && getStr(1) === '') continue; // skip completely empty rows
 
-    var matVal = getStr(matCol) || getStr(1);
+    var rawMat = getStr(matCol) || getStr(1);
+    var rawDesc = getStr(descCol) || getStr(2);
+    
+    // If material_name is 'RM.' or 'RM' or empty, fallback to material_description
+    var finalMatName = rawMat;
+    if (!finalMatName || finalMatName.trim() === 'RM.' || finalMatName.trim() === 'RM') {
+      finalMatName = rawDesc || rawMat || '—';
+    }
+
     var rDateVal = getStr(rDateCol) || getStr(11);
+    var vendorVal = getStr(suppCol) || getStr(5) || getStr(4);
 
     result.push({
       po_number: poVal,
-      material_name: matVal,
-      item_description: getStr(descCol) || getStr(2),
+      material_name: finalMatName,
+      item_description: rawDesc,
       uom: getStr(uomCol) || getStr(3),
-      vendor_name: getStr(suppCol) || getStr(4),
+      vendor_name: vendorVal,
       style: getStr(codeCol) || getStr(8),
       model_shoe: getStr(modelCol) || getStr(9),
       planned_qty: Number(row[batchCol !== -1 ? batchCol : 7]) || 0,
@@ -227,6 +236,98 @@ function getMasterData(params) {
 
   return { data: result, total: result.length };
 }
+
+// Helper to extract values from uploaded Excel row object regardless of exact header casing/spacing
+function getExcelVal(rObj, candList) {
+  if (!rObj) return '';
+  var keys = Object.keys(rObj);
+  for (var c = 0; c < candList.length; c++) {
+    var target = String(candList[c]).toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (var k = 0; k < keys.length; k++) {
+      var keyClean = String(keys[k] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (keyClean === target && rObj[keys[k]] != null && rObj[keys[k]] !== '') {
+        return rObj[keys[k]];
+      }
+    }
+  }
+  return '';
+}
+
+function bulkUpsertMasterData(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var rows = payload.rows || [];
+    if (!rows.length) return { status: 'ok', message: 'Tidak ada data untuk diproses.', count: 0 };
+
+    var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
+    if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
+
+    var data    = sheet.getDataRange().getValues();
+    var existingMap = {};
+    
+    // Map existing POs (Column M is index 12)
+    for (var i = 1; i < data.length; i++) {
+      var poKey = String(data[i][12]).trim();
+      if (poKey) {
+        existingMap[poKey] = true;
+      }
+    }
+
+    var now        = new Date().toISOString();
+    var uploaded   = payload.uploader_nik || 'admin';
+    var insertRows = [];
+    var rejectedPOs = [];
+
+    rows.forEach(function(row) {
+      // Maps keys from the uploaded ADF Layout Excel template flexibly
+      var po = String(getExcelVal(row, ['PO Number', 'po_number', 'po_no', 'ponumber', 'po'])).trim();
+      if (!po) return;
+
+      var matName = getExcelVal(row, ['Material Name', 'material_name', 'materialname', 'material']);
+      var matDesc = getExcelVal(row, ['Material Description', 'item_description', 'material_description', 'description', 'deskripsi']);
+      var uom = getExcelVal(row, ['UOM', 'uom']);
+      var supplier = getExcelVal(row, ['Supplier', 'supplier', 'vendor', 'vendor_name']);
+      var supplierName = getExcelVal(row, ['Supplier Name', 'supplier_name', 'vendor_name']);
+      var batchSize = Number(getExcelVal(row, ['Batch Size', 'batch_size', 'planned_qty', 'qty', 'qty_receive'])) || 0;
+      var productCode = getExcelVal(row, ['Product Code', 'product_code', 'style', 'style_number']);
+      var modelName = getExcelVal(row, ['Model Name', 'model_name', 'model_shoe', 'shoe_model', 'model']);
+      var bucket = getExcelVal(row, ['Bucket', 'bucket']);
+      var receiveDate = getExcelVal(row, ['Receive Date', 'receive_date', 'received_date', 'receivedate', 'date', 'tanggal_receive', 'tanggal_terima', 'incoming_date', 'tanggal_incoming']);
+      var shipment = getExcelVal(row, ['Shipment Number', 'shipment_number']);
+      var noBc = getExcelVal(row, ['No BC', 'no_bc']);
+      var bcType = getExcelVal(row, ['BC Type', 'bc_type']);
+      var receiveNum = getExcelVal(row, ['Receive Number', 'receive_number']);
+      var poArea = getExcelVal(row, ['PO Area', 'po_area']);
+      var matType = getExcelVal(row, ['Material Type', 'material_type']);
+
+      var newRow = [];
+      MASTER_DATA_HEADERS.forEach(function(h) {
+        if (h === 'no') newRow.push('');
+        else if (h === 'material_name') newRow.push(matName);
+        else if (h === 'material_description') newRow.push(matDesc);
+        else if (h === 'uom') newRow.push(uom);
+        else if (h === 'supplier') newRow.push(supplier);
+        else if (h === 'supplier_name') newRow.push(supplierName);
+        else if (h === 'po_area') newRow.push(poArea);
+        else if (h === 'batch_size') newRow.push(batchSize);
+        else if (h === 'product_code') newRow.push(productCode);
+        else if (h === 'model_name') newRow.push(modelName);
+        else if (h === 'bucket') newRow.push(bucket);
+        else if (h === 'receive_date') newRow.push(receiveDate);
+        else if (h === 'po_number') newRow.push(po);
+        else if (h === 'shipment_number') newRow.push(shipment);
+        else if (h === 'no_bc') newRow.push(noBc);
+        else if (h === 'bc_type') newRow.push(bcType);
+        else if (h === 'receive_number') newRow.push(receiveNum);
+        else if (h === 'material_type') newRow.push(matType);
+        else if (h === 'status') newRow.push('pending');
+        else if (h === 'uploaded_by') newRow.push(uploaded);
+        else if (h === 'uploaded_at') newRow.push(now);
+        else newRow.push('');
+      });
 
 // ─── GET INSPECTION DATA (untuk Dashboard) ────────────────────
 
