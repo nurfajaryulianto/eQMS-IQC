@@ -393,7 +393,8 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const matchStatus = status === 'all' || po.status === status;
+        const matchStatus = status === 'all' || 
+            (status === 'in-progress' ? (po.status === 'in-progress' || po.status === 'in progress') : po.status === status);
 
         return matchSearch && matchStatus;
     });

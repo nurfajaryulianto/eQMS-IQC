@@ -150,7 +150,7 @@ function getMasterData(params) {
 
   var headers = data[0];
 
-  function findCol(candList) {
+  function findColIndex(candList, fallbackIdx) {
     for (var c = 0; c < candList.length; c++) {
       var target = String(candList[c]).toLowerCase().replace(/[^a-z0-9]/g, '');
       for (var i = 0; i < headers.length; i++) {
@@ -158,19 +158,19 @@ function getMasterData(params) {
         if (h === target) return i;
       }
     }
-    return -1;
+    return fallbackIdx;
   }
 
-  var poCol       = findCol(['po_number', 'ponumber', 'po_no', 'pono', 'po']);
-  var matCol      = findCol(['material_name', 'materialname', 'material']);
-  var descCol     = findCol(['material_description', 'item_description', 'description', 'deskripsi']);
-  var uomCol      = findCol(['uom']);
-  var suppCol     = findCol(['supplier', 'vendor_name', 'vendor', 'supplier_name']);
-  var codeCol     = findCol(['product_code', 'style']);
-  var modelCol    = findCol(['model_name', 'model_shoe', 'model']);
-  var batchCol    = findCol(['batch_size', 'planned_qty', 'qty']);
-  var rDateCol    = findCol(['receive_date', 'received_date', 'date', 'tanggal_receive', 'tanggal_terima', 'incoming_date', 'tanggal_incoming']);
-  var statusCol   = findCol(['status']);
+  var poCol       = findColIndex(['po_number', 'ponumber', 'po_no', 'pono'], 12);
+  var matCol      = findColIndex(['material_name', 'materialname', 'material_nama', 'item_name'], 1);
+  var descCol     = findColIndex(['material_description', 'item_description', 'description', 'deskripsi'], 2);
+  var uomCol      = findColIndex(['uom'], 3);
+  var suppCol     = findColIndex(['supplier', 'vendor_name', 'vendor', 'supplier_name'], 4);
+  var codeCol     = findColIndex(['product_code', 'style', 'style_number'], 8);
+  var modelCol    = findColIndex(['model_name', 'model_shoe', 'shoe_model'], 9);
+  var batchCol    = findColIndex(['batch_size', 'planned_qty', 'qty'], 7);
+  var rDateCol    = findColIndex(['receive_date', 'received_date', 'tanggal_receive', 'tanggal_terima', 'incoming_date', 'tanggal_incoming'], 11);
+  var statusCol   = findColIndex(['status'], 18);
 
   var result = [];
 
@@ -180,13 +180,9 @@ function getMasterData(params) {
 
     function getStr(cIdx) {
       if (cIdx === -1) return '';
-      var disp = (dispRow && dispRow[cIdx] != null) ? String(dispRow[cIdx]).trim() : '';
-      if (disp) {
-        if (disp.includes('T')) return disp.split('T')[0];
-        return disp;
-      }
       var val = row[cIdx];
-      if (!val) return '';
+      var disp = (dispRow && dispRow[cIdx] != null) ? String(dispRow[cIdx]).trim() : '';
+
       if (val instanceof Date) {
         try {
           return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -194,27 +190,37 @@ function getMasterData(params) {
           return val.toISOString().split('T')[0];
         }
       }
-      var str = String(val).trim();
-      if (str.includes('T')) return str.split('T')[0];
-      return str;
+      if (disp && disp !== 'null' && disp !== 'undefined' && disp !== '—') {
+        if (disp.includes('T')) return disp.split('T')[0];
+        return disp;
+      }
+      if (val != null && val !== '') {
+        var str = String(val).trim();
+        if (str.includes('T')) return str.split('T')[0];
+        return str;
+      }
+      return '';
     }
 
     var st = (getStr(statusCol) || 'pending').toLowerCase();
     if (statusFilter !== 'all' && st !== statusFilter) continue;
 
-    var poVal = getStr(poCol);
-    if (!poVal && rDateCol === -1 && matCol === -1) continue; // skip completely empty rows
+    var poVal = getStr(poCol) || getStr(12);
+    if (!poVal && getStr(matCol) === '' && getStr(1) === '') continue; // skip completely empty rows
+
+    var matVal = getStr(matCol) || getStr(1);
+    var rDateVal = getStr(rDateCol) || getStr(11);
 
     result.push({
       po_number: poVal,
-      material_name: getStr(matCol),
-      item_description: getStr(descCol),
-      uom: getStr(uomCol),
-      vendor_name: getStr(suppCol),
-      style: getStr(codeCol),
-      model_shoe: getStr(modelCol),
+      material_name: matVal,
+      item_description: getStr(descCol) || getStr(2),
+      uom: getStr(uomCol) || getStr(3),
+      vendor_name: getStr(suppCol) || getStr(4),
+      style: getStr(codeCol) || getStr(8),
+      model_shoe: getStr(modelCol) || getStr(9),
       planned_qty: Number(row[batchCol !== -1 ? batchCol : 7]) || 0,
-      receive_date: getStr(rDateCol),
+      receive_date: rDateVal,
       status: st,
     });
   }
