@@ -37,53 +37,81 @@ export const ROLES = {
 const SUPABASE_URL = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bXpzenVmcndtcGtwbW1sbm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzgwODksImV4cCI6MjA5Mjg1NDA4OX0.gGu3xJ0yjUmLncz277gGSP8qiV8TiBrlJvg3C-t6ZJw';
 
-// Singleton Supabase client — hanya dibuat saat production (UI_TEST_MODE = false).
-// Saat test mode, client ini null dan tidak pernah digunakan.
+// Singleton Supabase client — menggunakan sessionStorage agar otomatis logout saat tab/browser ditutup
 export const supabase = UI_TEST_MODE ? null : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-        persistSession: true,       // Simpan sesi di localStorage (JWT terenkripsi)
-        autoRefreshToken: true,     // Auto-refresh token sebelum kadaluarsa
-        detectSessionInUrl: false,  // Nonaktifkan OAuth callback detection (tidak digunakan)
-        storageKey: 'eqms_auth_v1', // Namespace khusus untuk avoid collision
+        storage: window.sessionStorage, // Otomatis logout saat browser/tab ditutup
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storageKey: 'eqms_auth_v1',
     }
 });
 
 const LOGIN_PAGE = '/login.html';
 
 // =====================================================
+// INACTIVITY AUTO-LOGOUT MANAGER (2 Jam Idle Timeout)
+// =====================================================
+const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 Jam
+let lastActivityTime = Date.now();
+let inactivityInterval = null;
+
+export function initInactivityTimeout(maxIdleMs = INACTIVITY_LIMIT_MS) {
+    lastActivityTime = Date.now();
+
+    const resetTimer = () => {
+        lastActivityTime = Date.now();
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(evt => {
+        window.removeEventListener(evt, resetTimer);
+        window.addEventListener(evt, resetTimer, { passive: true });
+    });
+
+    if (inactivityInterval) clearInterval(inactivityInterval);
+    inactivityInterval = setInterval(async () => {
+        const idleTime = Date.now() - lastActivityTime;
+        if (idleTime >= maxIdleMs) {
+            clearInterval(inactivityInterval);
+            alert('Sesi Anda telah berakhir karena tidak ada aktivitas selama 2 jam. Silakan login kembali.');
+            await signOut();
+        }
+    }, 60 * 1000); // Cek setiap 1 menit
+}
+
+// =====================================================
 // MOCK SESSION (hanya aktif saat UI_TEST_MODE = true)
-// Disimpan di localStorage agar persist lintas tab & reload,
-// mensimulasikan perilaku sesi nyata.
-// Sesi otomatis kadaluarsa setelah SESSION_DURATION_MS.
 // =====================================================
 const MOCK_SESSION_KEY = 'eqms_test_session_v1';
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 jam
 
-/** Simpan mock session setelah login berhasil (test mode). */
+/** Simpan mock session di sessionStorage */
 export function setMockSession(userData) {
     const payload = {
         ...userData,
         expiresAt: Date.now() + SESSION_DURATION_MS,
     };
-    localStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(payload));
+    sessionStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(payload));
 
     // Seed mock data for local testing
-    localStorage.setItem('eqms_vendors_v1', JSON.stringify([
+    sessionStorage.setItem('eqms_vendors_v1', JSON.stringify([
         { id: 1, name: 'Vendor A', material_type: 'upper' },
         { id: 2, name: 'Vendor B', material_type: 'bottom' }
     ]));
-    localStorage.setItem('eqms_components_v1', JSON.stringify([
+    sessionStorage.setItem('eqms_components_v1', JSON.stringify([
         { id: 10, name: 'Foxing', vendor_id: 1 },
         { id: 11, name: 'Tongue', vendor_id: 1 },
         { id: 12, name: 'Mudguard', vendor_id: 2 }
     ]));
-    localStorage.setItem('eqms_processes_v1', JSON.stringify([
+    sessionStorage.setItem('eqms_processes_v1', JSON.stringify([
         { id: 20, name: 'Stitching', component_id: 10 },
         { id: 21, name: 'Cutting', component_id: 10 },
         { id: 22, name: 'Stitching', component_id: 11 },
         { id: 23, name: 'Buffing', component_id: 12 }
     ]));
-    localStorage.setItem('eqms_defects_v1', JSON.stringify([
+    sessionStorage.setItem('eqms_defects_v1', JSON.stringify([
         { id: 30, name: 'Damage', label: 'Damage', category: 'major' },
         { id: 31, name: 'Stain', label: 'Stain', category: 'minor' },
         { id: 32, name: 'Tearing', label: 'Tearing', category: 'critical' }
@@ -100,15 +128,14 @@ export function hasMockSession() {
     }
 }
 
-/** Baca data mock session. Hapus otomatis jika sudah kadaluarsa. */
+/** Baca data mock session dari sessionStorage. Hapus otomatis jika sudah kadaluarsa. */
 function getMockSession() {
     try {
-        const raw = localStorage.getItem(MOCK_SESSION_KEY);
+        const raw = sessionStorage.getItem(MOCK_SESSION_KEY);
         if (!raw) return null;
         const data = JSON.parse(raw);
         if (data.expiresAt && Date.now() > data.expiresAt) {
-            // Sesi kadaluarsa — hapus dan paksa login ulang
-            localStorage.removeItem(MOCK_SESSION_KEY);
+            sessionStorage.removeItem(MOCK_SESSION_KEY);
             return null;
         }
         return data;
@@ -119,7 +146,7 @@ function getMockSession() {
 
 /** Hapus mock session saat logout. */
 function clearMockSession() {
-    localStorage.removeItem(MOCK_SESSION_KEY);
+    sessionStorage.removeItem(MOCK_SESSION_KEY);
 }
 
 // =====================================================
@@ -128,19 +155,15 @@ function clearMockSession() {
 
 /**
  * Guard: Periksa sesi aktif. Jika tidak ada → redirect ke login.html.
- * Bekerja di TEST MODE (mock session) maupun PRODUCTION (Supabase JWT).
- * Selalu aktif — tidak peduli nilai UI_TEST_MODE.
- *
- * @returns {Promise<object|null>} session object, atau null jika redirect
  */
 export async function requireAuth() {
     if (UI_TEST_MODE) {
         const mockSession = getMockSession();
         if (!mockSession) {
-            // Perangkat baru / belum login → redirect ke login
             window.location.replace(LOGIN_PAGE);
             return null;
         }
+        initInactivityTimeout();
         return { mock: true, user: mockSession };
     }
 
@@ -150,6 +173,7 @@ export async function requireAuth() {
             window.location.replace(LOGIN_PAGE);
             return null;
         }
+        initInactivityTimeout();
         return session;
     } catch {
         window.location.replace(LOGIN_PAGE);

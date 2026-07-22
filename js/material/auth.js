@@ -33,12 +33,41 @@ const MOCK_SESSION = {
     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
 
-// ─── SESSION MANAGEMENT ──────────────────────────────────────
+// ─── INACTIVITY AUTO-LOGOUT MANAGER (2 Jam Idle Timeout) ─────
+const MATERIAL_INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 Jam
+let materialLastActivityTime = Date.now();
+let materialInactivityInterval = null;
+
+export function initMaterialInactivityTimeout(maxIdleMs = MATERIAL_INACTIVITY_LIMIT_MS) {
+    materialLastActivityTime = Date.now();
+
+    const resetTimer = () => {
+        materialLastActivityTime = Date.now();
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(evt => {
+        window.removeEventListener(evt, resetTimer);
+        window.addEventListener(evt, resetTimer, { passive: true });
+    });
+
+    if (materialInactivityInterval) clearInterval(materialInactivityInterval);
+    materialInactivityInterval = setInterval(async () => {
+        const idleTime = Date.now() - materialLastActivityTime;
+        if (idleTime >= maxIdleMs) {
+            clearInterval(materialInactivityInterval);
+            alert('Sesi IQC Material Anda telah berakhir karena tidak ada aktivitas selama 2 jam. Silakan login kembali.');
+            await materialLogout();
+        }
+    }, 60 * 1000); // Cek setiap 1 menit
+}
+
+// ─── SESSION MANAGEMENT (sessionStorage) ─────────────────────
 
 export function getSession() {
     if (MATERIAL_TEST_MODE) return MOCK_SESSION;
     try {
-        const raw = localStorage.getItem(SESSION_KEY);
+        const raw = sessionStorage.getItem(SESSION_KEY);
         if (!raw) return null;
         const session = JSON.parse(raw);
         // Check expiry
@@ -53,11 +82,11 @@ export function getSession() {
 }
 
 export function setSession(sessionData) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
 }
 
 export function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
 }
 
 export function isLoggedIn() {
@@ -84,6 +113,7 @@ export async function requireMaterialRole(allowedRoles = []) {
         window.location.replace('/unauthorized.html');
         return null;
     }
+    initMaterialInactivityTimeout();
     return session;
 }
 
