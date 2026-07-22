@@ -2435,18 +2435,18 @@
     </nav>
 
     <!-- ====== MOBILE DRAWER MENU ====== -->
-    <div id="mobile-drawer" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex justify-end">
-        <div class="bg-white w-4/5 max-w-xs h-full shadow-2xl flex flex-col p-5 space-y-4">
+    <div id="mobile-drawer" onclick="if(event.target === this) toggleMobileDrawer()" class="fixed inset-0 z-[100] hidden bg-slate-900/60 backdrop-blur-xs flex justify-end transition-opacity">
+        <div class="bg-white w-4/5 max-w-xs h-full shadow-2xl flex flex-col p-5 space-y-4" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-blue-600">verified</span>
                     <span class="font-bold text-sm text-slate-900">IQC Subcont Menu</span>
                 </div>
-                <button onclick="toggleMobileDrawer()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <button onclick="toggleMobileDrawer()" class="text-slate-400 hover:text-slate-600 cursor-pointer p-1">
                     <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
             </div>
-            <div class="flex flex-col gap-1.5 pt-2 flex-1">
+            <div class="flex flex-col gap-1.5 pt-2 flex-1 overflow-y-auto">
                 <button onclick="showView('dashboard'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">edit_document</span> Inspection Form
                 </button>
@@ -2459,13 +2459,13 @@
                 <button onclick="showView('defect-library'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">menu_book</span> Defect Library
                 </button>
-                <button onclick="showView('settings'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                <button data-view="settings" onclick="showView('settings'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">settings</span> Settings
                 </button>
-                <button data-view="leader-monitor" onclick="showView('leader-monitor'); toggleMobileDrawer();" class="hidden flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                <button data-view="leader-monitor" onclick="showView('leader-monitor'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer" style="display:none">
                     <span class="material-symbols-outlined text-[18px]">supervisor_account</span> Leader Monitor
                 </button>
-                <button data-view="admin" onclick="showView('admin'); toggleMobileDrawer();" class="hidden flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+                <button data-view="admin" onclick="showView('admin'); toggleMobileDrawer();" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer" style="display:none">
                     <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span> Admin
                 </button>
             </div>
@@ -2475,7 +2475,9 @@
     <script>
         window.toggleMobileDrawer = function() {
             const drawer = document.getElementById('mobile-drawer');
-            if (drawer) drawer.classList.toggle('hidden');
+            if (drawer) {
+                drawer.classList.toggle('hidden');
+            }
         };
     </script>
 
