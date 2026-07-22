@@ -315,6 +315,22 @@ function showPOEmpty() {
     if (emptyEl) emptyEl.style.display = 'flex';
 }
 
+function formatReceiveDate(raw) {
+    if (!raw) return '—';
+    const str = String(raw).trim();
+    if (!str || str === 'null' || str === 'undefined') return '—';
+    if (str.includes('T')) return str.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    return str;
+}
+
 // ─── SELECT PO ────────────────────────────────────────────────
 
 function selectPO(po, cardEl) {
