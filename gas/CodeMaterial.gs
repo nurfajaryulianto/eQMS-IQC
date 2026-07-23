@@ -485,6 +485,26 @@ function submitInspection(payload) {
       }
     });
 
+    // Error proofing: Qty Inspect cannot exceed Planned Qty / Batch Size
+    var plannedQty = mdRowData ? Number(mdRowData[7]) || 0 : 0;
+    var inspectQty = Number(payload.qty_inspect) || 0;
+    if (plannedQty > 0 && inspectQty > plannedQty) {
+      throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi Qty Received / Planned Qty (' + plannedQty + ').');
+    }
+
+    // Delete previous in-progress inspection rows for this PO from inspections sheet
+    var targetPO = String(payload.po_number || '').trim().toLowerCase();
+    if (targetPO && sheet.getLastRow() > 2) {
+      var existingData = sheet.getDataRange().getValues();
+      for (var r = existingData.length - 1; r >= 2; r--) {
+        var rPO = String(existingData[r][7] || '').trim().toLowerCase();
+        var rStatus = String(existingData[r][18] || '').trim().toLowerCase();
+        if (rPO === targetPO && rStatus === 'in-progress') {
+          sheet.deleteRow(r + 1);
+        }
+      }
+    }
+
     sheet.appendRow(newRow);
 
     // Update status and checked_qty in master_data
@@ -589,6 +609,20 @@ function passAll(payload) {
       payload.po_numbers.forEach(function(po) {
         targetPOs[String(po).trim()] = true;
       });
+    }
+
+    // Delete any previous in-progress inspection rows for target POs from inspSheet
+    if (inspSheet && inspSheet.getLastRow() > 2) {
+      var existingInspData = inspSheet.getDataRange().getValues();
+      for (var r = existingInspData.length - 1; r >= 2; r--) {
+        var rPO = String(existingInspData[r][7] || '').trim();
+        var rStatus = String(existingInspData[r][18] || '').trim().toLowerCase();
+        if (rStatus === 'in-progress') {
+          if (!targetPOs || targetPOs[rPO]) {
+            inspSheet.deleteRow(r + 1);
+          }
+        }
+      }
     }
 
     for (var i = 1; i < data.length; i++) {

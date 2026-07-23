@@ -397,13 +397,22 @@ function selectPO(po, cardEl) {
         formSection.style.pointerEvents = 'auto';
     }
 
-    // Reset inputs
+    // Reset inputs & set max attributes for error proofing
     const qtyInspectEl = document.getElementById('qty-inspect');
     const qtyFailEl = document.getElementById('qty-fail');
     const notesEl = document.getElementById('defect-notes');
     const checkColorEl = document.getElementById('check-color');
-    if (qtyInspectEl) qtyInspectEl.value = '';
-    if (qtyFailEl) qtyFailEl.value = '';
+
+    if (qtyInspectEl) {
+        qtyInspectEl.value = '';
+        qtyInspectEl.max = po.planned_qty;
+        qtyInspectEl.placeholder = `Maks. ${po.planned_qty.toLocaleString('id-ID')}`;
+    }
+    if (qtyFailEl) {
+        qtyFailEl.value = '';
+        qtyFailEl.max = po.planned_qty;
+        qtyFailEl.placeholder = `Maks. Qty Inspect`;
+    }
     if (notesEl) notesEl.value = '';
     if (checkColorEl) checkColorEl.value = 'OK';
     updateCalculations();
@@ -463,11 +472,34 @@ window.clearPOFilterDate = function () {
     filterPOList();
 };
 
-// ─── QTY CALCULATIONS ─────────────────────────────────────────
+// ─── QTY CALCULATIONS & ERROR PROOFING ────────────────────────
 
 window.updateCalculations = function () {
-    const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
-    const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
+    const qtyInspectEl = document.getElementById('qty-inspect');
+    const qtyFailEl = document.getElementById('qty-fail');
+
+    let inspect = parseInt(qtyInspectEl?.value, 10) || 0;
+    let fail = parseInt(qtyFailEl?.value, 10) || 0;
+
+    // Error proofing: Clamp inspect to planned_qty
+    if (selectedPO) {
+        const maxAllowed = selectedPO.planned_qty;
+        if (inspect > maxAllowed) {
+            inspect = maxAllowed;
+            if (qtyInspectEl) qtyInspectEl.value = maxAllowed;
+            showToast(`Qty Inspect tidak boleh melebihi Qty Received / Planned Qty (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`, 'error');
+        }
+    }
+
+    // Error proofing: Clamp fail to inspect
+    if (fail > inspect) {
+        fail = inspect;
+        if (qtyFailEl) qtyFailEl.value = inspect;
+        if (inspect > 0) {
+            showToast(`Qty Fail tidak boleh melebihi Qty Inspect (${inspect}).`, 'error');
+        }
+    }
+
     const pass = Math.max(0, inspect - fail);
 
     const passRateEl = document.getElementById('calc-pass-rate');
@@ -494,8 +526,17 @@ window.openValidationDialog = function () {
     const fileInput = document.getElementById('evidence-file');
 
     const errors = [];
-    if (!selectedPO) errors.push('Silakan pilih PO/Material terlebih dahulu.');
-    if (inspect <= 0) errors.push('Qty Inspect harus lebih dari 0.');
+    if (!selectedPO) {
+        errors.push('Silakan pilih PO/Material terlebih dahulu.');
+    } else {
+        const maxAllowed = selectedPO.planned_qty;
+        if (inspect <= 0) {
+            errors.push('Qty Inspect harus lebih dari 0.');
+        } else if (inspect > maxAllowed) {
+            errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi Qty Received / Planned Qty (${maxAllowed} ${selectedPO.uom}).`);
+        }
+    }
+
     if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
     if (fail > inspect) errors.push(`Qty Fail (${fail}) tidak boleh melebihi Qty Inspect (${inspect}).`);
     
