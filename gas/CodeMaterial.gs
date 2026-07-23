@@ -22,7 +22,7 @@ var MASTER_DATA_HEADERS = [
   'no', 'material_name', 'material_description', 'uom', 'supplier', 'supplier_name', 'po_area', 
   'batch_size', 'product_code', 'model_name', 'bucket', 'receive_date', 'po_number', 
   'shipment_number', 'no_bc', 'bc_type', 'receive_number', 'material_type',
-  'status', 'uploaded_by', 'uploaded_at'
+  'status', 'uploaded_by', 'uploaded_at', 'checked_qty'
 ];
 
 // Header columns for inspections sheet (Matches target 18-column image layout + metadata)
@@ -150,28 +150,12 @@ function getMasterData(params) {
   var displayData = sheet.getDataRange().getDisplayValues();
   if (data.length < 2) return { data: [] };
 
-  // Build a map of total checked qty per PO from inspections sheet
-  // inspections columns: 7=po_no, 9=ok, 10=no_qty
-  var checkedMap = {};
-  var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
-  if (inspSheet && inspSheet.getLastRow() > 2) {
-    var inspData = inspSheet.getDataRange().getValues();
-    for (var i = 2; i < inspData.length; i++) { // skip 2 header rows
-      var inspPO = String(inspData[i][7] || '').trim().toLowerCase();
-      if (!inspPO) continue;
-      var okQty = Number(inspData[i][9]) || 0;
-      var noQty = Number(inspData[i][10]) || 0;
-      var qtyChecked = okQty + noQty;
-      checkedMap[inspPO] = (checkedMap[inspPO] || 0) + qtyChecked;
-    }
-  }
-
   // Column indices are FIXED — they match MASTER_DATA_HEADERS exactly:
   // 0:no  1:material_name  2:material_description  3:uom  4:supplier
   // 5:supplier_name  6:po_area  7:batch_size  8:product_code  9:model_name
   // 10:bucket  11:receive_date  12:po_number  13:shipment_number
   // 14:no_bc  15:bc_type  16:receive_number  17:material_type
-  // 18:status  19:uploaded_by  20:uploaded_at
+  // 18:status  19:uploaded_by  20:uploaded_at  21:checked_qty
 
   var result = [];
 
@@ -201,7 +185,9 @@ function getMasterData(params) {
     }
 
     var plannedQty = Number(row[7]) || 0;
-    var checkedQty = checkedMap[poVal.toLowerCase()] || 0;
+    // checked_qty is stored in col 21 (index 21) of master_data
+    // Only populated when status is 'in-progress', empty for 'pending'/'done'
+    var checkedQty = Number(row[21]) || 0;
     var inProgressQty = Math.max(0, plannedQty - checkedQty);
 
     result.push({
@@ -500,8 +486,9 @@ function submitInspection(payload) {
 
     sheet.appendRow(newRow);
 
-    // Update status in master_data
-    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done');
+    // Update status and checked_qty in master_data
+    var qtyInspected = Number(payload.qty_inspect) || 0;
+    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 
@@ -510,16 +497,26 @@ function submitInspection(payload) {
   }
 }
 
-function updateMasterDataStatus(ss, poNumber, newStatus) {
+function updateMasterDataStatus(ss, poNumber, newStatus, qtyInspected) {
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) return;
 
   var data    = sheet.getDataRange().getValues();
-  // status is Col S (index 18)
+  // status is Col S (index 18), checked_qty is Col V (index 21)
   // po_number is Col M (index 12)
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][12]).trim() === String(poNumber).trim()) {
       sheet.getRange(i + 1, 19).setValue(newStatus);
+
+      // Update checked_qty column (index 21 = col 22)
+      if (newStatus === 'in-progress') {
+        // Accumulate: existing checked_qty + newly inspected qty
+        var existingChecked = Number(data[i][21]) || 0;
+        sheet.getRange(i + 1, 22).setValue(existingChecked + (qtyInspected || 0));
+      } else if (newStatus === 'done' || newStatus === 'pending') {
+        // Clear checked_qty when done or pending
+        sheet.getRange(i + 1, 22).setValue('');
+      }
       break;
     }
   }
@@ -638,6 +635,7 @@ function passAll(payload) {
       newInspRows.push(newRow);
 
       mdSheet.getRange(i + 1, 19).setValue('done');
+      mdSheet.getRange(i + 1, 22).setValue(''); // clear checked_qty for done status
       count++;
     }
 
@@ -712,7 +710,7 @@ function setupSpreadsheetHeaders() {
       'NO', 'Material Name', 'Material Description', 'UOM', 'Supplier', 'Supplier Name', 'PO Area', 
       'Batch Size', 'Product Code', 'Model Name', 'Bucket', 'Receive Date', 'PO Number', 
       'Shipment Number', 'No BC', 'BC Type', 'Receive Number', 'Material Type',
-      'status', 'uploaded_by', 'uploaded_at'
+      'status', 'uploaded_by', 'uploaded_at', 'checked_qty'
     ];
     mdSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
     mdSheet.getRange(1, 1, 1, r1.length).setFontWeight('bold').setBackground('#f1f5f9');
