@@ -127,6 +127,9 @@ function login(payload) {
       var matAssignCol = headers.indexOf('material_assignment');
       var matAssignVal = matAssignCol >= 0 ? String(data[i][matAssignCol] || '').trim() : '';
 
+      var expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 8);
+
       return {
         nik: rowNik,
         name: nameVal,
