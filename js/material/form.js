@@ -26,6 +26,8 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'NIKE DYNAMO FREE',
         receive_date: '2026-07-22',
         planned_qty: 500,
+        checked_qty: 0,
+        in_progress_qty: 500,
         status: 'pending',
     },
     {
@@ -38,7 +40,9 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'NIKE DYNAMO FREE',
         receive_date: '2026-07-21',
         planned_qty: 300,
-        status: 'pending',
+        checked_qty: 120,
+        in_progress_qty: 180,
+        status: 'in-progress',
     },
     {
         po_number: 'PO-2025-003',
@@ -50,6 +54,8 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'WMNS TENNIS CLASSIC',
         receive_date: '2026-07-20',
         planned_qty: 200,
+        checked_qty: 200,
+        in_progress_qty: 0,
         status: 'done',
     },
     {
@@ -62,6 +68,8 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'WMNS TENNIS CLASSIC',
         receive_date: '2026-07-20',
         planned_qty: 400,
+        checked_qty: 0,
+        in_progress_qty: 400,
         status: 'pending',
     },
     {
@@ -74,7 +82,9 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'Multiple Models',
         receive_date: '2026-07-19',
         planned_qty: 150,
-        status: 'pending',
+        checked_qty: 50,
+        in_progress_qty: 100,
+        status: 'in-progress',
     },
 ];
 
@@ -197,18 +207,24 @@ async function fetchMasterData() {
 
         if (json.error) throw new Error(json.error);
 
-        allPOData = (json.data || []).map(row => ({
-            po_number: row.po_number || row.PONumber || '',
-            material_name: row.material_name || row.MaterialName || '',
-            item_description: row.item_description || row.ItemDescription || '',
-            uom: row.uom || row.UOM || '',
-            vendor_name: row.vendor_name || row.VendorName || '',
-            style: row.style || row.Style || '',
-            model_shoe: row.model_shoe || row.ModelShoe || '',
-            planned_qty: Number(row.planned_qty || row.PlannedQty) || 0,
-            receive_date: row.receive_date || row.ReceiveDate || '',
-            status: (row.status || row.Status || 'pending').toLowerCase(),
-        }));
+        allPOData = (json.data || []).map(row => {
+            const plannedQty = Number(row.planned_qty || row.PlannedQty) || 0;
+            const checkedQty = Number(row.checked_qty) || 0;
+            return {
+                po_number: row.po_number || row.PONumber || '',
+                material_name: row.material_name || row.MaterialName || '',
+                item_description: row.item_description || row.ItemDescription || '',
+                uom: row.uom || row.UOM || '',
+                vendor_name: row.vendor_name || row.VendorName || '',
+                style: row.style || row.Style || '',
+                model_shoe: row.model_shoe || row.ModelShoe || '',
+                planned_qty: plannedQty,
+                checked_qty: checkedQty,
+                in_progress_qty: Math.max(0, plannedQty - checkedQty),
+                receive_date: row.receive_date || row.ReceiveDate || '',
+                status: (row.status || row.Status || 'pending').toLowerCase(),
+            };
+        });
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
         renderPOList(allPOData);
@@ -346,6 +362,8 @@ function selectPO(po, cardEl) {
     const detailEl = document.getElementById('po-detail');
     if (detailEl) {
         detailEl.style.fontStyle = 'normal';
+        const inProgressQty = po.in_progress_qty != null ? po.in_progress_qty : Math.max(0, po.planned_qty - (po.checked_qty || 0));
+        const inProgressColor = inProgressQty > 0 ? '#fbbf24' : '#34d399';
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
@@ -357,6 +375,7 @@ function selectPO(po, cardEl) {
                 ${row('Model Sepatu', po.model_shoe)}
                 ${row('Received Date', formatReceiveDate(po.receive_date))}
                 ${row('Planned Qty', `${po.planned_qty.toLocaleString('id-ID')} ${po.uom}`)}
+                <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">In-Progress Qty</span><span style="color:${inProgressColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${inProgressQty.toLocaleString('id-ID')} ${esc(po.uom)} <span style="font-weight:400;font-size:11px;color:rgba(255,255,255,0.4);">(checked: ${(po.checked_qty || 0).toLocaleString('id-ID')})</span></span>
             </div>
         `;
     }
@@ -603,9 +622,13 @@ async function submitInspection() {
         if (MATERIAL_TEST_MODE) {
             console.log('[TEST MODE] Payload:', JSON.stringify(payload, null, 2));
             await delay(1000);
-            // Update PO status in local mock
+            // Update PO status and checked qty in local mock
             const idx = allPOData.findIndex(p => p.po_number === selectedPO.po_number);
-            if (idx !== -1) allPOData[idx].status = checkingStatus;
+            if (idx !== -1) {
+                allPOData[idx].status = checkingStatus;
+                allPOData[idx].checked_qty = (allPOData[idx].checked_qty || 0) + inspect;
+                allPOData[idx].in_progress_qty = Math.max(0, allPOData[idx].planned_qty - allPOData[idx].checked_qty);
+            }
 
             loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan! (simulasi)`, 'success');

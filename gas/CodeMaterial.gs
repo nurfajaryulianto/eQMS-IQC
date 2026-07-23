@@ -150,6 +150,22 @@ function getMasterData(params) {
   var displayData = sheet.getDataRange().getDisplayValues();
   if (data.length < 2) return { data: [] };
 
+  // Build a map of total checked qty per PO from inspections sheet
+  // inspections columns: 7=po_no, 9=ok, 10=no_qty
+  var checkedMap = {};
+  var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+  if (inspSheet && inspSheet.getLastRow() > 2) {
+    var inspData = inspSheet.getDataRange().getValues();
+    for (var i = 2; i < inspData.length; i++) { // skip 2 header rows
+      var inspPO = String(inspData[i][7] || '').trim().toLowerCase();
+      if (!inspPO) continue;
+      var okQty = Number(inspData[i][9]) || 0;
+      var noQty = Number(inspData[i][10]) || 0;
+      var qtyChecked = okQty + noQty;
+      checkedMap[inspPO] = (checkedMap[inspPO] || 0) + qtyChecked;
+    }
+  }
+
   // Column indices are FIXED — they match MASTER_DATA_HEADERS exactly:
   // 0:no  1:material_name  2:material_description  3:uom  4:supplier
   // 5:supplier_name  6:po_area  7:batch_size  8:product_code  9:model_name
@@ -184,6 +200,10 @@ function getMasterData(params) {
       }
     }
 
+    var plannedQty = Number(row[7]) || 0;
+    var checkedQty = checkedMap[poVal.toLowerCase()] || 0;
+    var inProgressQty = Math.max(0, plannedQty - checkedQty);
+
     result.push({
       po_number:        poVal,
       material_name:    String(row[1] || '').trim(),
@@ -192,7 +212,9 @@ function getMasterData(params) {
       vendor_name:      String(row[5] || row[4] || '').trim(),
       style:            String(row[8] || '').trim(),
       model_shoe:       String(row[9] || '').trim(),
-      planned_qty:      Number(row[7]) || 0,
+      planned_qty:      plannedQty,
+      checked_qty:      checkedQty,
+      in_progress_qty:  inProgressQty,
       receive_date:     rdVal,
       status:           st,
     });
