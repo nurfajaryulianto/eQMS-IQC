@@ -501,6 +501,7 @@ window.confirmPassAll = async function () {
         const payload = {
             action: 'passAll',
             admin_nik: currentUser?.nik || 'admin',
+            admin_name: currentUser?.name || 'Admin Material',
             po_numbers: selectedPos
         };
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
@@ -560,7 +561,231 @@ document.addEventListener('DOMContentLoaded', () => {
     if (passallTab) {
         passallTab.addEventListener('click', () => { window.loadPassAllPreview(); });
     }
+    const assignmentTab = document.getElementById('tab-assignment');
+    if (assignmentTab) {
+        assignmentTab.addEventListener('click', () => { window.loadMaterialAssignments(); });
+    }
 });
+
+// ─── MATERIAL ASSIGNMENT TAB ──────────────────────────────────
+
+let allAssignments = [];
+let editingAssignmentMaterialType = null;
+
+window.loadMaterialAssignments = async function () {
+    const tbody = document.getElementById('assignment-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data assignment...</td></tr>`;
+
+    populateAssignmentFormOptions();
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            allAssignments = [
+                { material_type: 'LEATHER', inspector_nik: 'inspector1', inspector_name: 'Budi Santoso', updated_by: 'Admin Material', updated_at: '2026-07-20T10:00:00Z' },
+                { material_type: 'TEXTILE', inspector_nik: 'inspector2', inspector_name: 'Siti Rahma', updated_by: 'Admin Material', updated_at: '2026-07-21T11:30:00Z' },
+            ];
+        } else {
+            const res = await fetch(`${MATERIAL_GAS_URL}?action=getMaterialAssignments`);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            allAssignments = json.data || [];
+        }
+        renderAssignmentsTable();
+    } catch (err) {
+        console.error(err);
+        showToast('Gagal memuat material assignments: ' + err.message, 'error');
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data assignment.</td></tr>`;
+    }
+};
+
+async function populateAssignmentFormOptions() {
+    const datalist = document.getElementById('mat-type-suggestions');
+    if (datalist) {
+        const types = [...new Set(allMasterData.map(d => d.material_type || d.MaterialType).filter(Boolean))].sort();
+        ['LEATHER', 'TEXTILE', 'SYNTHETIC', 'RUBBER', 'FOAM', 'PACKAGING', 'HARDWARE'].forEach(t => {
+            if (!types.includes(t)) types.push(t);
+        });
+        datalist.innerHTML = types.map(t => `<option value="${esc(t)}"></option>`).join('');
+    }
+
+    const inspectorSelect = document.getElementById('assign-inspector');
+    if (!inspectorSelect) return;
+
+    try {
+        if (!allUsers.length) {
+            if (MATERIAL_TEST_MODE) {
+                allUsers = [
+                    { nik: 'admin', name: 'Admin Material', role: 'admin' },
+                    { nik: 'inspector1', name: 'Budi Santoso', role: 'inspector' },
+                    { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector' }
+                ];
+            } else {
+                const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+                const json = await res.json();
+                allUsers = json.data || [];
+            }
+        }
+        
+        inspectorSelect.innerHTML = `<option value="">Pilih Inspector...</option>` +
+            allUsers.map(u => `<option value="${esc(u.name || u.nik)}" data-nik="${esc(u.nik)}">${esc(u.name || u.nik)} (${esc(u.nik)} - ${u.role})</option>`).join('');
+    } catch (e) {
+        console.error('Failed to populate inspector select:', e);
+    }
+}
+
+function renderAssignmentsTable() {
+    const tbody = document.getElementById('assignment-tbody');
+    const countEl = document.getElementById('assignment-count');
+    if (!tbody) return;
+
+    if (countEl) countEl.textContent = allAssignments.length;
+
+    if (!allAssignments.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Belum ada assignment material_type.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = allAssignments.map((a, idx) => {
+        const dateStr = a.updated_at ? new Date(a.updated_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const inspectorDisp = a.inspector_name || a.inspector_nik || '—';
+
+        return `<tr>
+            <td style="padding:12px 14px;font-weight:700;color:rgba(255,255,255,0.5);">${idx + 1}</td>
+            <td style="padding:12px 14px;font-weight:700;color:#34d399;">${esc(a.material_type)}</td>
+            <td style="padding:12px 14px;font-weight:600;color:white;">${esc(inspectorDisp)}</td>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(a.updated_by || 'Admin')} (${esc(dateStr)})</td>
+            <td style="padding:12px 14px;text-align:center;">
+                <div style="display:flex;gap:12px;justify-content:center;">
+                    <button onclick="window.editAssignment('${esc(a.material_type)}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#60a5fa;border-color:rgba(96,165,250,0.3);">Edit</button>
+                    <button onclick="window.deleteAssignment('${esc(a.material_type)}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#f87171;border-color:rgba(248,113,113,0.3);">Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+window.handleAssignmentSubmit = async function (e) {
+    e.preventDefault();
+    const mtInput = document.getElementById('assign-material-type');
+    const inspSelect = document.getElementById('assign-inspector');
+
+    const materialType = mtInput.value.trim();
+    const inspectorName = inspSelect.value;
+    const selectedOpt = inspSelect.options[inspSelect.selectedIndex];
+    const inspectorNik = selectedOpt ? (selectedOpt.dataset.nik || inspectorName) : inspectorName;
+
+    if (!materialType || !inspectorName) {
+        showToast('Material Type dan Inspector wajib diisi.', 'error');
+        return;
+    }
+
+    setLoading(true, 'Menyimpan material assignment...');
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            await delay(1000);
+            const idx = allAssignments.findIndex(a => a.material_type.toLowerCase() === materialType.toLowerCase());
+            const now = new Date().toISOString();
+            if (idx >= 0) {
+                allAssignments[idx] = { material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now };
+            } else {
+                allAssignments.push({ material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now });
+            }
+            setLoading(false);
+            showToast('Assignment berhasil disimpan (simulasi)', 'success');
+            resetAssignmentForm();
+            renderAssignmentsTable();
+            return;
+        }
+
+        const payload = {
+            action: 'saveMaterialAssignment',
+            material_type: materialType,
+            inspector_nik: inspectorNik,
+            inspector_name: inspectorName,
+            updated_by: currentUser?.name || currentUser?.nik || 'Admin'
+        };
+
+        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        setLoading(false);
+        showToast(json.message || 'Assignment berhasil disimpan.', 'success');
+        resetAssignmentForm();
+        await loadMaterialAssignments();
+
+    } catch (err) {
+        setLoading(false);
+        showToast('Gagal menyimpan assignment: ' + err.message, 'error');
+    }
+};
+
+window.editAssignment = function (materialType) {
+    const item = allAssignments.find(a => a.material_type.toLowerCase() === materialType.toLowerCase());
+    if (!item) return;
+
+    editingAssignmentMaterialType = item.material_type;
+    document.getElementById('assign-material-type').value = item.material_type;
+    
+    const inspSelect = document.getElementById('assign-inspector');
+    if (inspSelect) {
+        inspSelect.value = item.inspector_name || item.inspector_nik || '';
+    }
+
+    const titleEl = document.getElementById('assignment-form-title');
+    const submitBtn = document.getElementById('assign-submit-btn');
+    const cancelBtn = document.getElementById('assign-cancel-btn');
+
+    if (titleEl) titleEl.textContent = `Edit Assignment: ${item.material_type}`;
+    if (submitBtn) submitBtn.textContent = 'Update Assignment';
+    if (cancelBtn) cancelBtn.style.display = 'block';
+};
+
+window.resetAssignmentForm = function () {
+    editingAssignmentMaterialType = null;
+    document.getElementById('assignment-form')?.reset();
+
+    const titleEl = document.getElementById('assignment-form-title');
+    const submitBtn = document.getElementById('assign-submit-btn');
+    const cancelBtn = document.getElementById('assign-cancel-btn');
+
+    if (titleEl) titleEl.textContent = 'Assign Inspector per Material';
+    if (submitBtn) submitBtn.textContent = 'Simpan Assignment';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+};
+
+window.deleteAssignment = async function (materialType) {
+    if (!confirm(`Hapus assignment untuk material type "${materialType}"?`)) return;
+
+    setLoading(true, 'Menghapus assignment...');
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            await delay(800);
+            allAssignments = allAssignments.filter(a => a.material_type.toLowerCase() !== materialType.toLowerCase());
+            setLoading(false);
+            showToast('Assignment dihapus (simulasi)', 'success');
+            renderAssignmentsTable();
+            return;
+        }
+
+        const payload = { action: 'deleteMaterialAssignment', material_type: materialType };
+        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        setLoading(false);
+        showToast(json.message || 'Assignment berhasil dihapus.', 'success');
+        await loadMaterialAssignments();
+
+    } catch (err) {
+        setLoading(false);
+        showToast('Gagal menghapus assignment: ' + err.message, 'error');
+    }
+};
 
 // ─── USER MANAGEMENT TAB ─────────────────────────────────────
 

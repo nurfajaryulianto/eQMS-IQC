@@ -345,7 +345,7 @@ function renderLogTable() {
             <td style="font-weight:600;white-space:nowrap;color:white;">${esc(d.po_number)}</td>
             <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,0.85);">${esc(d.material_name || '—')}</td>
             <td style="color:rgba(255,255,255,0.85);">${esc(d.vendor_name || '—')}</td>
-            <td style="color:rgba(255,255,255,0.85);">${esc(d.inspector_nik || '—')}</td>
+            <td style="color:rgba(255,255,255,0.85);">${esc(d.inspector_name || d.inspector_nik || '—')}</td>
             <td style="text-align:center;">${rollingBadge}</td>
             <td style="text-align:right;font-weight:600;color:white;">${d.qty_inspect.toLocaleString('id-ID')}</td>
             <td style="text-align:right;font-weight:600;color:#f87171;">${d.qty_fail.toLocaleString('id-ID')}</td>

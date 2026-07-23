@@ -389,6 +389,12 @@ function row(label, value) {
 window.filterPOList = function () {
     const search = (document.getElementById('po-search')?.value || '').toLowerCase().trim();
     const status = document.getElementById('status-filter')?.value || 'all';
+    const dateVal = document.getElementById('po-date-filter')?.value || '';
+    const clearBtn = document.getElementById('po-date-clear-btn');
+
+    if (clearBtn) {
+        clearBtn.style.display = dateVal ? 'flex' : 'none';
+    }
 
     filteredPO = allPOData.filter(po => {
         const matchSearch = !search || [
@@ -398,10 +404,34 @@ window.filterPOList = function () {
         const matchStatus = status === 'all' || 
             (status === 'in-progress' ? (po.status === 'in-progress' || po.status === 'in progress') : po.status === status);
 
-        return matchSearch && matchStatus;
+        let matchDate = true;
+        if (dateVal) {
+            const rawDate = String(po.receive_date || po.uploaded_at || '').trim();
+            if (rawDate) {
+                let normalizedDate = rawDate.split('T')[0];
+                if (rawDate.includes('-') && rawDate.split('-')[0].length === 2) {
+                    const parts = rawDate.split('-');
+                    normalizedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else if (rawDate.includes('/') && rawDate.split('/')[0].length === 2) {
+                    const parts = rawDate.split('/');
+                    normalizedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+                matchDate = (normalizedDate === dateVal);
+            } else {
+                matchDate = false;
+            }
+        }
+
+        return matchSearch && matchStatus && matchDate;
     });
 
     renderPOList(filteredPO);
+};
+
+window.clearPOFilterDate = function () {
+    const dateInput = document.getElementById('po-date-filter');
+    if (dateInput) dateInput.value = '';
+    filterPOList();
 };
 
 // ─── QTY CALCULATIONS ─────────────────────────────────────────
@@ -517,6 +547,7 @@ async function submitInspection() {
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
     const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
     const inspectorNik = currentUser?.nik || '';
+    const inspectorName = currentUser?.name || currentUser?.nik || '';
     const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
     const leaderSelect = document.getElementById('approved-by-leader');
     const fileInput = document.getElementById('evidence-file');
@@ -551,7 +582,8 @@ async function submitInspection() {
     const payload = {
         action: 'submitInspection',
         po_number: selectedPO.po_number,
-        inspector_nik: inspectorNik,
+        inspector_nik: inspectorName,
+        inspector_name: inspectorName,
         qty_inspect: inspect,
         qty_fail: fail,
         defect_notes: notes,

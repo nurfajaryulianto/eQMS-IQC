@@ -353,6 +353,15 @@
                             <option value="in-progress">In-Progress</option>
                             <option value="done">Done</option>
                         </select>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="date" id="po-date-filter" onchange="filterPOList()"
+                                class="styled-input" style="width: auto; cursor: pointer; color: white;" title="Filter Berdasarkan Tanggal">
+                            <button id="po-date-clear-btn" onclick="clearPOFilterDate()" class="btn-secondary"
+                                style="display: none; padding: 6px 8px; border-radius: 8px; font-size: 12px; height: 38px; align-items: center; justify-content: center;"
+                                title="Reset Tanggal">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- PO List -->

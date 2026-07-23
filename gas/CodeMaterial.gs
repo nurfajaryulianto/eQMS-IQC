@@ -12,6 +12,7 @@ var SHEET = {
   INSPECTIONS:  'inspections',
   USERS:        'users',
   SETTINGS:     'settings',
+  ASSIGNMENTS:  'material_assignments',
 };
 
 var SUPABASE_URL  = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
@@ -37,10 +38,11 @@ var INSPECTION_HEADERS = [
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
   try {
-    if (action === 'getMasterData')     return jsonResponse(getMasterData(e.parameter));
-    if (action === 'getInspectionData') return jsonResponse(getInspectionData(e.parameter));
-    if (action === 'getUsers')          return jsonResponse(getUsers());
-    if (action === 'generateTemplate')  return generateTemplate();
+    if (action === 'getMasterData')          return jsonResponse(getMasterData(e.parameter));
+    if (action === 'getInspectionData')      return jsonResponse(getInspectionData(e.parameter));
+    if (action === 'getUsers')               return jsonResponse(getUsers());
+    if (action === 'getMaterialAssignments') return jsonResponse(getMaterialAssignments());
+    if (action === 'generateTemplate')       return generateTemplate();
     if (action === 'getStatus') {
       var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       return jsonResponse({
@@ -67,12 +69,14 @@ function doPost(e) {
 
   var action = payload.action || '';
   try {
-    if (action === 'login')              return jsonResponse(login(payload));
-    if (action === 'submitInspection')   return jsonResponse(submitInspection(payload));
-    if (action === 'bulkUpsertMasterData') return jsonResponse(bulkUpsertMasterData(payload));
-    if (action === 'passAll')            return jsonResponse(passAll(payload));
-    if (action === 'saveUser')           return jsonResponse(saveUser(payload));
-    if (action === 'deleteUser')         return jsonResponse(deleteUser(payload));
+    if (action === 'login')                  return jsonResponse(login(payload));
+    if (action === 'submitInspection')       return jsonResponse(submitInspection(payload));
+    if (action === 'bulkUpsertMasterData')   return jsonResponse(bulkUpsertMasterData(payload));
+    if (action === 'passAll')                return jsonResponse(passAll(payload));
+    if (action === 'saveUser')               return jsonResponse(saveUser(payload));
+    if (action === 'deleteUser')             return jsonResponse(deleteUser(payload));
+    if (action === 'saveMaterialAssignment')   return jsonResponse(saveMaterialAssignment(payload));
+    if (action === 'deleteMaterialAssignment') return jsonResponse(deleteMaterialAssignment(payload));
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -405,7 +409,7 @@ function submitInspection(payload) {
       }
       else if (h === 'inspection_id') newRow.push(inspectionId);
       else if (h === 'po_no') newRow.push(payload.po_number || '');
-      else if (h === 'inspector_nik') newRow.push(payload.inspector_nik || '');
+      else if (h === 'inspector_nik') newRow.push(payload.inspector_name || payload.inspector_nik || '');
       
       // Inspection details
       else if (h === 'qty_receive') {
@@ -492,8 +496,27 @@ function passAll(payload) {
     var data    = mdSheet.getDataRange().getValues();
     var now = new Date().toISOString();
     var adminNik = payload.admin_nik || 'admin';
+    var adminName = payload.admin_name || 'Admin Material';
     var count = 0;
     var newInspRows = [];
+
+    // Load material assignments map
+    var assignSheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
+    var assignMap = {};
+    if (assignSheet && assignSheet.getLastRow() > 1) {
+      var assignData = assignSheet.getDataRange().getValues();
+      var aHeaders = assignData[0].map(function(h) { return String(h).toLowerCase().trim(); });
+      var mtCol = aHeaders.indexOf('material_type');
+      var nameCol = aHeaders.indexOf('inspector_name');
+      var nikCol = aHeaders.indexOf('inspector_nik');
+      for (var k = 1; k < assignData.length; k++) {
+        var mt = String(assignData[k][mtCol] || '').trim().toLowerCase();
+        var iname = String(assignData[k][nameCol] || assignData[k][nikCol] || '').trim();
+        if (mt && iname) {
+          assignMap[mt] = iname;
+        }
+      }
+    }
 
     // Filter by specific PO numbers if provided
     var targetPOs = null;
@@ -512,6 +535,8 @@ function passAll(payload) {
       if (targetPOs && !targetPOs[po]) continue;
 
       var qty = Number(data[i][7]) || 0; // batch_size is Col H (index 7)
+      var matType = String(data[i][17] || '').trim(); // material_type is Col R (index 17)
+      var assignedInspectorName = assignMap[matType.toLowerCase()] || adminName;
 
       var newRow = [];
       var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
@@ -522,7 +547,7 @@ function passAll(payload) {
         }
         else if (h === 'inspection_id') newRow.push(uniqueId);
         else if (h === 'po_no') newRow.push(po);
-        else if (h === 'inspector_nik') newRow.push(adminNik);
+        else if (h === 'inspector_nik') newRow.push(assignedInspectorName);
         else if (h === 'qty_receive') newRow.push(qty);
         else if (h === 'ok') newRow.push(qty);
         else if (h === 'no_qty') newRow.push(0);
@@ -650,6 +675,14 @@ function setupSpreadsheetHeaders() {
     uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
   }
 
+  // material_assignments
+  var aSheet = ss.getSheetByName(SHEET.ASSIGNMENTS) || ss.insertSheet(SHEET.ASSIGNMENTS);
+  if (aSheet.getLastRow() === 0) {
+    var aHeaders = ['material_type', 'inspector_nik', 'inspector_name', 'updated_by', 'updated_at'];
+    aSheet.getRange(1, 1, 1, aHeaders.length).setValues([aHeaders]);
+    aSheet.getRange(1, 1, 1, aHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
+  }
+
   SpreadsheetApp.flush();
 }
 
@@ -771,6 +804,124 @@ function deleteUser(payload) {
 
     throw new Error('User tidak ditemukan.');
 
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ─── MATERIAL ASSIGNMENT CRUD ──────────────────────────────────
+
+function getMaterialAssignments() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
+  if (!sheet) return { data: [] };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { data: [] };
+
+  var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+  var rows = data.slice(1);
+
+  var result = rows.map(function(row) {
+    var obj = {};
+    headers.forEach(function(h, i) {
+      obj[h] = row[i];
+    });
+    return obj;
+  });
+
+  return { data: result };
+}
+
+function saveMaterialAssignment(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var materialType = String(payload.material_type || '').trim();
+    var inspectorNik = String(payload.inspector_nik || '').trim();
+    var inspectorName = String(payload.inspector_name || payload.inspector_nik || '').trim();
+    var updatedBy = String(payload.updated_by || 'Admin').trim();
+
+    if (!materialType || !inspectorName) {
+      throw new Error('Material Type dan Inspector wajib diisi.');
+    }
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET.ASSIGNMENTS);
+      var aHeaders = ['material_type', 'inspector_nik', 'inspector_name', 'updated_by', 'updated_at'];
+      sheet.getRange(1, 1, 1, aHeaders.length).setValues([aHeaders]);
+      sheet.getRange(1, 1, 1, aHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    var mtCol = headers.indexOf('material_type');
+    var nikCol = headers.indexOf('inspector_nik');
+    var nameCol = headers.indexOf('inspector_name');
+    var byCol = headers.indexOf('updated_by');
+    var dateCol = headers.indexOf('updated_at');
+
+    var existingRowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][mtCol]).trim().toLowerCase() === materialType.toLowerCase()) {
+        existingRowIdx = i + 1;
+        break;
+      }
+    }
+
+    var now = new Date().toISOString();
+
+    if (existingRowIdx >= 0) {
+      if (nikCol >= 0) sheet.getRange(existingRowIdx, nikCol + 1).setValue(inspectorNik);
+      if (nameCol >= 0) sheet.getRange(existingRowIdx, nameCol + 1).setValue(inspectorName);
+      if (byCol >= 0) sheet.getRange(existingRowIdx, byCol + 1).setValue(updatedBy);
+      if (dateCol >= 0) sheet.getRange(existingRowIdx, dateCol + 1).setValue(now);
+      return { status: 'ok', message: 'Material assignment berhasil diperbarui.' };
+    } else {
+      var newRow = [];
+      headers.forEach(function(h) {
+        if (h === 'material_type') newRow.push(materialType);
+        else if (h === 'inspector_nik') newRow.push(inspectorNik);
+        else if (h === 'inspector_name') newRow.push(inspectorName);
+        else if (h === 'updated_by') newRow.push(updatedBy);
+        else if (h === 'updated_at') newRow.push(now);
+        else newRow.push('');
+      });
+      sheet.appendRow(newRow);
+      return { status: 'ok', message: 'Material assignment baru berhasil ditambahkan.' };
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteMaterialAssignment(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var materialType = String(payload.material_type || '').trim();
+    if (!materialType) throw new Error('Material Type tidak valid.');
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
+    if (!sheet) throw new Error('Sheet assignment tidak ditemukan.');
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    var mtCol = headers.indexOf('material_type');
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][mtCol]).trim().toLowerCase() === materialType.toLowerCase()) {
+        sheet.deleteRow(i + 1);
+        return { status: 'ok', message: 'Assignment berhasil dihapus.' };
+      }
+    }
+
+    throw new Error('Assignment tidak ditemukan.');
   } finally {
     lock.releaseLock();
   }
