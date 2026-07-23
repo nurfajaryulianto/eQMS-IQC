@@ -282,10 +282,6 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">done_all</span>
                 Pass All
             </button>
-            <button class="tab-btn" id="tab-assignment" onclick="switchTab('assignment')">
-                <span class="material-symbols-outlined" style="font-size:16px;">assignment_ind</span>
-                Material Assignment
-            </button>
             <button class="tab-btn" id="tab-users" onclick="switchTab('users')">
                 <span class="material-symbols-outlined" style="font-size:16px;">group</span>
                 Manage Users
@@ -498,80 +494,6 @@
             </div>
         </div>
 
-        <!-- ── TAB: MATERIAL ASSIGNMENT ── -->
-        <div id="panel-assignment" style="display:none;">
-            <div style="display:grid;grid-template-columns: 2fr 1fr; gap:20px; align-items: start;">
-                <!-- Assignments Table Card -->
-                <div class="card">
-                    <div class="card-header" style="justify-content:space-between;">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">assignment_ind</span>
-                            <span style="font-size:14px;font-weight:700;color:white;">Daftar Material Assignment</span>
-                            <span id="assignment-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">0</span>
-                        </div>
-                        <button onclick="loadMaterialAssignments()" class="btn-secondary" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;font-size:12px;">
-                            <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
-                        </button>
-                    </div>
-                    <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-                            <thead>
-                                <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);text-align:left;">
-                                    <th style="padding:12px 14px;">No</th>
-                                    <th style="padding:12px 14px;">Material Type</th>
-                                    <th style="padding:12px 14px;">Inspector Assigned</th>
-                                    <th style="padding:12px 14px;">Updated By</th>
-                                    <th style="padding:12px 14px;text-align:center;">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="assignment-tbody">
-                                <tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
-                                    Memuat daftar assignment...
-                                </td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Add/Edit Assignment Form Card -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">person_add</span>
-                        <span id="assignment-form-title" style="font-size:14px;font-weight:700;color:white;">Assign Inspector per Material</span>
-                    </div>
-                    <div style="padding:20px;">
-                        <form id="assignment-form" onsubmit="handleAssignmentSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
-                            <div>
-                                <label for="assign-material-type" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
-                                    Material Type <span style="color:#ef4444;">*</span>
-                                </label>
-                                <input type="text" id="assign-material-type" list="mat-type-suggestions" class="styled-input" placeholder="Misal: LEATHER, TEXTILE, SYNTHETIC..." required>
-                                <datalist id="mat-type-suggestions"></datalist>
-                            </div>
-
-                            <div>
-                                <label for="assign-inspector" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
-                                    Pilih Inspector <span style="color:#ef4444;">*</span>
-                                </label>
-                                <select id="assign-inspector" class="styled-input" style="cursor:pointer;" required>
-                                    <option value="">Pilih Inspector...</option>
-                                </select>
-                            </div>
-
-                            <div style="display:flex; gap:10px; margin-top:8px;">
-                                <button type="submit" id="assign-submit-btn" class="btn-gradient" style="flex:1; padding:10px; border-radius:8px; font-size:13px; font-weight:700;">
-                                    Simpan Assignment
-                                </button>
-                                <button type="button" id="assign-cancel-btn" onclick="resetAssignmentForm()" class="btn-secondary" style="display:none; padding:10px; border-radius:8px; font-size:13px; font-weight:600;">
-                                    Batal
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ── TAB: MANAGE USERS ── -->
         <div id="panel-users" style="display:none;">
             <div style="display:grid;grid-template-columns: 2fr 1fr; gap:20px; align-items: start;">
@@ -594,12 +516,13 @@
                                     <th>NIK</th>
                                     <th>Nama</th>
                                     <th>Role</th>
+                                    <th>Material Assignment</th>
                                     <th>Tanggal Dibuat</th>
                                     <th style="text-align:center;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="users-tbody">
-                                <tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                <tr><td colspan="6" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
                                     Memuat daftar user...
                                 </td></tr>
                             </tbody>
@@ -642,6 +565,16 @@
                                     <option value="manager">Manager (Akses Dashboard & Admin)</option>
                                     <option value="admin">Admin (Akses Penuh)</option>
                                 </select>
+                            </div>
+
+                            <!-- Material Assignment Input -->
+                            <div>
+                                <label for="user-material-assignment" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    Material Assignment
+                                </label>
+                                <input type="text" id="user-material-assignment" list="mat-type-suggestions" class="styled-input" placeholder="Misal: LEATHER, TEXTILE, SYNTHETIC...">
+                                <datalist id="mat-type-suggestions"></datalist>
+                                <p style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px;">Jenis material type yang di-assign untuk inspector ini.</p>
                             </div>
 
                             <!-- Password Input -->
@@ -790,15 +723,12 @@
                 tab = 'leadermonitor';
             }
 
-            ['master','upload','passall','assignment','users','leadermonitor','spreadsheet'].forEach(t => {
+            ['master','upload','passall','users','leadermonitor','spreadsheet'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = t === tab ? 'block' : 'none';
                 if (btn) btn.classList.toggle('active', t === tab);
             });
-            if (tab === 'assignment' && typeof window.loadMaterialAssignments === 'function') {
-                window.loadMaterialAssignments();
-            }
             if (tab === 'users' && typeof window.loadUsersList === 'function') {
                 window.loadUsersList();
             }

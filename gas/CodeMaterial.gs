@@ -217,6 +217,26 @@ function getExcelVal(rObj, candList) {
   return '';
 }
 
+function normalizeDateStr(dVal) {
+  if (!dVal) return '';
+  if (dVal instanceof Date) {
+    try { return Utilities.formatDate(dVal, Session.getScriptTimeZone(), 'yyyy-MM-dd'); } catch(e) {}
+  }
+  var str = String(dVal).trim();
+  if (!str) return '';
+  if (str.indexOf('T') > 0) return str.split('T')[0];
+  var clean = str.split(' ')[0];
+  if (clean.indexOf('-') > 0 && clean.split('-')[0].length <= 2) {
+    var p1 = clean.split('-');
+    if (p1.length === 3) return p1[2] + '-' + (p1[1].length === 1 ? '0' + p1[1] : p1[1]) + '-' + (p1[0].length === 1 ? '0' + p1[0] : p1[0]);
+  }
+  if (clean.indexOf('/') > 0 && clean.split('/')[0].length <= 2) {
+    var p2 = clean.split('/');
+    if (p2.length === 3) return p2[2] + '-' + (p2[1].length === 1 ? '0' + p2[1] : p2[1]) + '-' + (p2[0].length === 1 ? '0' + p2[0] : p2[0]);
+  }
+  return clean.toLowerCase();
+}
+
 function bulkUpsertMasterData(payload) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -232,11 +252,12 @@ function bulkUpsertMasterData(payload) {
     var data    = sheet.getDataRange().getValues();
     var existingMap = {};
     
-    // Map existing POs (Column M is index 12)
+    // Map existing POs + Receive Date (Column M is index 12, Column L is index 11)
     for (var i = 1; i < data.length; i++) {
       var poKey = String(data[i][12]).trim();
+      var dateKey = normalizeDateStr(data[i][11]);
       if (poKey) {
-        existingMap[poKey] = true;
+        existingMap[(poKey + '___' + dateKey).toLowerCase()] = true;
       }
     }
 
@@ -267,6 +288,8 @@ function bulkUpsertMasterData(payload) {
       var poArea = getExcelVal(row, ['PO Area', 'po_area']);
       var matType = getExcelVal(row, ['Material Type', 'material_type']);
 
+      var dupKey = (po + '___' + normalizeDateStr(receiveDate)).toLowerCase();
+
       var newRow = [];
       MASTER_DATA_HEADERS.forEach(function(h) {
         if (h === 'no') newRow.push('');
@@ -293,10 +316,10 @@ function bulkUpsertMasterData(payload) {
         else newRow.push('');
       });
 
-      if (existingMap[po]) {
-        rejectedPOs.push(po);
+      if (existingMap[dupKey]) {
+        rejectedPOs.push(po + ' (Tgl: ' + (receiveDate || 'N/A') + ')');
       } else {
-        existingMap[po] = true;
+        existingMap[dupKey] = true;
         insertRows.push(newRow);
       }
     });
@@ -312,7 +335,7 @@ function bulkUpsertMasterData(payload) {
 
     return {
       status:  'ok',
-      message: `Upload selesai: ${insertRows.length} baru, ${rejectedPOs.length} duplikat ditolak.`,
+      message: `Upload selesai: ${insertRows.length} baru disimpan, ${rejectedPOs.length} duplikat (PO & Receive Date sama) ditolak.`,
       inserted: insertRows.length,
       rejected: rejectedPOs,
     };
@@ -500,9 +523,30 @@ function passAll(payload) {
     var count = 0;
     var newInspRows = [];
 
-    // Load material assignments map
-    var assignSheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
+    // Load material assignments map from USERS sheet and ASSIGNMENTS sheet
     var assignMap = {};
+    var uSheet = ss.getSheetByName(SHEET.USERS);
+    if (uSheet && uSheet.getLastRow() > 1) {
+      var uData = uSheet.getDataRange().getValues();
+      var uHdrs = uData[0].map(function(h) { return String(h).toLowerCase().trim(); });
+      var uNameCol = uHdrs.indexOf('name');
+      var uMatCol = uHdrs.indexOf('material_assignment');
+      if (uNameCol >= 0 && uMatCol >= 0) {
+        for (var u = 1; u < uData.length; u++) {
+          var uname = String(uData[u][uNameCol] || '').trim();
+          var umats = String(uData[u][uMatCol] || '').trim();
+          if (uname && umats) {
+            var splitted = umats.split(',');
+            splitted.forEach(function(sm) {
+              var cleanMat = sm.trim().toLowerCase();
+              if (cleanMat) assignMap[cleanMat] = uname;
+            });
+          }
+        }
+      }
+    }
+
+    var assignSheet = ss.getSheetByName(SHEET.ASSIGNMENTS);
     if (assignSheet && assignSheet.getLastRow() > 1) {
       var assignData = assignSheet.getDataRange().getValues();
       var aHeaders = assignData[0].map(function(h) { return String(h).toLowerCase().trim(); });
@@ -667,12 +711,12 @@ function setupSpreadsheetHeaders() {
   // users
   var uSheet = ss.getSheetByName(SHEET.USERS) || ss.insertSheet(SHEET.USERS);
   if (uSheet.getLastRow() === 0) {
-    var uHeaders = ['nik', 'password', 'name', 'role', 'created_at'];
+    var uHeaders = ['nik', 'password', 'name', 'role', 'material_assignment', 'created_at'];
     uSheet.getRange(1, 1, 1, uHeaders.length).setValues([uHeaders]);
     uSheet.getRange(1, 1, 1, uHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
     
     var now = new Date().toISOString();
-    uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', now]);
+    uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', '', now]);
   }
 
   // material_assignments
@@ -719,6 +763,7 @@ function saveUser(payload) {
     var name = String(payload.name || '').trim();
     var role = String(payload.role || '').trim();
     var password = String(payload.password || '').trim();
+    var matAssign = String(payload.material_assignment || payload.material_type || '').trim();
 
     if (!nik || !name || !role) throw new Error('Data tidak lengkap. NIK, Nama, dan Role wajib diisi.');
 
@@ -726,12 +771,21 @@ function saveUser(payload) {
     var sheet = ss.getSheetByName(SHEET.USERS);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET.USERS);
-      sheet.getRange(1, 1, 1, 5).setValues([['nik', 'password', 'name', 'role', 'created_at']]);
-      sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#e2e8f0');
+      sheet.getRange(1, 1, 1, 6).setValues([['nik', 'password', 'name', 'role', 'material_assignment', 'created_at']]);
+      sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#e2e8f0');
     }
 
     var data = sheet.getDataRange().getValues();
     var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
+    
+    // Ensure material_assignment column exists in header row if older sheet
+    var assignCol = headers.indexOf('material_assignment');
+    if (assignCol < 0) {
+      assignCol = headers.length;
+      headers.push('material_assignment');
+      sheet.getRange(1, assignCol + 1).setValue('material_assignment').setFontWeight('bold');
+    }
+
     var nikCol = headers.indexOf('nik');
     var passCol = headers.indexOf('password');
     var nameCol = headers.indexOf('name');
@@ -748,9 +802,10 @@ function saveUser(payload) {
     var now = new Date().toISOString();
 
     if (existingRowIdx >= 0) {
-      sheet.getRange(existingRowIdx, nameCol + 1).setValue(name);
-      sheet.getRange(existingRowIdx, roleCol + 1).setValue(role);
-      if (password) {
+      if (nameCol >= 0) sheet.getRange(existingRowIdx, nameCol + 1).setValue(name);
+      if (roleCol >= 0) sheet.getRange(existingRowIdx, roleCol + 1).setValue(role);
+      if (assignCol >= 0) sheet.getRange(existingRowIdx, assignCol + 1).setValue(matAssign);
+      if (password && passCol >= 0) {
         sheet.getRange(existingRowIdx, passCol + 1).setValue(password);
       }
       return { status: 'ok', message: 'User berhasil diperbarui.' };
@@ -763,6 +818,7 @@ function saveUser(payload) {
         else if (h === 'password') newRow.push(password);
         else if (h === 'name') newRow.push(name);
         else if (h === 'role') newRow.push(role);
+        else if (h === 'material_assignment') newRow.push(matAssign);
         else if (h === 'created_at') newRow.push(now);
         else newRow.push('');
       });

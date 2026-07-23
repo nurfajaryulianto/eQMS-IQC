@@ -253,23 +253,29 @@ window.confirmUpload = async function () {
         if (MATERIAL_TEST_MODE) {
             await delay(1500);
             
-            // Map existing POs in cache to check duplicates
+            // Map existing POs + Receive Date in cache to check duplicates
             const existingMap = {};
             allMasterData.forEach(d => {
-                if (d.po_number) existingMap[d.po_number] = true;
+                if (d.po_number) {
+                    const key = (d.po_number + '___' + (d.receive_date || '')).toLowerCase();
+                    existingMap[key] = true;
+                }
             });
 
             parsedFileData.forEach(row => {
                 const po = String(row['PO Number'] || row.po_number || '').trim();
+                const recDate = String(row['Receive Date'] || row.receive_date || '').trim();
                 if (!po) return;
                 
-                if (existingMap[po]) {
-                    rejected.push(po);
+                const key = (po + '___' + recDate).toLowerCase();
+                if (existingMap[key]) {
+                    rejected.push(po + ' (Tgl: ' + (recDate || 'N/A') + ')');
                 } else {
-                    existingMap[po] = true;
+                    existingMap[key] = true;
                     inserted++;
                     allMasterData.push({
                         po_number: po,
+                        receive_date: recDate,
                         material_name: row['Material Name'] || row.material_name || '',
                         vendor_name: row['Supplier'] || row.vendor_name || '',
                         uom: row['UOM'] || row.uom || '',
@@ -797,14 +803,24 @@ window.loadUsersList = async function () {
     const tbody = document.getElementById('users-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data user...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data user...</td></tr>`;
+
+    // Populate material type datalist suggestions
+    const datalist = document.getElementById('mat-type-suggestions');
+    if (datalist && allMasterData.length) {
+        const types = [...new Set(allMasterData.map(d => d.material_type || d.MaterialType).filter(Boolean))].sort();
+        ['LEATHER', 'TEXTILE', 'SYNTHETIC', 'RUBBER', 'FOAM', 'PACKAGING', 'HARDWARE'].forEach(t => {
+            if (!types.includes(t)) types.push(t);
+        });
+        datalist.innerHTML = types.map(t => `<option value="${esc(t)}"></option>`).join('');
+    }
 
     try {
         if (MATERIAL_TEST_MODE) {
             allUsers = [
-                { nik: 'admin', name: 'Admin Material', role: 'admin', created_at: '2026-07-10T12:00:00Z' },
-                { nik: 'inspector1', name: 'Budi Santoso', role: 'inspector', created_at: '2026-07-12T08:30:00Z' },
-                { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', created_at: '2026-07-14T09:45:00Z' },
+                { nik: 'admin', name: 'Admin Material', role: 'admin', material_assignment: 'ALL', created_at: '2026-07-10T12:00:00Z' },
+                { nik: 'inspector1', name: 'Budi Santoso', role: 'inspector', material_assignment: 'LEATHER', created_at: '2026-07-12T08:30:00Z' },
+                { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', material_assignment: 'TEXTILE', created_at: '2026-07-14T09:45:00Z' },
             ];
         } else {
             const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
@@ -816,7 +832,7 @@ window.loadUsersList = async function () {
     } catch (err) {
         console.error(err);
         showToast('Gagal memuat daftar user: ' + err.message, 'error');
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data user.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data user.</td></tr>`;
     }
 };
 
@@ -828,7 +844,7 @@ function renderUsersTable() {
     if (countEl) countEl.textContent = allUsers.length;
 
     if (!allUsers.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Tidak ada user terdaftar.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Tidak ada user terdaftar.</td></tr>`;
         return;
     }
 
@@ -845,10 +861,13 @@ function renderUsersTable() {
             roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
         }
 
+        const matAssign = u.material_assignment || u.material_type || '—';
+
         return `<tr>
             <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.85);">${esc(u.name)}</td>
             <td style="padding:12px 14px;">${roleLabel}</td>
+            <td style="padding:12px 14px;font-weight:600;color:#34d399;">${esc(matAssign)}</td>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(dateStr)}</td>
             <td style="padding:12px 14px;text-align:center;">
                 <div style="display:flex;gap:12px;justify-content:center;">
@@ -866,11 +885,13 @@ window.handleUserSubmit = async function (e) {
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
     const passwordInput = document.getElementById('user-password');
+    const assignInput = document.getElementById('user-material-assignment');
 
     const nik = nikInput.value.trim();
     const name = nameInput.value.trim();
     const role = roleInput.value;
     const password = passwordInput.value;
+    const matAssignment = assignInput ? assignInput.value.trim() : '';
 
     if (!nik || !name || !role) {
         showToast('NIK, Nama, dan Role wajib diisi.', 'error');
@@ -894,6 +915,7 @@ window.handleUserSubmit = async function (e) {
         nik: nik,
         name: name,
         role: role,
+        material_assignment: matAssignment,
         password: password || undefined
     };
 
@@ -906,9 +928,10 @@ window.handleUserSubmit = async function (e) {
                 if (idx !== -1) {
                     allUsers[idx].name = name;
                     allUsers[idx].role = role;
+                    allUsers[idx].material_assignment = matAssignment;
                 }
             } else {
-                allUsers.push({ nik, name, role, created_at: new Date().toISOString() });
+                allUsers.push({ nik, name, role, material_assignment: matAssignment, created_at: new Date().toISOString() });
             }
             showToast('User berhasil disimpan (simulasi)!', 'success');
         } else {
@@ -943,6 +966,7 @@ window.editUser = function (nik) {
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
     const passwordInput = document.getElementById('user-password');
+    const assignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
     const pwdRequiredStar = document.getElementById('pwd-required-star');
@@ -950,6 +974,7 @@ window.editUser = function (nik) {
     if (nikInput) { nikInput.value = editingUserNik; nikInput.disabled = true; }
     if (nameInput) nameInput.value = user.name || '';
     if (roleInput) roleInput.value = String(user.role || 'inspector').trim().toLowerCase();
+    if (assignInput) assignInput.value = user.material_assignment || user.material_type || '';
     if (passwordInput) {
         passwordInput.value = '';
         passwordInput.placeholder = 'Kosongkan jika tidak diubah';
@@ -1005,11 +1030,13 @@ window.resetUserForm = function () {
 
     const nikInput = document.getElementById('user-nik');
     const passwordInput = document.getElementById('user-password');
+    const assignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
     const pwdRequiredStar = document.getElementById('pwd-required-star');
 
     if (nikInput) nikInput.disabled = false;
+    if (assignInput) assignInput.value = '';
     if (passwordInput) {
         passwordInput.placeholder = 'Minimal 6 karakter';
         passwordInput.required = true;
