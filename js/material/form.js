@@ -27,7 +27,8 @@ const MOCK_MASTER_DATA = [
         receive_date: '2026-07-22',
         planned_qty: 500,
         checked_qty: 0,
-        in_progress_qty: 500,
+        in_progress_qty: 0,
+        balance_qty: 500,
         status: 'pending',
     },
     {
@@ -41,7 +42,8 @@ const MOCK_MASTER_DATA = [
         receive_date: '2026-07-21',
         planned_qty: 300,
         checked_qty: 120,
-        in_progress_qty: 180,
+        in_progress_qty: 120,
+        balance_qty: 180,
         status: 'in-progress',
     },
     {
@@ -54,8 +56,9 @@ const MOCK_MASTER_DATA = [
         model_shoe: 'WMNS TENNIS CLASSIC',
         receive_date: '2026-07-20',
         planned_qty: 200,
-        checked_qty: 200,
+        checked_qty: 0,
         in_progress_qty: 0,
+        balance_qty: 200,
         status: 'done',
     },
     {
@@ -69,7 +72,8 @@ const MOCK_MASTER_DATA = [
         receive_date: '2026-07-20',
         planned_qty: 400,
         checked_qty: 0,
-        in_progress_qty: 400,
+        in_progress_qty: 0,
+        balance_qty: 400,
         status: 'pending',
     },
     {
@@ -83,7 +87,8 @@ const MOCK_MASTER_DATA = [
         receive_date: '2026-07-19',
         planned_qty: 150,
         checked_qty: 50,
-        in_progress_qty: 100,
+        in_progress_qty: 50,
+        balance_qty: 100,
         status: 'in-progress',
     },
 ];
@@ -210,6 +215,7 @@ async function fetchMasterData() {
         allPOData = (json.data || []).map(row => {
             const plannedQty = Number(row.planned_qty || row.PlannedQty) || 0;
             const checkedQty = Number(row.checked_qty) || 0;
+            const balanceQty = Math.max(0, plannedQty - checkedQty);
             return {
                 po_number: row.po_number || row.PONumber || '',
                 material_name: row.material_name || row.MaterialName || '',
@@ -220,7 +226,8 @@ async function fetchMasterData() {
                 model_shoe: row.model_shoe || row.ModelShoe || '',
                 planned_qty: plannedQty,
                 checked_qty: checkedQty,
-                in_progress_qty: Math.max(0, plannedQty - checkedQty),
+                in_progress_qty: checkedQty,
+                balance_qty: balanceQty,
                 receive_date: row.receive_date || row.ReceiveDate || '',
                 status: (row.status || row.Status || 'pending').toLowerCase(),
             };
@@ -362,8 +369,10 @@ function selectPO(po, cardEl) {
     const detailEl = document.getElementById('po-detail');
     if (detailEl) {
         detailEl.style.fontStyle = 'normal';
-        const inProgressQty = po.in_progress_qty != null ? po.in_progress_qty : Math.max(0, po.planned_qty - (po.checked_qty || 0));
-        const inProgressColor = inProgressQty > 0 ? '#fbbf24' : '#34d399';
+        const checkedQty = po.checked_qty || 0;
+        const balanceQty = po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - checkedQty);
+        const inProgressColor = checkedQty > 0 ? '#fbbf24' : 'rgba(255,255,255,0.7)';
+        const balanceColor = balanceQty > 0 ? '#60a5fa' : '#34d399';
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
@@ -375,7 +384,8 @@ function selectPO(po, cardEl) {
                 ${row('Model Sepatu', po.model_shoe)}
                 ${row('Received Date', formatReceiveDate(po.receive_date))}
                 ${row('Planned Qty', `${po.planned_qty.toLocaleString('id-ID')} ${po.uom}`)}
-                <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">In-Progress Qty</span><span style="color:${inProgressColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${inProgressQty.toLocaleString('id-ID')} ${esc(po.uom)} <span style="font-weight:400;font-size:11px;color:rgba(255,255,255,0.4);">(checked: ${(po.checked_qty || 0).toLocaleString('id-ID')})</span></span>
+                <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">In-Progress Qty</span><span style="color:${inProgressColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${checkedQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
+                <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">Balance Qty</span><span style="color:${balanceColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${balanceQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
             </div>
         `;
     }
@@ -626,8 +636,15 @@ async function submitInspection() {
             const idx = allPOData.findIndex(p => p.po_number === selectedPO.po_number);
             if (idx !== -1) {
                 allPOData[idx].status = checkingStatus;
-                allPOData[idx].checked_qty = (allPOData[idx].checked_qty || 0) + inspect;
-                allPOData[idx].in_progress_qty = Math.max(0, allPOData[idx].planned_qty - allPOData[idx].checked_qty);
+                if (checkingStatus === 'in-progress') {
+                    allPOData[idx].checked_qty = (allPOData[idx].checked_qty || 0) + inspect;
+                    allPOData[idx].in_progress_qty = allPOData[idx].checked_qty;
+                    allPOData[idx].balance_qty = Math.max(0, allPOData[idx].planned_qty - allPOData[idx].checked_qty);
+                } else {
+                    allPOData[idx].checked_qty = 0;
+                    allPOData[idx].in_progress_qty = 0;
+                    allPOData[idx].balance_qty = allPOData[idx].planned_qty;
+                }
             }
 
             loading.classList.remove('visible');

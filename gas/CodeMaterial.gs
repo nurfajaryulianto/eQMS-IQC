@@ -188,7 +188,7 @@ function getMasterData(params) {
     // checked_qty is stored in col 21 (index 21) of master_data
     // Only populated when status is 'in-progress', empty for 'pending'/'done'
     var checkedQty = Number(row[21]) || 0;
-    var inProgressQty = Math.max(0, plannedQty - checkedQty);
+    var balanceQty = Math.max(0, plannedQty - checkedQty);
 
     result.push({
       po_number:        poVal,
@@ -200,7 +200,8 @@ function getMasterData(params) {
       model_shoe:       String(row[9] || '').trim(),
       planned_qty:      plannedQty,
       checked_qty:      checkedQty,
-      in_progress_qty:  inProgressQty,
+      in_progress_qty:  checkedQty,
+      balance_qty:      balanceQty,
       receive_date:     rdVal,
       status:           st,
     });
