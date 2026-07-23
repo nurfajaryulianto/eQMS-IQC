@@ -485,11 +485,17 @@ function submitInspection(payload) {
       }
     });
 
-    // Error proofing: Qty Inspect cannot exceed Planned Qty / Batch Size
+    // Error proofing: Qty Inspect cannot exceed Qty Balance (for in-progress) or Qty Received (for pending)
     var plannedQty = mdRowData ? Number(mdRowData[7]) || 0 : 0;
+    var existingChecked = mdRowData ? Number(mdRowData[21]) || 0 : 0;
+    var mdStatus = mdRowData ? String(mdRowData[18] || '').toLowerCase().trim() : '';
+
+    var maxAllowedBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? Math.max(0, plannedQty - existingChecked) : plannedQty;
     var inspectQty = Number(payload.qty_inspect) || 0;
-    if (plannedQty > 0 && inspectQty > plannedQty) {
-      throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi Qty Received / Planned Qty (' + plannedQty + ').');
+
+    if (maxAllowedBackend > 0 && inspectQty > maxAllowedBackend) {
+      var labelTypeBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? 'Qty Balance' : 'Qty Received';
+      throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
     }
 
     // Delete previous in-progress inspection rows for this PO from inspections sheet

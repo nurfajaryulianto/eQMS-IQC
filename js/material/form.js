@@ -403,14 +403,15 @@ function selectPO(po, cardEl) {
     const notesEl = document.getElementById('defect-notes');
     const checkColorEl = document.getElementById('check-color');
 
+    const maxAllowed = getMaxAllowedInspect(po);
     if (qtyInspectEl) {
         qtyInspectEl.value = '';
-        qtyInspectEl.max = po.planned_qty;
-        qtyInspectEl.placeholder = `Maks. ${po.planned_qty.toLocaleString('id-ID')}`;
+        qtyInspectEl.max = maxAllowed;
+        qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
     }
     if (qtyFailEl) {
         qtyFailEl.value = '';
-        qtyFailEl.max = po.planned_qty;
+        qtyFailEl.max = maxAllowed;
         qtyFailEl.placeholder = `Maks. Qty Inspect`;
     }
     if (notesEl) notesEl.value = '';
@@ -472,6 +473,14 @@ window.clearPOFilterDate = function () {
     filterPOList();
 };
 
+function getMaxAllowedInspect(po) {
+    if (!po) return 0;
+    if (po.checked_qty > 0 || po.status === 'in-progress' || po.status === 'in progress') {
+        return po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - (po.checked_qty || 0));
+    }
+    return po.planned_qty;
+}
+
 // ─── QTY CALCULATIONS & ERROR PROOFING ────────────────────────
 
 window.updateCalculations = function () {
@@ -481,13 +490,16 @@ window.updateCalculations = function () {
     let inspect = parseInt(qtyInspectEl?.value, 10) || 0;
     let fail = parseInt(qtyFailEl?.value, 10) || 0;
 
-    // Error proofing: Clamp inspect to planned_qty
+    // Error proofing: Clamp inspect to maxAllowed (Qty Balance if in-progress, Qty Received if pending)
     if (selectedPO) {
-        const maxAllowed = selectedPO.planned_qty;
+        const maxAllowed = getMaxAllowedInspect(selectedPO);
+        const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
+        const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
+
         if (inspect > maxAllowed) {
             inspect = maxAllowed;
             if (qtyInspectEl) qtyInspectEl.value = maxAllowed;
-            showToast(`Qty Inspect tidak boleh melebihi Qty Received / Planned Qty (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`, 'error');
+            showToast(`Qty Inspect tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`, 'error');
         }
     }
 
@@ -529,11 +541,14 @@ window.openValidationDialog = function () {
     if (!selectedPO) {
         errors.push('Silakan pilih PO/Material terlebih dahulu.');
     } else {
-        const maxAllowed = selectedPO.planned_qty;
+        const maxAllowed = getMaxAllowedInspect(selectedPO);
+        const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
+        const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
+
         if (inspect <= 0) {
             errors.push('Qty Inspect harus lebih dari 0.');
         } else if (inspect > maxAllowed) {
-            errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi Qty Received / Planned Qty (${maxAllowed} ${selectedPO.uom}).`);
+            errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`);
         }
     }
 
