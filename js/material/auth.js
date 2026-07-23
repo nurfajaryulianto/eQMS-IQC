@@ -148,11 +148,12 @@ export async function materialLogin(nik, password) {
     if (json.error) return { success: false, message: json.error };
 
     const session = {
-        nik:       json.nik,
-        name:      json.name,
-        role:      json.role,
-        token:     json.token,
-        expires_at: json.expires_at,
+        nik:                 json.nik,
+        name:                json.name,
+        role:                json.role,
+        material_assignment: json.material_assignment || '',
+        token:               json.token,
+        expires_at:          json.expires_at,
     };
     setSession(session);
     return { success: true, session };

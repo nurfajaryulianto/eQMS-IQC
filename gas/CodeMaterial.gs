@@ -124,13 +124,14 @@ function login(payload) {
       var nameVal = nameCol >= 0 ? String(data[i][nameCol]) : rowNik;
       var roleVal = String(data[i][roleCol]).toLowerCase().trim();
       
-      var expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 8);
+      var matAssignCol = headers.indexOf('material_assignment');
+      var matAssignVal = matAssignCol >= 0 ? String(data[i][matAssignCol] || '').trim() : '';
 
       return {
         nik: rowNik,
         name: nameVal,
         role: roleVal,
+        material_assignment: matAssignVal,
         token: 'token_' + Utilities.getUuid(),
         expires_at: expiresAt.toISOString()
       };
@@ -600,7 +601,13 @@ function passAll(payload) {
             var splitted = umats.split(',');
             splitted.forEach(function(sm) {
               var cleanMat = sm.trim().toLowerCase();
-              if (cleanMat) assignMap[cleanMat] = uname;
+              if (cleanMat) {
+                if (!assignMap[cleanMat]) {
+                  assignMap[cleanMat] = [uname];
+                } else if (assignMap[cleanMat].indexOf(uname) < 0) {
+                  assignMap[cleanMat].push(uname);
+                }
+              }
             });
           }
         }
@@ -618,7 +625,11 @@ function passAll(payload) {
         var mt = String(assignData[k][mtCol] || '').trim().toLowerCase();
         var iname = String(assignData[k][nameCol] || assignData[k][nikCol] || '').trim();
         if (mt && iname) {
-          assignMap[mt] = iname;
+          if (!assignMap[mt]) {
+            assignMap[mt] = [iname];
+          } else if (Array.isArray(assignMap[mt]) && assignMap[mt].indexOf(iname) < 0) {
+            assignMap[mt].push(iname);
+          }
         }
       }
     }
@@ -654,8 +665,11 @@ function passAll(payload) {
       if (targetPOs && !targetPOs[po]) continue;
 
       var qty = Number(data[i][7]) || 0; // batch_size is Col H (index 7)
-      var matType = String(data[i][17] || '').trim(); // material_type is Col R (index 17)
-      var assignedInspectorName = assignMap[matType.toLowerCase()] || adminName;
+      var matType = String(data[i][17] || '').trim().toLowerCase(); // material_type is Col R (index 17)
+      var matName = String(data[i][1] || '').trim().toLowerCase();  // material_name is Col B (index 1)
+
+      var foundList = assignMap[matType] || assignMap[matName] || [];
+      var assignedInspectorName = (Array.isArray(foundList) && foundList.length > 0) ? foundList.join(', ') : adminName;
 
       var newRow = [];
       var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;

@@ -158,7 +158,7 @@ function doPost(e) {
     if (Array.isArray(data.items) && data.items.length > 0) {
       // Loop untuk setiap item inspeksi
       data.items.forEach((item, index) => {
-        const sessionId = baseSessionId + '-' + (index + 1);
+        const sessionId = baseSessionId;
         
         const sessionRow = [
           sessionId,
@@ -367,7 +367,9 @@ function doGet(e) {
         var row = allData[r];
         
         var rawSid = getCellStr(r, sessionIdCol);
-        var sid = rawSid || ('ROW-' + r);
+        // Normalize rawSid: strip trailing item index suffix like "-1", "-2" if present
+        var parentSid = rawSid ? rawSid.replace(/-\d+$/, '') : ('ROW-' + r);
+        var sid = parentSid;
 
         var st = getCellStr(r, statusCol) || 'Done';
 
@@ -412,7 +414,7 @@ function doGet(e) {
           if (!sessionsMap[sid].process) sessionsMap[sid].process = getCellStr(r, processCol);
         }
 
-        // If row contains item details (flat sheet format), push item
+        // If row contains item details (flat sheet format), push item if not already present
         if (componentCol !== -1 && row[componentCol]) {
           var comp = String(row[componentCol] || '');
           var proc = processCol !== -1 ? String(row[processCol] || '') : '';
@@ -422,7 +424,8 @@ function doGet(e) {
           var qDef = defectCol !== -1 ? Number(row[defectCol]) || 0 : 0;
 
           var exists = sessionsMap[sid].items.some(function(it) {
-            return it.component === comp && it.process === proc;
+            return String(it.component || '').trim().toLowerCase() === comp.trim().toLowerCase() && 
+                   String(it.process || '').trim().toLowerCase() === proc.trim().toLowerCase();
           });
 
           if (!exists) {
