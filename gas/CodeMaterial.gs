@@ -434,31 +434,72 @@ function submitInspection(payload) {
       }
     }
 
+    // Error proofing: Qty Inspect cannot exceed Qty Balance (for in-progress) or Qty Received (for pending)
+    var plannedQty = mdRowData ? Number(mdRowData[7]) || 0 : 0;
+    var existingChecked = mdRowData ? Number(mdRowData[21]) || 0 : 0;
+    var mdStatus = mdRowData ? String(mdRowData[18] || '').toLowerCase().trim() : '';
+
+    var maxAllowedBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? Math.max(0, plannedQty - existingChecked) : plannedQty;
+    var inspectQty = Number(payload.qty_inspect) || 0;
+
+    if (maxAllowedBackend > 0 && inspectQty > maxAllowedBackend) {
+      var labelTypeBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? 'Qty Balance' : 'Qty Received';
+      throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
+    }
+
+    // Accumulate previous in-progress inspection results & delete old in-progress rows
+    var prevOK = 0;
+    var prevNO = 0;
+    var prevNotes = '';
+    var targetPO = String(payload.po_number || '').trim().toLowerCase();
+    if (targetPO && sheet.getLastRow() > 2) {
+      var existingData = sheet.getDataRange().getValues();
+      for (var r = existingData.length - 1; r >= 2; r--) {
+        var rPO = String(existingData[r][7] || '').trim().toLowerCase();
+        var rStatus = String(existingData[r][18] || '').trim().toLowerCase();
+        if (rPO === targetPO && rStatus === 'in-progress') {
+          prevOK += Number(existingData[r][9]) || 0;
+          prevNO += Number(existingData[r][10]) || 0;
+          var n = String(existingData[r][22] || '').trim();
+          if (n) prevNotes = prevNotes ? (prevNotes + '; ' + n) : n;
+          sheet.deleteRow(r + 1);
+        }
+      }
+    }
+
+    // Combine previous in-progress inspection totals with current submission
+    var currentOK = (payload.qty_inspect - payload.qty_fail);
+    var currentNO = payload.qty_fail;
+    var totalOK = prevOK + (currentOK > 0 ? currentOK : 0);
+    var totalNO = prevNO + (currentNO > 0 ? currentNO : 0);
+    var currentNotes = payload.defect_notes || '';
+    var combinedNotes = prevNotes ? (currentNotes ? (prevNotes + '; ' + currentNotes) : prevNotes) : currentNotes;
+
     var newRow = [];
     INSPECTION_HEADERS.forEach(function(h) {
       if (h === 'no') {
-        newRow.push(Math.max(1, sheet.getLastRow() - 1)); // 2 header rows: NO starts atgetLastRow - 1
+        newRow.push(Math.max(1, sheet.getLastRow() - 1)); // 2 header rows
       }
       else if (h === 'inspection_id') newRow.push(inspectionId);
       else if (h === 'po_no') newRow.push(payload.po_number || '');
       else if (h === 'inspector_nik') newRow.push(payload.inspector_name || payload.inspector_nik || '');
       
-      // Inspection details
+      // Inspection details — write total accumulated OK & NO
       else if (h === 'qty_receive') {
         var val = mdRowData ? Number(mdRowData[7]) : 0; // batch_size is index 7
         newRow.push(val);
       }
       else if (h === 'ok') {
-        newRow.push(payload.qty_inspect - payload.qty_fail);
+        newRow.push(totalOK);
       }
       else if (h === 'no_qty') {
-        newRow.push(payload.qty_fail);
+        newRow.push(totalNO);
       }
       else if (h === 'check_color') {
         newRow.push(payload.check_color || 'OK');
       }
       
-      else if (h === 'defect_notes') newRow.push(payload.defect_notes || '');
+      else if (h === 'defect_notes') newRow.push(combinedNotes);
       else if (h === 'rolling_inspection') newRow.push(payload.rolling_inspection || 'No');
       else if (h === 'approved_by_leader') newRow.push(payload.approved_by_leader || '');
       else if (h === 'evidence_url') newRow.push(evidenceUrl || '');
@@ -484,32 +525,6 @@ function submitInspection(payload) {
         newRow.push('');
       }
     });
-
-    // Error proofing: Qty Inspect cannot exceed Qty Balance (for in-progress) or Qty Received (for pending)
-    var plannedQty = mdRowData ? Number(mdRowData[7]) || 0 : 0;
-    var existingChecked = mdRowData ? Number(mdRowData[21]) || 0 : 0;
-    var mdStatus = mdRowData ? String(mdRowData[18] || '').toLowerCase().trim() : '';
-
-    var maxAllowedBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? Math.max(0, plannedQty - existingChecked) : plannedQty;
-    var inspectQty = Number(payload.qty_inspect) || 0;
-
-    if (maxAllowedBackend > 0 && inspectQty > maxAllowedBackend) {
-      var labelTypeBackend = (mdStatus === 'in-progress' || existingChecked > 0) ? 'Qty Balance' : 'Qty Received';
-      throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
-    }
-
-    // Delete previous in-progress inspection rows for this PO from inspections sheet
-    var targetPO = String(payload.po_number || '').trim().toLowerCase();
-    if (targetPO && sheet.getLastRow() > 2) {
-      var existingData = sheet.getDataRange().getValues();
-      for (var r = existingData.length - 1; r >= 2; r--) {
-        var rPO = String(existingData[r][7] || '').trim().toLowerCase();
-        var rStatus = String(existingData[r][18] || '').trim().toLowerCase();
-        if (rPO === targetPO && rStatus === 'in-progress') {
-          sheet.deleteRow(r + 1);
-        }
-      }
-    }
 
     sheet.appendRow(newRow);
 
