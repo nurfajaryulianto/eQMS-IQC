@@ -24,6 +24,9 @@ window.updateTabBadges = function (po) {
     const badgeRaw = document.getElementById('badge-tab-raw');
     const badgeLam = document.getElementById('badge-tab-laminating');
     const badgeBond = document.getElementById('badge-tab-bonding');
+    const tabRaw = document.getElementById('tab-check-raw');
+    const tabLam = document.getElementById('tab-check-laminating');
+    const tabBond = document.getElementById('tab-check-bonding');
 
     if (!po) {
         [badgeRaw, badgeLam, badgeBond].forEach(b => {
@@ -38,37 +41,46 @@ window.updateTabBadges = function (po) {
 
     if (badgeRaw) {
         if (po.raw_done) {
-            badgeRaw.textContent = '✓ Done';
-            badgeRaw.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeRaw.textContent = '✓ Selesai';
+            badgeRaw.style.background = 'rgba(16, 185, 129, 0.25)';
             badgeRaw.style.color = '#34d399';
+            badgeRaw.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            if (tabRaw) tabRaw.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         } else {
             badgeRaw.textContent = 'Pending';
             badgeRaw.style.background = 'rgba(255,255,255,0.08)';
             badgeRaw.style.color = 'rgba(255,255,255,0.6)';
+            badgeRaw.style.border = 'none';
         }
     }
 
     if (badgeLam) {
         if (po.laminating_done) {
-            badgeLam.textContent = '✓ Done';
-            badgeLam.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeLam.textContent = '✓ Selesai';
+            badgeLam.style.background = 'rgba(16, 185, 129, 0.25)';
             badgeLam.style.color = '#34d399';
+            badgeLam.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            if (tabLam) tabLam.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         } else {
             badgeLam.textContent = 'Pending';
             badgeLam.style.background = 'rgba(255,255,255,0.08)';
             badgeLam.style.color = 'rgba(255,255,255,0.6)';
+            badgeLam.style.border = 'none';
         }
     }
 
     if (badgeBond) {
         if (po.bonding_done) {
-            badgeBond.textContent = '✓ Done';
-            badgeBond.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeBond.textContent = '✓ Selesai';
+            badgeBond.style.background = 'rgba(16, 185, 129, 0.25)';
             badgeBond.style.color = '#34d399';
+            badgeBond.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            if (tabBond) tabBond.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         } else {
             badgeBond.textContent = 'Pending';
             badgeBond.style.background = 'rgba(255,255,255,0.08)';
             badgeBond.style.color = 'rgba(255,255,255,0.6)';
+            badgeBond.style.border = 'none';
         }
     }
 };
@@ -84,6 +96,7 @@ window.switchInspectionTab = function (type) {
     const commonFields = document.getElementById('common-fields-body');
     const sectionTitle = document.getElementById('form-section-title');
     const doneNotice = document.getElementById('done-po-notice');
+    const submitBtn = document.getElementById('submit-btn');
 
     const isRawDone = selectedPO && selectedPO.raw_done;
     const isLamDone = selectedPO && selectedPO.laminating_done;
@@ -103,14 +116,26 @@ window.switchInspectionTab = function (type) {
         if (isRawDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Inspeksi <strong>Check Raw Material</strong> untuk PO ini sudah selesai (Done). Anda masih dapat memilih tab jenis pengecekan lainnya yang belum selesai.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Pilih jenis pengecekan lainnya yang masih Pending.</span>`;
             }
-            if (bodyRaw) { bodyRaw.style.opacity = '0.4'; bodyRaw.style.pointerEvents = 'none'; }
-            if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
+            if (bodyRaw) { bodyRaw.style.opacity = '0.35'; bodyRaw.style.pointerEvents = 'none'; }
+            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.4';
+                submitBtn.style.pointerEvents = 'none';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
+            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyRaw) { bodyRaw.style.opacity = '1'; bodyRaw.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.pointerEvents = 'auto';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
+            }
         }
     } else if (type === 'laminating') {
         if (tabLam) tabLam.classList.add('active');
@@ -121,14 +146,26 @@ window.switchInspectionTab = function (type) {
         if (isLamDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Inspeksi <strong>Check Laminating Material</strong> untuk PO ini sudah selesai (Done). Anda masih dapat memilih tab jenis pengecekan lainnya yang belum selesai.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Pilih jenis pengecekan lainnya yang masih Pending.</span>`;
             }
-            if (bodyLam) { bodyLam.style.opacity = '0.4'; bodyLam.style.pointerEvents = 'none'; }
-            if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
+            if (bodyLam) { bodyLam.style.opacity = '0.35'; bodyLam.style.pointerEvents = 'none'; }
+            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.4';
+                submitBtn.style.pointerEvents = 'none';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
+            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyLam) { bodyLam.style.opacity = '1'; bodyLam.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.pointerEvents = 'auto';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
+            }
         }
     } else if (type === 'bonding') {
         if (tabBond) tabBond.classList.add('active');
@@ -139,15 +176,24 @@ window.switchInspectionTab = function (type) {
         if (isBondDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">check_circle</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini sudah diunggah (Done). Mengunggah kembali akan memperbarui berkas yang ada.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Berkas sudah tersimpan di Google Drive.</span>`;
+            }
+            if (bodyBond) { bodyBond.style.opacity = '0.35'; bodyBond.style.pointerEvents = 'none'; }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.4';
+                submitBtn.style.pointerEvents = 'none';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
             }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
-        }
-
-        if (bodyBond) {
-            bodyBond.style.opacity = '1';
-            bodyBond.style.pointerEvents = 'auto';
+            if (bodyBond) { bodyBond.style.opacity = '1'; bodyBond.style.pointerEvents = 'auto'; }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.pointerEvents = 'auto';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
+            }
         }
     }
 };
@@ -389,6 +435,7 @@ async function fetchMasterData() {
             const plannedQty = Number(row.planned_qty || row.PlannedQty) || 0;
             const checkedQty = Number(row.checked_qty) || 0;
             const balanceQty = Math.max(0, plannedQty - checkedQty);
+            const statusVal = (row.status || row.Status || 'pending').toLowerCase();
             return {
                 po_number: row.po_number || row.PONumber || '',
                 material_name: row.material_name || row.MaterialName || '',
@@ -402,7 +449,10 @@ async function fetchMasterData() {
                 in_progress_qty: checkedQty,
                 balance_qty: balanceQty,
                 receive_date: row.receive_date || row.ReceiveDate || '',
-                status: (row.status || row.Status || 'pending').toLowerCase(),
+                status: statusVal,
+                raw_done: row.raw_done !== undefined ? Boolean(row.raw_done) : (statusVal === 'done' || (checkedQty >= plannedQty && plannedQty > 0)),
+                laminating_done: row.laminating_done !== undefined ? Boolean(row.laminating_done) : (statusVal === 'done'),
+                bonding_done: row.bonding_done !== undefined ? Boolean(row.bonding_done) : false
             };
         });
 
