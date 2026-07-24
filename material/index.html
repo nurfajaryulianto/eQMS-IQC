@@ -624,6 +624,14 @@
 
                         <!-- FORM SUB-CONTAINER 3: BONDING TEST -->
                         <div id="form-bonding-test-body" style="display: none; flex-direction: column; gap: 14px;">
+                            <div id="bonding-po-badge" style="background: rgba(16, 185, 129, 0.1); border: 1.5px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #34d399; font-weight: 600;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="material-symbols-outlined" style="font-size: 18px;">analytics</span>
+                                    <span>Target PO: <strong id="bonding-target-po-no" style="color: white; font-size: 13px;">—</strong></span>
+                                </div>
+                                <span id="bonding-target-mat-name" style="font-size: 11px; color: rgba(255,255,255,0.6); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">—</span>
+                            </div>
+
                             <div style="background: rgba(255,255,255,0.02); border: 1.5px dashed rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 16px;">
                                 <label for="bonding-file" style="display: block; font-size: 13px; font-weight: 700; color: white; margin-bottom: 6px;">
                                     Upload Evidence / Document Bonding Test <span style="color: #ef4444;">*</span>
@@ -686,12 +694,19 @@
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
+                    <!-- Action Buttons: Reset All & Submit -->
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; width: 100%;">
+                        <button type="button" id="reset-form-btn" onclick="resetForm(true)" class="btn-secondary"
+                            style="padding: 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">restart_alt</span>
+                            Reset All
+                        </button>
                         <button id="submit-btn" onclick="openValidationDialog()"
-                            style="width: 100%; padding: 13px; border-radius: 12px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.25s; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);">
+                            style="padding: 13px; border-radius: 12px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.25s; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);">
                             <span class="material-symbols-outlined" style="font-size: 18px;">fact_check</span>
                             Verifikasi & Simpan
                         </button>
+                    </div>
 
                         <p style="font-size: 11px; color: rgba(255,255,255,0.3); text-align: center; margin: 0;">
                             Pop-up konfirmasi akan muncul sebelum data tersimpan.

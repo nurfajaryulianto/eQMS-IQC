@@ -458,11 +458,38 @@ function formatReceiveDate(raw) {
 // ─── SELECT PO ────────────────────────────────────────────────
 
 function selectPO(po, cardEl) {
+    // Safety check: if user already chose a file or entered input for a different PO, confirm switch
+    const bondingFileEl = document.getElementById('bonding-file');
+    const evidenceFileEl = document.getElementById('evidence-file');
+    const qtyInspectEl = document.getElementById('qty-inspect');
+    const hasUnsubmittedData = (bondingFileEl && bondingFileEl.files.length > 0) ||
+        (evidenceFileEl && evidenceFileEl.files.length > 0) ||
+        (qtyInspectEl && qtyInspectEl.value && parseInt(qtyInspectEl.value, 10) > 0);
+
+    if (selectedPO && selectedPO.po_number !== po.po_number && hasUnsubmittedData) {
+        const confirmSwitch = confirm(`Anda sedang mengisi form / memilih file untuk PO ${selectedPO.po_number}.\n\nYakin ingin mengganti ke PO ${po.po_number}? Berkas yang sudah dipilih akan ter-reset.`);
+        if (!confirmSwitch) {
+            return; // Cancel PO switch
+        }
+    }
+
     // Deselect all
     document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
     cardEl.classList.add('selected');
 
     selectedPO = po;
+
+    // Reset file inputs when switching POs
+    if (bondingFileEl) bondingFileEl.value = '';
+    if (evidenceFileEl) evidenceFileEl.value = '';
+    const bondingNotesEl = document.getElementById('bonding-notes');
+    if (bondingNotesEl) bondingNotesEl.value = '';
+
+    // Update target PO badge in bonding form
+    const bondingTargetPoNo = document.getElementById('bonding-target-po-no');
+    const bondingTargetMatName = document.getElementById('bonding-target-mat-name');
+    if (bondingTargetPoNo) bondingTargetPoNo.textContent = po.po_number;
+    if (bondingTargetMatName) bondingTargetMatName.textContent = po.material_name || '';
 
     // Show detail
     const detailEl = document.getElementById('po-detail');
@@ -509,7 +536,6 @@ function selectPO(po, cardEl) {
     }
 
     // Reset inputs & set max attributes for error proofing
-    const qtyInspectEl = document.getElementById('qty-inspect');
     const qtyFailEl = document.getElementById('qty-fail');
     const notesEl = document.getElementById('defect-notes');
     const checkColorEl = document.getElementById('check-color');
@@ -940,7 +966,7 @@ async function submitInspection() {
     }
 }
 
-function resetForm() {
+window.resetForm = function (userTriggered = false) {
     selectedPO = null;
     document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
 
@@ -974,6 +1000,16 @@ function resetForm() {
     const lamColorRes = document.getElementById('lam-color-result');
     if (lamColorRes) lamColorRes.value = 'Color OK';
 
+    const bondingFileEl = document.getElementById('bonding-file');
+    if (bondingFileEl) bondingFileEl.value = '';
+    const bondingNotesEl = document.getElementById('bonding-notes');
+    if (bondingNotesEl) bondingNotesEl.value = '';
+
+    const bondingTargetPoNo = document.getElementById('bonding-target-po-no');
+    const bondingTargetMatName = document.getElementById('bonding-target-mat-name');
+    if (bondingTargetPoNo) bondingTargetPoNo.textContent = '—';
+    if (bondingTargetMatName) bondingTargetMatName.textContent = '—';
+
     const notesEl = document.getElementById('defect-notes');
     if (notesEl) notesEl.value = '';
 
@@ -984,8 +1020,18 @@ function resetForm() {
     const container = document.getElementById('evidence-upload-container');
     if (container) container.style.display = 'none';
 
-    document.getElementById('calc-pass-rate').textContent = '—';
-    document.getElementById('calc-fail-rate').textContent = '—';
+    const calcPass = document.getElementById('calc-pass-rate');
+    if (calcPass) calcPass.textContent = '—';
+    const calcFail = document.getElementById('calc-fail-rate');
+    if (calcFail) calcFail.textContent = '—';
+
+    if (userTriggered) {
+        showToast('Form inspeksi dan pilihan PO berhasil di-reset.', 'info');
+    }
+};
+
+function resetForm() {
+    window.resetForm(false);
 }
 
 // ─── TOAST ───────────────────────────────────────────────────
