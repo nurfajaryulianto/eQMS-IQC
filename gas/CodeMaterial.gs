@@ -35,6 +35,23 @@ var INSPECTION_HEADERS = [
   'packaging_reject_reason', 'roll_inspection_flag', 'roll_inspection_percentage', 'bonding_test_url'
 ];
 
+/**
+ * UTILITY FUNCTION: Jalankan fungsi ini 1x di Apps Script Editor
+ * untuk otomatis memperbarui Baris 1 pada sheet 'inspections' dengan 35 kolom header lengkap.
+ */
+function setupInspectionHeaders() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(SHEET.INSPECTIONS);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET.INSPECTIONS);
+  }
+  
+  sheet.getRange(1, 1, 1, INSPECTION_HEADERS.length).setValues([INSPECTION_HEADERS]);
+  sheet.getRange(1, 1, 1, INSPECTION_HEADERS.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+  
+  Logger.log("Berhasil memperbarui Baris 1 sheet 'inspections' dengan 35 kolom header lengkap!");
+}
+
 // ─── ENTRY POINTS ─────────────────────────────────────────────
 
 function doGet(e) {
