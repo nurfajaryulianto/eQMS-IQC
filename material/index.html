@@ -71,6 +71,9 @@
             padding: 16px;
             cursor: pointer;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 0;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         .po-card:hover {
             border-color: rgba(16, 185, 129, 0.4);
@@ -82,6 +85,20 @@
             border-color: var(--emerald);
             background: rgba(16, 185, 129, 0.08);
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+        }
+
+        /* Form Grid Layout */
+        .form-grid-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 420px;
+            gap: 24px;
+            align-items: start;
+            width: 100%;
+        }
+        @media (max-width: 1024px) {
+            .form-grid-layout {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Status badge */
@@ -285,7 +302,7 @@
 
     <!-- Navbar -->
     <nav class="navbar">
-        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <div style="width: 28px; height: 28px; background: linear-gradient(135deg, #10b981, #047857); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
@@ -370,7 +387,7 @@
     </div>
 
     <!-- Main Content -->
-    <main style="max-width: 1200px; margin: 0 auto; padding: 24px 20px;">
+    <main style="max-width: 1400px; margin: 0 auto; padding: 24px 20px;">
 
         <!-- Page Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
@@ -386,10 +403,10 @@
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start;">
+        <div class="form-grid-layout">
 
             <!-- LEFT: PO/Material List -->
-            <div>
+            <div style="min-width: 0;">
                 <div class="form-section">
                     <div class="section-header">
                         <span class="material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">receipt_long</span>
@@ -445,7 +462,7 @@
             </div>
 
             <!-- RIGHT: Inspection Form -->
-            <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="min-width: 0; display: flex; flex-direction: column; gap: 16px;">
 
                 <!-- Selected PO Info -->
                 <div class="form-section">
