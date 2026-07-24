@@ -24,22 +24,64 @@ window.switchInspectionTab = function (type) {
     currentInspectionType = type;
     const tabRaw = document.getElementById('tab-check-raw');
     const tabLam = document.getElementById('tab-check-laminating');
+    const tabBond = document.getElementById('tab-check-bonding');
     const bodyRaw = document.getElementById('form-raw-material-body');
     const bodyLam = document.getElementById('form-laminating-material-body');
+    const bodyBond = document.getElementById('form-bonding-test-body');
+    const commonFields = document.getElementById('common-fields-body');
     const sectionTitle = document.getElementById('form-section-title');
+    const doneNotice = document.getElementById('done-po-notice');
+
+    const isDone = selectedPO && selectedPO.status === 'done';
+
+    [tabRaw, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
+    if (bodyRaw) bodyRaw.style.display = 'none';
+    if (bodyLam) bodyLam.style.display = 'none';
+    if (bodyBond) bodyBond.style.display = 'none';
 
     if (type === 'raw') {
         if (tabRaw) tabRaw.classList.add('active');
-        if (tabLam) tabLam.classList.remove('active');
         if (bodyRaw) bodyRaw.style.display = 'flex';
-        if (bodyLam) bodyLam.style.display = 'none';
+        if (commonFields) commonFields.style.display = 'flex';
         if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Raw Material';
-    } else {
-        if (tabRaw) tabRaw.classList.remove('active');
+        if (doneNotice) doneNotice.style.display = isDone ? 'flex' : 'none';
+        
+        if (bodyRaw && isDone) {
+            bodyRaw.style.opacity = '0.4';
+            bodyRaw.style.pointerEvents = 'none';
+            if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
+        } else if (bodyRaw) {
+            bodyRaw.style.opacity = '1';
+            bodyRaw.style.pointerEvents = 'auto';
+            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+        }
+    } else if (type === 'laminating') {
         if (tabLam) tabLam.classList.add('active');
-        if (bodyRaw) bodyRaw.style.display = 'none';
         if (bodyLam) bodyLam.style.display = 'flex';
+        if (commonFields) commonFields.style.display = 'flex';
         if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Laminating Material';
+        if (doneNotice) doneNotice.style.display = isDone ? 'flex' : 'none';
+
+        if (bodyLam && isDone) {
+            bodyLam.style.opacity = '0.4';
+            bodyLam.style.pointerEvents = 'none';
+            if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
+        } else if (bodyLam) {
+            bodyLam.style.opacity = '1';
+            bodyLam.style.pointerEvents = 'auto';
+            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+        }
+    } else if (type === 'bonding') {
+        if (tabBond) tabBond.classList.add('active');
+        if (bodyBond) bodyBond.style.display = 'flex';
+        if (commonFields) commonFields.style.display = 'none';
+        if (sectionTitle) sectionTitle.textContent = 'Upload Hasil - Bonding Test';
+        if (doneNotice) doneNotice.style.display = 'none';
+
+        if (bodyBond) {
+            bodyBond.style.opacity = '1';
+            bodyBond.style.pointerEvents = 'auto';
+        }
     }
 };
 
@@ -458,29 +500,35 @@ function selectPO(po, cardEl) {
         formSection.style.opacity = '1';
         formSection.style.pointerEvents = 'auto';
     }
-    formSection.style.pointerEvents = 'auto';
-}
 
-// Reset inputs & set max attributes for error proofing
-const qtyInspectEl = document.getElementById('qty-inspect');
-const qtyFailEl = document.getElementById('qty-fail');
-const notesEl = document.getElementById('defect-notes');
-const checkColorEl = document.getElementById('check-color');
+    // Switch tab based on PO status (if status is done, switch to bonding tab automatically)
+    if (po.status === 'done') {
+        switchInspectionTab('bonding');
+    } else {
+        switchInspectionTab(currentInspectionType || 'raw');
+    }
 
-const maxAllowed = getMaxAllowedInspect(po);
-if (qtyInspectEl) {
-    qtyInspectEl.value = '';
-    qtyInspectEl.max = maxAllowed;
-    qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
+    // Reset inputs & set max attributes for error proofing
+    const qtyInspectEl = document.getElementById('qty-inspect');
+    const qtyFailEl = document.getElementById('qty-fail');
+    const notesEl = document.getElementById('defect-notes');
+    const checkColorEl = document.getElementById('check-color');
+
+    const maxAllowed = getMaxAllowedInspect(po);
+    if (qtyInspectEl) {
+        qtyInspectEl.value = '';
+        qtyInspectEl.max = maxAllowed;
+        qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
+    }
+    if (qtyFailEl) {
+        qtyFailEl.value = '';
+        qtyFailEl.max = maxAllowed;
+        qtyFailEl.placeholder = `Maks. Qty Inspect`;
+    }
+    if (notesEl) notesEl.value = '';
+    if (checkColorEl) checkColorEl.value = 'OK';
+    updateCalculations();
 }
-if (qtyFailEl) {
-    qtyFailEl.value = '';
-    qtyFailEl.max = maxAllowed;
-    qtyFailEl.placeholder = `Maks. Qty Inspect`;
-}
-if (notesEl) notesEl.value = '';
-if (checkColorEl) checkColorEl.value = 'OK';
-updateCalculations();
 
 function row(label, value) {
     return `<span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">${label}</span><span style="color:#ffffff; font-weight:500; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${esc(String(value))}</span>`;
@@ -631,6 +679,11 @@ window.openValidationDialog = function () {
                 errors.push('Harap isi Custom Percentage Roll (%).');
             }
         }
+    } else if (currentInspectionType === 'bonding') {
+        const bondingFileEl = document.getElementById('bonding-file');
+        if (!bondingFileEl || !bondingFileEl.files || bondingFileEl.files.length === 0) {
+            errors.push('Harap upload file evidence / dokumen Bonding Test.');
+        }
     }
 
     if (leaderSelect && leaderSelect.value) {
@@ -654,7 +707,11 @@ window.openValidationDialog = function () {
     } else {
         errorsEl.style.display = 'none';
         const isRaw = currentInspectionType === 'raw';
-        const inspectTypeLabel = isRaw ? 'Check Raw Material' : 'Check Laminating Material';
+        const isBonding = currentInspectionType === 'bonding';
+        let inspectTypeLabel = 'Check Raw Material';
+        if (currentInspectionType === 'laminating') inspectTypeLabel = 'Check Laminating Material';
+        if (isBonding) inspectTypeLabel = 'Check Bonding Test';
+
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
         const statusChecking = document.getElementById('checking-status')?.value === 'in-progress' ? 'In-Progress (Belum Selesai)' : 'Done (Selesai)';
@@ -678,6 +735,14 @@ window.openValidationDialog = function () {
                 ${summaryRow('Check Color', checkColor)}
                 ${summaryRow('Rolling Method', rolling)}
             `;
+        } else if (isBonding) {
+            const bondingFileEl = document.getElementById('bonding-file');
+            const fileName = bondingFileEl && bondingFileEl.files.length > 0 ? bondingFileEl.files[0].name : '—';
+            const bNotes = document.getElementById('bonding-notes')?.value.trim() || '—';
+            summaryHtml += `
+                ${summaryRow('File Bonding Test', fileName)}
+                ${summaryRow('Catatan Bonding', bNotes)}
+            `;
         } else {
             const colorRes = document.getElementById('lam-color-result')?.value.trim() || 'OK';
             const pkgReason = lamPackagingChoice === 'NO' ? (document.getElementById('lam-packaging-reason')?.value.trim() || '—') : 'OK';
@@ -690,12 +755,14 @@ window.openValidationDialog = function () {
             `;
         }
 
-        summaryHtml += `
-            ${summaryRow('Leader Approval', leaderVal)}
-            ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
-            ${summaryRow('Status Checking', statusChecking)}
-            ${notes ? summaryRow('Catatan', notes) : ''}
-        `;
+        if (!isBonding) {
+            summaryHtml += `
+                ${summaryRow('Leader Approval', leaderVal)}
+                ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
+                ${summaryRow('Status Checking', statusChecking)}
+                ${notes ? summaryRow('Catatan', notes) : ''}
+            `;
+        }
 
         summaryEl.innerHTML = summaryHtml;
     }
@@ -729,15 +796,24 @@ async function submitInspection() {
     loading.classList.add('visible');
     if (loadingTxt) loadingTxt.textContent = 'Menyimpan data...';
 
+    const isBonding = currentInspectionType === 'bonding';
     const isRaw = currentInspectionType === 'raw';
+    const isLam = currentInspectionType === 'laminating';
+
+    let inspectTypeStr = 'Raw Material';
+    if (isLam) inspectTypeStr = 'Laminating Material';
+    if (isBonding) inspectTypeStr = 'Bonding Test';
+
     const inspect = isRaw ? (parseInt(document.getElementById('qty-inspect')?.value, 10) || 0) : 0;
     const fail = isRaw ? (parseInt(document.getElementById('qty-fail')?.value, 10) || 0) : 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
+    const bondingNotes = isBonding ? (document.getElementById('bonding-notes')?.value.trim() || '') : '';
     const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
     const inspectorName = currentUser?.name || currentUser?.nik || '';
     const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
     const leaderSelect = document.getElementById('approved-by-leader');
     const fileInput = document.getElementById('evidence-file');
+    const bondingFileEl = document.getElementById('bonding-file');
 
     const lamColorRes = document.getElementById('lam-color-result')?.value.trim() || 'Color OK';
     const lamPkgReason = lamPackagingChoice === 'NO' ? (document.getElementById('lam-packaging-reason')?.value.trim() || '') : '';
@@ -748,7 +824,24 @@ async function submitInspection() {
     let fileName = '';
     let fileType = '';
 
-    if (leaderSelect && leaderSelect.value && fileInput && fileInput.files.length > 0) {
+    if (isBonding && bondingFileEl && bondingFileEl.files.length > 0) {
+        if (loadingTxt) loadingTxt.textContent = 'Membaca file bonding test...';
+        const file = bondingFileEl.files[0];
+        fileName = file.name;
+        fileType = file.type;
+        try {
+            fileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        } catch (err) {
+            loading.classList.remove('visible');
+            showToast('Gagal membaca file bonding test.', 'error');
+            return;
+        }
+    } else if (leaderSelect && leaderSelect.value && fileInput && fileInput.files.length > 0) {
         if (loadingTxt) loadingTxt.textContent = 'Membaca file evidence...';
         const file = fileInput.files[0];
         fileName = file.name;
@@ -769,28 +862,28 @@ async function submitInspection() {
 
     if (loadingTxt) loadingTxt.textContent = 'Mengirim data ke server...';
 
-    const checkingStatus = document.getElementById('checking-status')?.value || 'done';
+    const checkingStatus = isBonding ? 'done' : (document.getElementById('checking-status')?.value || 'done');
 
     const payload = {
         action: 'submitInspection',
         po_number: selectedPO.po_number,
         inspector_nik: inspectorName,
         inspector_name: inspectorName,
-        inspection_type: isRaw ? 'Raw Material' : 'Laminating Material',
+        inspection_type: inspectTypeStr,
         qty_inspect: inspect,
         qty_fail: fail,
-        defect_notes: notes,
-        result_status: isRaw ? (fail === 0 ? 'Pass' : 'Fail') : (lamColorChoice === 'YES' && lamPackagingChoice === 'YES' ? 'Pass' : 'Fail'),
+        defect_notes: isBonding ? bondingNotes : notes,
+        result_status: isBonding ? 'Pass' : (isRaw ? (fail === 0 ? 'Pass' : 'Fail') : (lamColorChoice === 'YES' && lamPackagingChoice === 'YES' ? 'Pass' : 'Fail')),
         input_type: 'manual',
-        rolling_inspection: isRaw ? rollingChecked : lamRollChk,
-        check_color: isRaw ? checkColor : lamColorRes,
-        color_check_status: isRaw ? 'N/A' : lamColorChoice,
-        color_check_result: isRaw ? checkColor : lamColorRes,
-        packaging_status: isRaw ? 'N/A' : lamPackagingChoice,
-        packaging_reject_reason: lamPkgReason,
-        roll_inspection_flag: isRaw ? rollingChecked : lamRollChk,
-        roll_inspection_percentage: isRaw ? '' : lamRollPct,
-        approved_by_leader: leaderSelect ? leaderSelect.value : '',
+        rolling_inspection: isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
+        check_color: isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
+        color_check_status: isRaw ? 'N/A' : (isBonding ? 'N/A' : lamColorChoice),
+        color_check_result: isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
+        packaging_status: isRaw ? 'N/A' : (isBonding ? 'N/A' : lamPackagingChoice),
+        packaging_reject_reason: isBonding ? '' : lamPkgReason,
+        roll_inspection_flag: isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
+        roll_inspection_percentage: isRaw ? '' : (isBonding ? '' : lamRollPct),
+        approved_by_leader: isBonding ? '' : (leaderSelect ? leaderSelect.value : ''),
         file_data: fileData,
         file_name: fileName,
         file_type: fileType,

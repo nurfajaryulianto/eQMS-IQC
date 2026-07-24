@@ -32,7 +32,7 @@ var INSPECTION_HEADERS = [
   'in_lab', 'lot', 'status', 'uploaded_at', 'inspection_id', 'inspector_nik',
   'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date',
   'inspection_type', 'color_check_status', 'color_check_result', 'packaging_status',
-  'packaging_reject_reason', 'roll_inspection_flag', 'roll_inspection_percentage'
+  'packaging_reject_reason', 'roll_inspection_flag', 'roll_inspection_percentage', 'bonding_test_url'
 ];
 
 // ─── ENTRY POINTS ─────────────────────────────────────────────
@@ -518,6 +518,7 @@ function submitInspection(payload) {
       else if (h === 'packaging_reject_reason') newRow.push(payload.packaging_reject_reason || '');
       else if (h === 'roll_inspection_flag') newRow.push(payload.roll_inspection_flag || payload.rolling_inspection || '');
       else if (h === 'roll_inspection_percentage') newRow.push(payload.roll_inspection_percentage || '');
+      else if (h === 'bonding_test_url') newRow.push(payload.bonding_test_url || (payload.inspection_type === 'Bonding Test' ? evidenceUrl : ''));
 
       else if (h === 'status') newRow.push(payload.status || 'done');
       else if (h === 'uploaded_at') newRow.push(now);
