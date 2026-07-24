@@ -20,7 +20,7 @@ let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
 
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
 
-window.switchInspectionTab = function(type) {
+window.switchInspectionTab = function (type) {
     currentInspectionType = type;
     const tabRaw = document.getElementById('tab-check-raw');
     const tabLam = document.getElementById('tab-check-laminating');
@@ -43,7 +43,7 @@ window.switchInspectionTab = function(type) {
     }
 };
 
-window.setLamColorChoice = function(choice) {
+window.setLamColorChoice = function (choice) {
     lamColorChoice = choice;
     const btnYes = document.getElementById('lam-color-yes-btn');
     const btnNo = document.getElementById('lam-color-no-btn');
@@ -56,7 +56,7 @@ window.setLamColorChoice = function(choice) {
     }
 };
 
-window.setLamPackagingChoice = function(choice) {
+window.setLamPackagingChoice = function (choice) {
     lamPackagingChoice = choice;
     const btnYes = document.getElementById('lam-packaging-yes-btn');
     const btnNo = document.getElementById('lam-packaging-no-btn');
@@ -72,7 +72,7 @@ window.setLamPackagingChoice = function(choice) {
     }
 };
 
-window.toggleLamRollPercentage = function() {
+window.toggleLamRollPercentage = function () {
     const chk = document.getElementById('lam-roll-checkbox');
     const wrap = document.getElementById('lam-roll-percentage-wrap');
     if (wrap) wrap.style.display = chk && chk.checked ? 'block' : 'none';
@@ -160,9 +160,9 @@ const MOCK_MASTER_DATA = [
 async function populateLeaders() {
     const leaderSelect = document.getElementById('approved-by-leader');
     if (!leaderSelect) return;
-    
+
     leaderSelect.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
-    
+
     try {
         let users = [];
         if (MATERIAL_TEST_MODE) {
@@ -177,13 +177,13 @@ async function populateLeaders() {
             const json = await res.json();
             users = json.data || [];
         }
-        
+
         // Filter for supervisor and manager roles
         const leaders = users.filter(u => {
             const role = String(u.role).toLowerCase().trim();
             return role === 'supervisor' || role === 'manager';
         });
-        
+
         leaders.forEach(u => {
             const opt = document.createElement('option');
             opt.value = u.name || u.nik;
@@ -458,30 +458,29 @@ function selectPO(po, cardEl) {
         formSection.style.opacity = '1';
         formSection.style.pointerEvents = 'auto';
     }
-        formSection.style.pointerEvents = 'auto';
-    }
-
-    // Reset inputs & set max attributes for error proofing
-    const qtyInspectEl = document.getElementById('qty-inspect');
-    const qtyFailEl = document.getElementById('qty-fail');
-    const notesEl = document.getElementById('defect-notes');
-    const checkColorEl = document.getElementById('check-color');
-
-    const maxAllowed = getMaxAllowedInspect(po);
-    if (qtyInspectEl) {
-        qtyInspectEl.value = '';
-        qtyInspectEl.max = maxAllowed;
-        qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
-    }
-    if (qtyFailEl) {
-        qtyFailEl.value = '';
-        qtyFailEl.max = maxAllowed;
-        qtyFailEl.placeholder = `Maks. Qty Inspect`;
-    }
-    if (notesEl) notesEl.value = '';
-    if (checkColorEl) checkColorEl.value = 'OK';
-    updateCalculations();
+    formSection.style.pointerEvents = 'auto';
 }
+
+// Reset inputs & set max attributes for error proofing
+const qtyInspectEl = document.getElementById('qty-inspect');
+const qtyFailEl = document.getElementById('qty-fail');
+const notesEl = document.getElementById('defect-notes');
+const checkColorEl = document.getElementById('check-color');
+
+const maxAllowed = getMaxAllowedInspect(po);
+if (qtyInspectEl) {
+    qtyInspectEl.value = '';
+    qtyInspectEl.max = maxAllowed;
+    qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
+}
+if (qtyFailEl) {
+    qtyFailEl.value = '';
+    qtyFailEl.max = maxAllowed;
+    qtyFailEl.placeholder = `Maks. Qty Inspect`;
+}
+if (notesEl) notesEl.value = '';
+if (checkColorEl) checkColorEl.value = 'OK';
+updateCalculations();
 
 function row(label, value) {
     return `<span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">${label}</span><span style="color:#ffffff; font-weight:500; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${esc(String(value))}</span>`;
@@ -504,7 +503,7 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const matchStatus = status === 'all' || 
+        const matchStatus = status === 'all' ||
             (status === 'in-progress' ? (po.status === 'in-progress' || po.status === 'in progress') : po.status === status);
 
         let matchDate = true;
@@ -633,7 +632,7 @@ window.openValidationDialog = function () {
             }
         }
     }
-    
+
     if (leaderSelect && leaderSelect.value) {
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
             errors.push('Harap upload evidence / bukti persetujuan leader.');
@@ -868,7 +867,7 @@ function resetForm() {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    
+
     const rollingCheck = document.getElementById('rolling-inspection');
     if (rollingCheck) rollingCheck.checked = false;
 
