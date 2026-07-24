@@ -1218,8 +1218,8 @@
                         </div>
                     </section>
 
-                    <!-- Charts Grid -->
-                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Top Row: FTT Trend & Top Defects (2-column Grid) -->
+                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
                             <div class="flex justify-between items-center mb-4">
                                 <h3 class="text-base font-semibold text-slate-900">FTT Trend</h3>
@@ -1232,7 +1232,7 @@
                                         data-period="months">Monthly</button>
                                 </div>
                             </div>
-                            <div class="chart-container" style="position:relative;height:220px;"><canvas
+                            <div class="chart-container" style="position:relative;height:240px;"><canvas
                                     id="fttChart"></canvas></div>
                         </div>
                         <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
@@ -1240,19 +1240,20 @@
                                 <h3 class="text-base font-semibold text-slate-900">Top Defects</h3>
                                 <span class="text-xs text-slate-400">by total count</span>
                             </div>
-                            <div class="chart-container" style="position:relative;height:220px;"><canvas
+                            <div class="chart-container" style="position:relative;height:240px;"><canvas
                                     id="defectChart"></canvas></div>
                         </div>
+                    </section>
+
+                    <!-- Full Width Large Containers Stack -->
+                    <div class="space-y-6">
+                        <!-- Vendor Performance (Full Width) -->
                         <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
                             <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-base font-semibold text-slate-900">Pass / Defect Distribution</h3>
-                            </div>
-                            <div class="chart-container" style="position:relative;height:220px;"><canvas
-                                    id="gradePieChart"></canvas></div>
-                        </div>
-                        <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-base font-semibold text-slate-900">Vendor Performance</h3>
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">Vendor Performance</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">FTT percentage performance across all subcont vendors</p>
+                                </div>
                                 <div id="ncvs-sort-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
                                     <button type="button"
                                         class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
@@ -1262,12 +1263,31 @@
                                         data-sort="asc">Lowest</button>
                                 </div>
                             </div>
-                            <div class="chart-container" style="position:relative;height:220px;"><canvas
+                            <div class="chart-container" style="position:relative;height:280px;"><canvas
                                     id="ncvsFttChart"></canvas></div>
                         </div>
-                    </section>
 
-                    <!-- Inspection Table -->
+                        <!-- Model Performance (Full Width) -->
+                        <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
+                            <div class="flex justify-between items-center mb-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-900">Model Performance</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">FTT percentage performance breakdown by shoe model</p>
+                                </div>
+                                <div id="model-sort-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                                    <button type="button"
+                                        class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
+                                        data-sort="desc">Highest</button>
+                                    <button type="button"
+                                        class="btn px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded"
+                                        data-sort="asc">Lowest</button>
+                                </div>
+                            </div>
+                            <div class="chart-container" style="position:relative;height:280px;"><canvas
+                                    id="modelFttChart"></canvas></div>
+                        </div>
+
+                        <!-- Inspection Table (Full Width) -->
                     <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
                         <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                             <h3 class="text-base font-semibold text-slate-900">Full Inspection Data</h3>

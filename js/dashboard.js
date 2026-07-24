@@ -13,6 +13,7 @@ let currentFttPeriod = 'days';
 let currentDefectPlant = 'all';
 let currentGradePlant = 'all';
 let ncvsFttSortOrder = 'desc';
+let modelFttSortOrder = 'desc';
 
 // New state variable for table view limit
 let currentLimitView = 'today'; // Default tampilan awal tabel adalah 'today'
@@ -103,6 +104,18 @@ export async function initDashboard() {
             updateDashboard();
         }
     });
+
+    const modelSortEl = document.getElementById('model-sort-filter');
+    if (modelSortEl) {
+        modelSortEl.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                modelFttSortOrder = e.target.dataset.sort;
+                document.querySelectorAll('#model-sort-filter .btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                updateDashboard();
+            }
+        });
+    }
 
     // New event listener for the Limit View filter
     // NEW: Event listener for Auditor Table Filter dropdown
@@ -323,7 +336,7 @@ function updateDashboard() {
     updateMetrics(filteredInspections);
     updateFttChart(filteredInspections, currentFttPeriod);
     updateDefectChart(filteredDefects);
-    updateGradePieChart(filteredInspections);
+    updateModelPerformanceChart(filteredInspections, modelFttSortOrder);
     updateNcvsFttChart(filteredInspections, ncvsFttSortOrder);
     updateInspectionTable(filteredInspections);
 }
@@ -473,31 +486,47 @@ function updateDefectChart(data) {
     });
 }
 
-function updateGradePieChart(data) {
-    const ctx = document.getElementById('gradePieChart').getContext('2d');
-    const totalPass = data.reduce((sum, item) => sum + item.Pass, 0);
-    const totalDefect = data.reduce((sum, item) => sum + item.Defect, 0);
+function updateModelPerformanceChart(data, sortOrder) {
+    const el = document.getElementById('modelFttChart');
+    if (!el) return;
+    const ctx = el.getContext('2d');
+    const modelData = {};
 
-    renderChart(ctx, 'doughnut', {
-        labels: ['Pass', 'Defect'],
+    data.forEach(item => {
+        const model = item.Model || item.ModelName;
+        if (!model) return;
+        if (!modelData[model]) modelData[model] = { passSum: 0, inspectSum: 0 };
+        const pass = item.Pass != null ? item.Pass : (item.A_Grade != null ? item.A_Grade : Math.round(item.Qty_Inspect * (item.FTT || 0)));
+        const inspect = item.Qty_Inspect || item.QtyIncoming || 0;
+        modelData[model].passSum += pass;
+        modelData[model].inspectSum += inspect;
+    });
+
+    let processed = Object.entries(modelData).map(([model, vals]) => ({
+        model,
+        avgFtt: vals.inspectSum > 0 ? (vals.passSum / vals.inspectSum) * 100 : 0
+    }));
+
+    processed.sort((a, b) => sortOrder === 'asc' ? a.avgFtt - b.avgFtt : b.avgFtt - a.avgFtt);
+
+    renderChart(ctx, 'bar', {
+        labels: processed.map(d => d.model),
         datasets: [{
-            data: [totalPass, totalDefect],
-            backgroundColor: ['#22c55e', '#ef4444'],
-            borderWidth: 2,
+            label: 'FTT (%)',
+            data: processed.map(d => d.avgFtt),
+            backgroundColor: 'rgba(16, 185, 129, 0.65)',
+            borderColor: 'rgba(16, 185, 129, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
         }]
     }, {
         responsive: true, maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'bottom' },
-            tooltip: {
-                callbacks: {
-                    label: function (context) {
-                        const total = totalPass + totalDefect;
-                        const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                        return ` ${context.label}: ${context.parsed} (${pct}%)`;
-                    }
-                }
-            }
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ` FTT: ${ctx.parsed.y.toFixed(2)}%` } }
+        },
+        scales: {
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }
