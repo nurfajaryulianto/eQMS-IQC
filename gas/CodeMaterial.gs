@@ -173,12 +173,54 @@ function getMasterData(params) {
   var displayData = sheet.getDataRange().getDisplayValues();
   if (data.length < 2) return { data: [] };
 
-  // Column indices are FIXED — they match MASTER_DATA_HEADERS exactly:
-  // 0:no  1:material_name  2:material_description  3:uom  4:supplier
-  // 5:supplier_name  6:po_area  7:batch_size  8:product_code  9:model_name
-  // 10:bucket  11:receive_date  12:po_number  13:shipment_number
-  // 14:no_bc  15:bc_type  16:receive_number  17:material_type
-  // 18:status  19:uploaded_by  20:uploaded_at  21:checked_qty
+  // DYNAMIC LIVE LOOKUP from "inspections" sheet for single source of truth & per-inspection status
+  var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+  var inspMap = {};
+  if (inspSheet && inspSheet.getLastRow() > 1) {
+    var inspData = inspSheet.getDataRange().getValues();
+    // Col indices in inspections sheet:
+    // 7: po_no
+    // 9: ok, 10: no_qty
+    // 18: status ('done' / 'in-progress')
+    // 27: inspection_type ('Raw Material', 'Laminating Material', 'Bonding Test')
+    // 28: color_check_status
+    // 34: bonding_test_url (Col AI / index 34)
+    for (var i = 1; i < inspData.length; i++) {
+      var pNo = String(inspData[i][7] || '').trim().toLowerCase();
+      if (!pNo) continue;
+      if (!inspMap[pNo]) {
+        inspMap[pNo] = {
+          checked_qty: 0,
+          raw_done: false,
+          laminating_done: false,
+          bonding_done: false,
+          has_any_inspection: true,
+          last_status: ''
+        };
+      }
+
+      var iType = String(inspData[i][27] || '').trim();
+      var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
+      var okQty = Number(inspData[i][9]) || 0;
+      var noQty = Number(inspData[i][10]) || 0;
+      var colorStatus = String(inspData[i][28] || '').trim();
+      var bondingUrl = String(inspData[i][34] || '').trim();
+
+      inspMap[pNo].checked_qty += (okQty + noQty);
+
+      if (iType === 'Raw Material' && (iStatus === 'done' || (okQty + noQty) > 0)) {
+        if (iStatus === 'done') inspMap[pNo].raw_done = true;
+      }
+      if (iType === 'Laminating Material' || colorStatus !== '') {
+        inspMap[pNo].laminating_done = true;
+      }
+      if (iType === 'Bonding Test' || bondingUrl !== '') {
+        inspMap[pNo].bonding_done = true;
+      }
+
+      inspMap[pNo].last_status = iStatus;
+    }
+  }
 
   var result = [];
 
@@ -189,12 +231,29 @@ function getMasterData(params) {
     var poVal = String(row[12] || '').trim();
     if (!poVal) continue; // skip rows without PO number
 
-    var st = String(row[18] || 'pending').toLowerCase().trim();
-    if (statusFilter !== 'all' && st !== statusFilter) continue;
+    var plannedQty = Number(row[7]) || 0;
+    var poKey = poVal.toLowerCase();
+    var inspInfo = inspMap[poKey];
 
-    // receive_date: use display value directly (most reliable for dates in Sheets)
+    // Calculate dynamic checked_qty & status based on live inspections sheet
+    var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
+    var rawDone = inspInfo ? (inspInfo.raw_done || (checkedQty >= plannedQty && plannedQty > 0)) : false;
+    var lamDone = inspInfo ? inspInfo.laminating_done : false;
+    var bondDone = inspInfo ? inspInfo.bonding_done : false;
+
+    var dynamicStatus = 'pending';
+    if (!inspInfo) {
+      // No active rows in inspections sheet -> automatically reset to 'pending'!
+      dynamicStatus = 'pending';
+    } else if (rawDone || checkedQty >= plannedQty) {
+      dynamicStatus = 'done';
+    } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
+      dynamicStatus = 'in-progress';
+    }
+
+    if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
+
     var rdVal = disp[11] || '';
-    // If display value is empty but raw value exists, try to format it
     if (!rdVal && row[11] != null && row[11] !== '') {
       try {
         if (row[11] instanceof Date || (typeof row[11] === 'object' && row[11].getTime)) {
@@ -207,10 +266,6 @@ function getMasterData(params) {
       }
     }
 
-    var plannedQty = Number(row[7]) || 0;
-    // checked_qty is stored in col 21 (index 21) of master_data
-    // Only populated when status is 'in-progress', empty for 'pending'/'done'
-    var checkedQty = Number(row[21]) || 0;
     var balanceQty = Math.max(0, plannedQty - checkedQty);
 
     result.push({
@@ -226,7 +281,10 @@ function getMasterData(params) {
       in_progress_qty:  checkedQty,
       balance_qty:      balanceQty,
       receive_date:     rdVal,
-      status:           st,
+      status:           dynamicStatus,
+      raw_done:         rawDone,
+      laminating_done:  lamDone,
+      bonding_done:     bondDone
     });
   }
 

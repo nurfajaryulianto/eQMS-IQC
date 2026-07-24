@@ -20,6 +20,59 @@ let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
 
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
 
+window.updateTabBadges = function (po) {
+    const badgeRaw = document.getElementById('badge-tab-raw');
+    const badgeLam = document.getElementById('badge-tab-laminating');
+    const badgeBond = document.getElementById('badge-tab-bonding');
+
+    if (!po) {
+        [badgeRaw, badgeLam, badgeBond].forEach(b => {
+            if (b) {
+                b.textContent = 'Pending';
+                b.style.background = 'rgba(255,255,255,0.08)';
+                b.style.color = 'rgba(255,255,255,0.6)';
+            }
+        });
+        return;
+    }
+
+    if (badgeRaw) {
+        if (po.raw_done) {
+            badgeRaw.textContent = '✓ Done';
+            badgeRaw.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeRaw.style.color = '#34d399';
+        } else {
+            badgeRaw.textContent = 'Pending';
+            badgeRaw.style.background = 'rgba(255,255,255,0.08)';
+            badgeRaw.style.color = 'rgba(255,255,255,0.6)';
+        }
+    }
+
+    if (badgeLam) {
+        if (po.laminating_done) {
+            badgeLam.textContent = '✓ Done';
+            badgeLam.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeLam.style.color = '#34d399';
+        } else {
+            badgeLam.textContent = 'Pending';
+            badgeLam.style.background = 'rgba(255,255,255,0.08)';
+            badgeLam.style.color = 'rgba(255,255,255,0.6)';
+        }
+    }
+
+    if (badgeBond) {
+        if (po.bonding_done) {
+            badgeBond.textContent = '✓ Done';
+            badgeBond.style.background = 'rgba(16, 185, 129, 0.2)';
+            badgeBond.style.color = '#34d399';
+        } else {
+            badgeBond.textContent = 'Pending';
+            badgeBond.style.background = 'rgba(255,255,255,0.08)';
+            badgeBond.style.color = 'rgba(255,255,255,0.6)';
+        }
+    }
+};
+
 window.switchInspectionTab = function (type) {
     currentInspectionType = type;
     const tabRaw = document.getElementById('tab-check-raw');
@@ -32,7 +85,9 @@ window.switchInspectionTab = function (type) {
     const sectionTitle = document.getElementById('form-section-title');
     const doneNotice = document.getElementById('done-po-notice');
 
-    const isDone = selectedPO && selectedPO.status === 'done';
+    const isRawDone = selectedPO && selectedPO.raw_done;
+    const isLamDone = selectedPO && selectedPO.laminating_done;
+    const isBondDone = selectedPO && selectedPO.bonding_done;
 
     [tabRaw, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
     if (bodyRaw) bodyRaw.style.display = 'none';
@@ -44,15 +99,17 @@ window.switchInspectionTab = function (type) {
         if (bodyRaw) bodyRaw.style.display = 'flex';
         if (commonFields) commonFields.style.display = 'flex';
         if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Raw Material';
-        if (doneNotice) doneNotice.style.display = isDone ? 'flex' : 'none';
-        
-        if (bodyRaw && isDone) {
-            bodyRaw.style.opacity = '0.4';
-            bodyRaw.style.pointerEvents = 'none';
+
+        if (isRawDone) {
+            if (doneNotice) {
+                doneNotice.style.display = 'flex';
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Inspeksi <strong>Check Raw Material</strong> untuk PO ini sudah selesai (Done). Anda masih dapat memilih tab jenis pengecekan lainnya yang belum selesai.</span>`;
+            }
+            if (bodyRaw) { bodyRaw.style.opacity = '0.4'; bodyRaw.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
-        } else if (bodyRaw) {
-            bodyRaw.style.opacity = '1';
-            bodyRaw.style.pointerEvents = 'auto';
+        } else {
+            if (doneNotice) doneNotice.style.display = 'none';
+            if (bodyRaw) { bodyRaw.style.opacity = '1'; bodyRaw.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
         }
     } else if (type === 'laminating') {
@@ -60,15 +117,17 @@ window.switchInspectionTab = function (type) {
         if (bodyLam) bodyLam.style.display = 'flex';
         if (commonFields) commonFields.style.display = 'flex';
         if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Laminating Material';
-        if (doneNotice) doneNotice.style.display = isDone ? 'flex' : 'none';
 
-        if (bodyLam && isDone) {
-            bodyLam.style.opacity = '0.4';
-            bodyLam.style.pointerEvents = 'none';
+        if (isLamDone) {
+            if (doneNotice) {
+                doneNotice.style.display = 'flex';
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Inspeksi <strong>Check Laminating Material</strong> untuk PO ini sudah selesai (Done). Anda masih dapat memilih tab jenis pengecekan lainnya yang belum selesai.</span>`;
+            }
+            if (bodyLam) { bodyLam.style.opacity = '0.4'; bodyLam.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.4'; commonFields.style.pointerEvents = 'none'; }
-        } else if (bodyLam) {
-            bodyLam.style.opacity = '1';
-            bodyLam.style.pointerEvents = 'auto';
+        } else {
+            if (doneNotice) doneNotice.style.display = 'none';
+            if (bodyLam) { bodyLam.style.opacity = '1'; bodyLam.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
         }
     } else if (type === 'bonding') {
@@ -76,7 +135,15 @@ window.switchInspectionTab = function (type) {
         if (bodyBond) bodyBond.style.display = 'flex';
         if (commonFields) commonFields.style.display = 'none';
         if (sectionTitle) sectionTitle.textContent = 'Upload Hasil - Bonding Test';
-        if (doneNotice) doneNotice.style.display = 'none';
+
+        if (isBondDone) {
+            if (doneNotice) {
+                doneNotice.style.display = 'flex';
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">check_circle</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini sudah diunggah (Done). Mengunggah kembali akan memperbarui berkas yang ada.</span>`;
+            }
+        } else {
+            if (doneNotice) doneNotice.style.display = 'none';
+        }
 
         if (bodyBond) {
             bodyBond.style.opacity = '1';
@@ -560,11 +627,18 @@ async function selectPO(po, cardEl) {
         formSection.style.pointerEvents = 'auto';
     }
 
-    // Switch tab based on PO status (if status is done, switch to bonding tab automatically)
-    if (po.status === 'done') {
+    // Update tab status badges for selected PO
+    window.updateTabBadges(po);
+
+    // Auto-select first pending tab or default to raw
+    if (!po.raw_done) {
+        switchInspectionTab('raw');
+    } else if (!po.laminating_done) {
+        switchInspectionTab('laminating');
+    } else if (!po.bonding_done) {
         switchInspectionTab('bonding');
     } else {
-        switchInspectionTab(currentInspectionType || 'raw');
+        switchInspectionTab('raw');
     }
 
     // Reset inputs & set max attributes for error proofing

@@ -520,17 +520,26 @@
                         <span style="font-size: 14px; font-weight: 700; color: white;">Pilih Jenis Pengecekan</span>
                     </div>
                     <div style="padding: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')">
-                            <span class="material-symbols-outlined" style="font-size: 16px;">view_list</span>
-                            Check Raw Material
+                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">view_list</span>
+                                <span>Raw Material</span>
+                            </div>
+                            <span id="badge-tab-raw" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')">
-                            <span class="material-symbols-outlined" style="font-size: 16px;">layers</span>
-                            Check Laminating Material
+                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">layers</span>
+                                <span>Laminating</span>
+                            </div>
+                            <span id="badge-tab-laminating" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')">
-                            <span class="material-symbols-outlined" style="font-size: 16px;">science</span>
-                            Check Bonding Test
+                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                <span class="material-symbols-outlined" style="font-size: 16px;">science</span>
+                                <span>Bonding Test</span>
+                            </div>
+                            <span id="badge-tab-bonding" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
                     </div>
                 </div>
