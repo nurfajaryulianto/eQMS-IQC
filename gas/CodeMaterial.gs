@@ -528,74 +528,106 @@ function submitInspection(payload) {
       throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
     }
 
-    // IF BONDING TEST: Update existing PO row in place if it exists!
-    if (payload.inspection_type === 'Bonding Test') {
-      var targetPO = String(payload.po_number || '').trim().toLowerCase();
-      var existingRowIndex = -1;
-      var existingRowData = null;
-
-      if (targetPO && sheet.getLastRow() > 1) {
-        var allRows = sheet.getDataRange().getValues();
-        for (var r = allRows.length - 1; r >= 1; r--) {
-          var rowPO = String(allRows[r][7] || '').trim().toLowerCase(); // Index 7 is po_no
-          if (rowPO === targetPO) {
-            existingRowIndex = r + 1; // 1-based row index in Sheet
-            existingRowData = allRows[r];
-            break;
-          }
-        }
-      }
-
-      if (existingRowIndex > 1) {
-        // Update existing row in place: Col 35 (AI) is bonding_test_url
-        var bondingUrl = evidenceUrl || payload.bonding_test_url || '';
-        sheet.getRange(existingRowIndex, 35).setValue(bondingUrl);
-
-        // Append bonding notes to defect_notes if provided (Col 23 / W)
-        var newNotes = payload.bonding_notes || payload.defect_notes || '';
-        if (newNotes) {
-          var oldNotes = String(existingRowData[22] || '').trim();
-          var mergedNotes = oldNotes ? (oldNotes + '; [Bonding Test]: ' + newNotes) : ('[Bonding Test]: ' + newNotes);
-          sheet.getRange(existingRowIndex, 23).setValue(mergedNotes);
-        }
-
-        // Update status to 'done' (Col 19 / S)
-        sheet.getRange(existingRowIndex, 19).setValue('done');
-
-        // Update master_data status as well
-        updateMasterDataStatus(ss, payload.po_number, 'done', 0);
-
-        return { status: 'ok', inspection_id: String(existingRowData[20] || inspectionId), message: 'Bonding Test berhasil diperbarui pada baris PO yang sama.' };
-      }
-    }
-
-    // Accumulate previous in-progress inspection results & delete old in-progress rows
-    var prevOK = 0;
-    var prevNO = 0;
-    var prevNotes = '';
+    // STRICT SINGLE-ROW PER PO MECHANISM:
+    // Check if a row for this PO already exists in sheet "inspections"
     var targetPO = String(payload.po_number || '').trim().toLowerCase();
-    if (targetPO && sheet.getLastRow() > 2) {
-      var existingData = sheet.getDataRange().getValues();
-      for (var r = existingData.length - 1; r >= 2; r--) {
-        var rPO = String(existingData[r][7] || '').trim().toLowerCase();
-        var rStatus = String(existingData[r][18] || '').trim().toLowerCase();
-        if (rPO === targetPO && rStatus === 'in-progress') {
-          prevOK += Number(existingData[r][9]) || 0;
-          prevNO += Number(existingData[r][10]) || 0;
-          var n = String(existingData[r][22] || '').trim();
-          if (n) prevNotes = prevNotes ? (prevNotes + '; ' + n) : n;
-          sheet.deleteRow(r + 1);
+    var existingRowIndex = -1;
+    var existingRowValues = null;
+
+    if (targetPO && sheet.getLastRow() > 1) {
+      var allRows = sheet.getDataRange().getValues();
+      for (var r = 1; r < allRows.length; r++) {
+        var rowPO = String(allRows[r][7] || '').trim().toLowerCase(); // Index 7 is po_no
+        if (rowPO === targetPO) {
+          existingRowIndex = r + 1; // 1-based row index in Sheet
+          existingRowValues = allRows[r];
+          break;
         }
       }
     }
 
-    // Combine previous in-progress inspection totals with current submission
-    var currentOK = (payload.qty_inspect - payload.qty_fail);
-    var currentNO = payload.qty_fail;
-    var totalOK = prevOK + (currentOK > 0 ? currentOK : 0);
-    var totalNO = prevNO + (currentNO > 0 ? currentNO : 0);
-    var currentNotes = payload.defect_notes || '';
-    var combinedNotes = prevNotes ? (currentNotes ? (prevNotes + '; ' + currentNotes) : prevNotes) : currentNotes;
+    if (existingRowIndex > 1 && existingRowValues) {
+      // UPDATE EXISTING ROW IN PLACE (STRICTLY 1 ROW PER PO)
+      var isBonding = (payload.inspection_type === 'Bonding Test');
+      var isLam = (payload.inspection_type === 'Laminating Material');
+      var isRaw = (payload.inspection_type === 'Raw Material' || !payload.inspection_type);
+
+      // Col indices (0-indexed in array):
+      // 9: ok, 10: no_qty
+      // 18: status ('done' / 'in-progress')
+      // 21: inspector_nik, 22: defect_notes
+      // 24: approved_by_leader, 25: evidence_url (Col Z)
+      // 27: inspection_type
+      // 28: color_check_status, 29: color_check_result, 30: packaging_status, 31: packaging_reject_reason
+      // 32: roll_inspection_flag, 33: roll_inspection_percentage
+      // 34: bonding_test_url (Col AI)
+
+      if (isBonding) {
+        var bondingUrl = evidenceUrl || payload.bonding_test_url || '';
+        if (bondingUrl) existingRowValues[34] = bondingUrl;
+        var bNotes = payload.bonding_notes || payload.defect_notes || '';
+        if (bNotes) {
+          var oldNotes = String(existingRowValues[22] || '').trim();
+          existingRowValues[22] = oldNotes ? (oldNotes + '; [Bonding Test]: ' + bNotes) : ('[Bonding Test]: ' + bNotes);
+        }
+      } else if (isLam) {
+        existingRowValues[28] = payload.color_check_status || 'YES';
+        existingRowValues[29] = payload.color_check_result || payload.check_color || 'Color OK';
+        existingRowValues[30] = payload.packaging_status || 'YES';
+        existingRowValues[31] = payload.packaging_reject_reason || '';
+        existingRowValues[32] = payload.roll_inspection_flag || payload.rolling_inspection || 'No';
+        existingRowValues[33] = payload.roll_inspection_percentage || '';
+        
+        var curType = String(existingRowValues[27] || '').trim();
+        if (!curType.includes('Laminating Material')) {
+          existingRowValues[27] = curType ? (curType + ', Laminating Material') : 'Laminating Material';
+        }
+        if (payload.approved_by_leader) existingRowValues[24] = payload.approved_by_leader;
+        if (evidenceUrl) existingRowValues[25] = evidenceUrl; // Column Z
+        if (payload.defect_notes) {
+          var oldN = String(existingRowValues[22] || '').trim();
+          existingRowValues[22] = oldN ? (oldN + '; ' + payload.defect_notes) : payload.defect_notes;
+        }
+      } else {
+        // Raw Material inspection update
+        var prevOK = Number(existingRowValues[9]) || 0;
+        var prevNO = Number(existingRowValues[10]) || 0;
+        var curOK = Math.max(0, (payload.qty_inspect || 0) - (payload.qty_fail || 0));
+        var curNO = Number(payload.qty_fail) || 0;
+
+        existingRowValues[9] = prevOK + curOK;
+        existingRowValues[10] = prevNO + curNO;
+        existingRowValues[14] = payload.check_color || 'OK';
+        existingRowValues[23] = payload.rolling_inspection || 'No';
+        if (payload.approved_by_leader) existingRowValues[24] = payload.approved_by_leader;
+        if (evidenceUrl) existingRowValues[25] = evidenceUrl; // Column Z
+        if (payload.defect_notes) {
+          var oldN = String(existingRowValues[22] || '').trim();
+          existingRowValues[22] = oldN ? (oldN + '; ' + payload.defect_notes) : payload.defect_notes;
+        }
+        var curType = String(existingRowValues[27] || '').trim();
+        if (!curType.includes('Raw Material')) {
+          existingRowValues[27] = curType ? ('Raw Material, ' + curType) : 'Raw Material';
+        }
+      }
+
+      existingRowValues[18] = payload.status || 'done'; // Col S status
+      if (payload.inspector_name || payload.inspector_nik) existingRowValues[21] = payload.inspector_name || payload.inspector_nik;
+      existingRowValues[19] = now; // uploaded_at
+
+      // Write updated row back to Sheet at existingRowIndex (Col 1 to 35)
+      sheet.getRange(existingRowIndex, 1, 1, 35).setValues([existingRowValues]);
+
+      var qtyInspected = Number(payload.qty_inspect) || 0;
+      updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
+
+      return { status: 'ok', inspection_id: String(existingRowValues[20] || inspectionId), message: 'Data inspeksi berhasil diperbarui pada baris PO yang sama.' };
+    }
+
+    // IF NO EXISTING ROW: Create 1 single new row
+    var currentOK = Math.max(0, (payload.qty_inspect || 0) - (payload.qty_fail || 0));
+    var currentNO = Number(payload.qty_fail) || 0;
+    var currentNotes = payload.defect_notes || payload.bonding_notes || '';
 
     var newRow = [];
     INSPECTION_HEADERS.forEach(function(h) {
@@ -606,22 +638,15 @@ function submitInspection(payload) {
       else if (h === 'po_no') newRow.push(payload.po_number || '');
       else if (h === 'inspector_nik') newRow.push(payload.inspector_name || payload.inspector_nik || '');
       
-      // Inspection details — write total accumulated OK & NO
       else if (h === 'qty_receive') {
-        var val = mdRowData ? Number(mdRowData[7]) : 0; // batch_size is index 7
+        var val = mdRowData ? Number(mdRowData[7]) : 0;
         newRow.push(val);
       }
-      else if (h === 'ok') {
-        newRow.push(totalOK);
-      }
-      else if (h === 'no_qty') {
-        newRow.push(totalNO);
-      }
-      else if (h === 'check_color') {
-        newRow.push(payload.check_color || 'OK');
-      }
+      else if (h === 'ok') newRow.push(currentOK);
+      else if (h === 'no_qty') newRow.push(currentNO);
+      else if (h === 'check_color') newRow.push(payload.check_color || 'OK');
       
-      else if (h === 'defect_notes') newRow.push(combinedNotes);
+      else if (h === 'defect_notes') newRow.push(currentNotes);
       else if (h === 'rolling_inspection') newRow.push(payload.rolling_inspection || 'No');
       else if (h === 'approved_by_leader') newRow.push(payload.approved_by_leader || '');
       else if (h === 'evidence_url') newRow.push(payload.inspection_type === 'Bonding Test' ? '' : (evidenceUrl || ''));
@@ -639,17 +664,16 @@ function submitInspection(payload) {
       else if (h === 'status') newRow.push(payload.status || 'done');
       else if (h === 'uploaded_at') newRow.push(now);
       
-      // Map static elements from master_data
       else if (mdRowData) {
-        if (h === 'material_name') newRow.push(mdRowData[1]); // material_name
-        else if (h === 'item_description') newRow.push(mdRowData[2]); // material_description
-        else if (h === 'uom') newRow.push(mdRowData[3]); // uom
-        else if (h === 'suppliers') newRow.push(mdRowData[4]); // supplier
-        else if (h === 'supplier_pengirim') newRow.push(mdRowData[5]); // supplier_name
-        else if (h === 'style') newRow.push(mdRowData[8]); // product_code
-        else if (h === 'shoe_model') newRow.push(mdRowData[9]); // model_name
-        else if (h === 'bucket') newRow.push(mdRowData[10]); // bucket
-        else if (h === 'receive_date') newRow.push(mdRowData[11]); // receive_date
+        if (h === 'material_name') newRow.push(mdRowData[1]);
+        else if (h === 'item_description') newRow.push(mdRowData[2]);
+        else if (h === 'uom') newRow.push(mdRowData[3]);
+        else if (h === 'suppliers') newRow.push(mdRowData[4]);
+        else if (h === 'supplier_pengirim') newRow.push(mdRowData[5]);
+        else if (h === 'style') newRow.push(mdRowData[8]);
+        else if (h === 'shoe_model') newRow.push(mdRowData[9]);
+        else if (h === 'bucket') newRow.push(mdRowData[10]);
+        else if (h === 'receive_date') newRow.push(mdRowData[11]);
         else newRow.push('');
       }
       else {
