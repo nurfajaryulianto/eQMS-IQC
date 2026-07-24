@@ -216,6 +216,65 @@
             color: white;
             transform: translateY(-1px);
         }
+
+        /* Inspection Tab Selector */
+        .inspection-tab-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .inspection-tab-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+        .inspection-tab-btn.active {
+            border-color: var(--emerald-light);
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        .toggle-btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .toggle-choice-btn {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .toggle-choice-btn.active-yes {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+        .toggle-choice-btn.active-no {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
     </style>
 </head>
 <body>
@@ -399,60 +458,144 @@
                     </div>
                 </div>
 
+                <!-- Inspection Type Selector -->
+                <div class="form-section" id="inspection-type-section" style="opacity: 0.4; pointer-events: none; transition: opacity 0.2s;">
+                    <div class="section-header">
+                        <span class="material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">fact_check</span>
+                        <span style="font-size: 14px; font-weight: 700; color: white;">Pilih Jenis Pengecekan</span>
+                    </div>
+                    <div style="padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')">
+                            <span class="material-symbols-outlined" style="font-size: 16px;">view_list</span>
+                            Check Raw Material
+                        </button>
+                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')">
+                            <span class="material-symbols-outlined" style="font-size: 16px;">layers</span>
+                            Check Laminating Material
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Qty Input Form -->
                 <div class="form-section" id="qty-form-section" style="opacity: 0.4; pointer-events: none; transition: opacity 0.2s;">
                     <div class="section-header">
                         <span class="material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">edit_note</span>
-                        <span style="font-size: 14px; font-weight: 700; color: white;">Input Hasil Inspeksi</span>
+                        <span id="form-section-title" style="font-size: 14px; font-weight: 700; color: white;">Input Hasil Inspeksi</span>
                     </div>
                     <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
 
-                        <!-- Qty Inspect -->
-                        <div>
-                            <label for="qty-inspect" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-                                Qty Inspect <span style="color: #ef4444;">*</span>
-                            </label>
-                            <input type="number" id="qty-inspect" min="0" placeholder="0"
-                                class="styled-input" style="font-size: 15px; font-weight: 600;"
-                                oninput="updateCalculations()">
-                        </div>
-
-                        <!-- Qty Fail -->
-                        <div>
-                            <label for="qty-fail" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-                                Qty Fail <span style="color: #ef4444;">*</span>
-                            </label>
-                            <input type="number" id="qty-fail" min="0" placeholder="0"
-                                class="styled-input" style="font-size: 15px; font-weight: 600;"
-                                oninput="updateCalculations()">
-                        </div>
-
-                        <!-- Auto calculations -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 10px 12px; text-align: center;">
-                                <div style="font-size: 10px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Pass Rate</div>
-                                <div id="calc-pass-rate" style="font-size: 18px; font-weight: 800; color: #10b981;">—</div>
+                        <!-- FORM SUB-CONTAINER 1: RAW MATERIAL -->
+                        <div id="form-raw-material-body" style="display: flex; flex-direction: column; gap: 14px;">
+                            <!-- Qty Inspect -->
+                            <div>
+                                <label for="qty-inspect" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                    Qty Inspect <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="number" id="qty-inspect" min="0" placeholder="0"
+                                    class="styled-input" style="font-size: 15px; font-weight: 600;"
+                                    oninput="updateCalculations()">
                             </div>
-                            <div style="background: rgba(239, 68, 68, 0.08); border: 1.5px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 10px 12px; text-align: center;">
-                                <div style="font-size: 10px; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Fail Rate</div>
-                                <div id="calc-fail-rate" style="font-size: 18px; font-weight: 800; color: #ef4444;">—</div>
+
+                            <!-- Qty Fail -->
+                            <div>
+                                <label for="qty-fail" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                    Qty Fail <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="number" id="qty-fail" min="0" placeholder="0"
+                                    class="styled-input" style="font-size: 15px; font-weight: 600;"
+                                    oninput="updateCalculations()">
+                            </div>
+
+                            <!-- Auto calculations -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 10px 12px; text-align: center;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Pass Rate</div>
+                                    <div id="calc-pass-rate" style="font-size: 18px; font-weight: 800; color: #10b981;">—</div>
+                                </div>
+                                <div style="background: rgba(239, 68, 68, 0.08); border: 1.5px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 10px 12px; text-align: center;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Fail Rate</div>
+                                    <div id="calc-fail-rate" style="font-size: 18px; font-weight: 800; color: #ef4444;">—</div>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; margin-top: 2px;">
+                                <input type="checkbox" id="rolling-inspection" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399; margin: 0;">
+                                <label for="rolling-inspection" style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); cursor: pointer; user-select: none;">
+                                    Rolling Inspection Method
+                                </label>
+                            </div>
+
+                            <!-- Check Color -->
+                            <div>
+                                <label for="check-color" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
+                                    Check Color <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input type="text" id="check-color" value="OK" placeholder="OK" class="styled-input" style="font-size: 13px; font-weight: 600;">
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; margin-top: 2px;">
-                            <input type="checkbox" id="rolling-inspection" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399; margin: 0;">
-                            <label for="rolling-inspection" style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); cursor: pointer; user-select: none;">
-                                Rolling Inspection Method
-                            </label>
+                        <!-- FORM SUB-CONTAINER 2: LAMINATING MATERIAL -->
+                        <div id="form-laminating-material-body" style="display: none; flex-direction: column; gap: 14px;">
+                            <!-- Color Check (Yes/No Toggle + Manual Result) -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px;">
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: white; margin-bottom: 8px;">
+                                    1. Color Check (Pengecekan Warna) <span style="color: #ef4444;">*</span>
+                                </label>
+                                <div class="toggle-btn-group">
+                                    <button type="button" id="lam-color-yes-btn" class="toggle-choice-btn active-yes" onclick="setLamColorChoice('YES')">
+                                        <span class="material-symbols-outlined" style="font-size: 16px;">check_circle</span> YES
+                                    </button>
+                                    <button type="button" id="lam-color-no-btn" class="toggle-choice-btn" onclick="setLamColorChoice('NO')">
+                                        <span class="material-symbols-outlined" style="font-size: 16px;">cancel</span> NO
+                                    </button>
+                                </div>
+                                <div style="margin-top: 8px;">
+                                    <label for="lam-color-result" style="display: block; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); margin-bottom: 4px;">
+                                        Hasil Pengecekan Warna Manual
+                                    </label>
+                                    <input type="text" id="lam-color-result" value="Color OK" placeholder="Ketik hasil warna..." class="styled-input" style="font-size: 13px;">
+                                </div>
+                            </div>
+
+                            <!-- Packaging Check (Yes/No Toggle + Reason if No) -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px;">
+                                <label style="display: block; font-size: 12px; font-weight: 700; color: white; margin-bottom: 8px;">
+                                    2. Packaging Check (Kondisi Kemasan) <span style="color: #ef4444;">*</span>
+                                </label>
+                                <div class="toggle-btn-group">
+                                    <button type="button" id="lam-packaging-yes-btn" class="toggle-choice-btn active-yes" onclick="setLamPackagingChoice('YES')">
+                                        <span class="material-symbols-outlined" style="font-size: 16px;">check_circle</span> YES
+                                    </button>
+                                    <button type="button" id="lam-packaging-no-btn" class="toggle-choice-btn" onclick="setLamPackagingChoice('NO')">
+                                        <span class="material-symbols-outlined" style="font-size: 16px;">cancel</span> NO
+                                    </button>
+                                </div>
+                                <div id="lam-packaging-reason-wrap" style="display: none; margin-top: 8px;">
+                                    <label for="lam-packaging-reason" style="display: block; font-size: 11px; font-weight: 700; color: #f87171; margin-bottom: 4px;">
+                                        Alasan Packaging NO / Reject <span style="color: #ef4444;">*</span>
+                                    </label>
+                                    <input type="text" id="lam-packaging-reason" placeholder="Jelaskan alasan reject packaging..." class="styled-input" style="font-size: 13px; border-color: rgba(239,68,68,0.4);">
+                                </div>
+                            </div>
+
+                            <!-- Roll Inspection (Checkbox + Custom Percentage) -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" id="lam-roll-checkbox" onchange="toggleLamRollPercentage()" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399; margin: 0;">
+                                    <label for="lam-roll-checkbox" style="font-size: 13px; font-weight: 700; color: white; cursor: pointer; user-select: none;">
+                                        3. Roll Inspection
+                                    </label>
+                                </div>
+                                <div id="lam-roll-percentage-wrap" style="display: none; margin-top: 10px;">
+                                    <label for="lam-roll-percentage" style="display: block; font-size: 11px; font-weight: 700; color: #34d399; margin-bottom: 4px;">
+                                        Custom Percentage Roll (%) <span style="color: #ef4444;">*</span>
+                                    </label>
+                                    <input type="text" id="lam-roll-percentage" placeholder="Misal: 20%, 50%..." class="styled-input" style="font-size: 13px; border-color: rgba(16,185,129,0.4);">
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Check Color -->
-                        <div>
-                            <label for="check-color" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-                                Check Color <span style="color: #ef4444;">*</span>
-                            </label>
-                            <input type="text" id="check-color" value="OK" placeholder="OK" class="styled-input" style="font-size: 13px; font-weight: 600;">
-                        </div>
+                        <!-- COMMON FIELDS FOR BOTH INSPECION TYPES -->
 
                         <!-- Defect Notes -->
                         <div>

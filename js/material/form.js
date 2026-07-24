@@ -14,6 +14,70 @@ let filteredPO = [];      // setelah filter/search
 let selectedPO = null;    // PO yang sedang dipilih user
 let currentUser = null;   // user yang sedang login
 
+let currentInspectionType = 'raw'; // 'raw' | 'laminating'
+let lamColorChoice = 'YES'; // 'YES' | 'NO'
+let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
+
+// ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
+
+window.switchInspectionTab = function(type) {
+    currentInspectionType = type;
+    const tabRaw = document.getElementById('tab-check-raw');
+    const tabLam = document.getElementById('tab-check-laminating');
+    const bodyRaw = document.getElementById('form-raw-material-body');
+    const bodyLam = document.getElementById('form-laminating-material-body');
+    const sectionTitle = document.getElementById('form-section-title');
+
+    if (type === 'raw') {
+        if (tabRaw) tabRaw.classList.add('active');
+        if (tabLam) tabLam.classList.remove('active');
+        if (bodyRaw) bodyRaw.style.display = 'flex';
+        if (bodyLam) bodyLam.style.display = 'none';
+        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Raw Material';
+    } else {
+        if (tabRaw) tabRaw.classList.remove('active');
+        if (tabLam) tabLam.classList.add('active');
+        if (bodyRaw) bodyRaw.style.display = 'none';
+        if (bodyLam) bodyLam.style.display = 'flex';
+        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Laminating Material';
+    }
+};
+
+window.setLamColorChoice = function(choice) {
+    lamColorChoice = choice;
+    const btnYes = document.getElementById('lam-color-yes-btn');
+    const btnNo = document.getElementById('lam-color-no-btn');
+    if (choice === 'YES') {
+        if (btnYes) btnYes.className = 'toggle-choice-btn active-yes';
+        if (btnNo) btnNo.className = 'toggle-choice-btn';
+    } else {
+        if (btnYes) btnYes.className = 'toggle-choice-btn';
+        if (btnNo) btnNo.className = 'toggle-choice-btn active-no';
+    }
+};
+
+window.setLamPackagingChoice = function(choice) {
+    lamPackagingChoice = choice;
+    const btnYes = document.getElementById('lam-packaging-yes-btn');
+    const btnNo = document.getElementById('lam-packaging-no-btn');
+    const reasonWrap = document.getElementById('lam-packaging-reason-wrap');
+    if (choice === 'YES') {
+        if (btnYes) btnYes.className = 'toggle-choice-btn active-yes';
+        if (btnNo) btnNo.className = 'toggle-choice-btn';
+        if (reasonWrap) reasonWrap.style.display = 'none';
+    } else {
+        if (btnYes) btnYes.className = 'toggle-choice-btn';
+        if (btnNo) btnNo.className = 'toggle-choice-btn active-no';
+        if (reasonWrap) reasonWrap.style.display = 'block';
+    }
+};
+
+window.toggleLamRollPercentage = function() {
+    const chk = document.getElementById('lam-roll-checkbox');
+    const wrap = document.getElementById('lam-roll-percentage-wrap');
+    if (wrap) wrap.style.display = chk && chk.checked ? 'block' : 'none';
+};
+
 // ─── MOCK DATA (MATERIAL_TEST_MODE) ─────────────────────────
 const MOCK_MASTER_DATA = [
     {
@@ -302,12 +366,6 @@ function renderPOList(data) {
 
         const badgeClass = po.status === 'done' ? 'badge-done' : (po.status === 'in-progress' ? 'badge-progress' : 'badge-pending');
         const badgeText = po.status === 'done' ? 'Done' : (po.status === 'in-progress' ? 'In-Progress' : 'Pending');
-        const isDisabled = po.status === 'done';
-
-        if (isDisabled) {
-            card.style.opacity = '0.55';
-            card.style.cursor = 'default';
-        }
 
         card.innerHTML = `
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px;">
@@ -325,9 +383,8 @@ function renderPOList(data) {
             </div>
         `;
 
-        if (!isDisabled) {
-            card.addEventListener('click', () => selectPO(po, card));
-        }
+        // All PO cards remain clickable regardless of status
+        card.addEventListener('click', () => selectPO(po, card));
 
         container.appendChild(card);
     });
@@ -390,10 +447,17 @@ function selectPO(po, cardEl) {
         `;
     }
 
-    // Enable form
+    // Enable inspection type section & form section
+    const typeSection = document.getElementById('inspection-type-section');
+    if (typeSection) {
+        typeSection.style.opacity = '1';
+        typeSection.style.pointerEvents = 'auto';
+    }
     const formSection = document.getElementById('qty-form-section');
     if (formSection) {
         formSection.style.opacity = '1';
+        formSection.style.pointerEvents = 'auto';
+    }
         formSection.style.pointerEvents = 'auto';
     }
 
@@ -530,6 +594,8 @@ window.updateCalculations = function () {
 
 // ─── VALIDATION & SUBMIT ──────────────────────────────────────
 
+// ─── VALIDATION & SUBMIT ──────────────────────────────────────
+
 window.openValidationDialog = function () {
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
@@ -540,7 +606,7 @@ window.openValidationDialog = function () {
     const errors = [];
     if (!selectedPO) {
         errors.push('Silakan pilih PO/Material terlebih dahulu.');
-    } else {
+    } else if (currentInspectionType === 'raw') {
         const maxAllowed = getMaxAllowedInspect(selectedPO);
         const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
         const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
@@ -550,10 +616,23 @@ window.openValidationDialog = function () {
         } else if (inspect > maxAllowed) {
             errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`);
         }
+        if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
+        if (fail > inspect) errors.push(`Qty Fail (${fail}) tidak boleh melebihi Qty Inspect (${inspect}).`);
+    } else if (currentInspectionType === 'laminating') {
+        if (lamPackagingChoice === 'NO') {
+            const reason = document.getElementById('lam-packaging-reason')?.value.trim();
+            if (!reason) {
+                errors.push('Harap isi Alasan Packaging NO / Reject.');
+            }
+        }
+        const rollChk = document.getElementById('lam-roll-checkbox')?.checked;
+        if (rollChk) {
+            const pct = document.getElementById('lam-roll-percentage')?.value.trim();
+            if (!pct) {
+                errors.push('Harap isi Custom Percentage Roll (%).');
+            }
+        }
     }
-
-    if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
-    if (fail > inspect) errors.push(`Qty Fail (${fail}) tidak boleh melebihi Qty Inspect (${inspect}).`);
     
     if (leaderSelect && leaderSelect.value) {
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -575,27 +654,51 @@ window.openValidationDialog = function () {
         summaryEl.style.display = 'none';
     } else {
         errorsEl.style.display = 'none';
-        const pass = inspect - fail;
-        const passRate = ((pass / inspect) * 100).toFixed(1);
-        const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
-        const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
+        const isRaw = currentInspectionType === 'raw';
+        const inspectTypeLabel = isRaw ? 'Check Raw Material' : 'Check Laminating Material';
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
         const statusChecking = document.getElementById('checking-status')?.value === 'in-progress' ? 'In-Progress (Belum Selesai)' : 'Done (Selesai)';
-        summaryEl.innerHTML = `
+
+        let summaryHtml = `
             ${summaryRow('PO Number', selectedPO.po_number)}
             ${summaryRow('Material', selectedPO.material_name)}
             ${summaryRow('Vendor', selectedPO.vendor_name)}
-            ${summaryRow('Qty Inspect', inspect.toLocaleString('id-ID'))}
-            ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
-            ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
-            ${summaryRow('Check Color', checkColor)}
-            ${summaryRow('Rolling Method', rolling)}
+            ${summaryRow('Jenis Inspeksi', inspectTypeLabel)}
+        `;
+
+        if (isRaw) {
+            const pass = inspect - fail;
+            const passRate = ((pass / inspect) * 100).toFixed(1);
+            const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
+            const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
+            summaryHtml += `
+                ${summaryRow('Qty Inspect', inspect.toLocaleString('id-ID'))}
+                ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
+                ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
+                ${summaryRow('Check Color', checkColor)}
+                ${summaryRow('Rolling Method', rolling)}
+            `;
+        } else {
+            const colorRes = document.getElementById('lam-color-result')?.value.trim() || 'OK';
+            const pkgReason = lamPackagingChoice === 'NO' ? (document.getElementById('lam-packaging-reason')?.value.trim() || '—') : 'OK';
+            const rollChk = document.getElementById('lam-roll-checkbox')?.checked ? 'Yes' : 'No';
+            const rollPct = rollChk === 'Yes' ? (document.getElementById('lam-roll-percentage')?.value.trim() || '—') : 'N/A';
+            summaryHtml += `
+                ${summaryRow('Color Check', `${lamColorChoice} (${colorRes})`)}
+                ${summaryRow('Packaging Check', `${lamPackagingChoice} ${lamPackagingChoice === 'NO' ? `[Alasan: ${pkgReason}]` : ''}`)}
+                ${summaryRow('Roll Inspection', `${rollChk} ${rollChk === 'Yes' ? `(${rollPct})` : ''}`)}
+            `;
+        }
+
+        summaryHtml += `
             ${summaryRow('Leader Approval', leaderVal)}
             ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
             ${summaryRow('Status Checking', statusChecking)}
             ${notes ? summaryRow('Catatan', notes) : ''}
         `;
+
+        summaryEl.innerHTML = summaryHtml;
     }
 
     overlay.style.display = 'flex';
@@ -627,15 +730,20 @@ async function submitInspection() {
     loading.classList.add('visible');
     if (loadingTxt) loadingTxt.textContent = 'Menyimpan data...';
 
-    const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
-    const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
+    const isRaw = currentInspectionType === 'raw';
+    const inspect = isRaw ? (parseInt(document.getElementById('qty-inspect')?.value, 10) || 0) : 0;
+    const fail = isRaw ? (parseInt(document.getElementById('qty-fail')?.value, 10) || 0) : 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
     const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
-    const inspectorNik = currentUser?.nik || '';
     const inspectorName = currentUser?.name || currentUser?.nik || '';
     const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
     const leaderSelect = document.getElementById('approved-by-leader');
     const fileInput = document.getElementById('evidence-file');
+
+    const lamColorRes = document.getElementById('lam-color-result')?.value.trim() || 'Color OK';
+    const lamPkgReason = lamPackagingChoice === 'NO' ? (document.getElementById('lam-packaging-reason')?.value.trim() || '') : '';
+    const lamRollChk = document.getElementById('lam-roll-checkbox')?.checked ? 'Yes' : 'No';
+    const lamRollPct = lamRollChk === 'Yes' ? (document.getElementById('lam-roll-percentage')?.value.trim() || '') : '';
 
     let fileData = null;
     let fileName = '';
@@ -669,13 +777,20 @@ async function submitInspection() {
         po_number: selectedPO.po_number,
         inspector_nik: inspectorName,
         inspector_name: inspectorName,
+        inspection_type: isRaw ? 'Raw Material' : 'Laminating Material',
         qty_inspect: inspect,
         qty_fail: fail,
         defect_notes: notes,
-        result_status: fail === 0 ? 'Pass' : 'Fail',
+        result_status: isRaw ? (fail === 0 ? 'Pass' : 'Fail') : (lamColorChoice === 'YES' && lamPackagingChoice === 'YES' ? 'Pass' : 'Fail'),
         input_type: 'manual',
-        rolling_inspection: rollingChecked,
-        check_color: checkColor,
+        rolling_inspection: isRaw ? rollingChecked : lamRollChk,
+        check_color: isRaw ? checkColor : lamColorRes,
+        color_check_status: isRaw ? 'N/A' : lamColorChoice,
+        color_check_result: isRaw ? checkColor : lamColorRes,
+        packaging_status: isRaw ? 'N/A' : lamPackagingChoice,
+        packaging_reject_reason: lamPkgReason,
+        roll_inspection_flag: isRaw ? rollingChecked : lamRollChk,
+        roll_inspection_percentage: isRaw ? '' : lamRollPct,
         approved_by_leader: leaderSelect ? leaderSelect.value : '',
         file_data: fileData,
         file_name: fileName,
@@ -737,6 +852,12 @@ function resetForm() {
     selectedPO = null;
     document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
 
+    const typeSection = document.getElementById('inspection-type-section');
+    if (typeSection) { typeSection.style.opacity = '0.4'; typeSection.style.pointerEvents = 'none'; }
+    switchInspectionTab('raw');
+    setLamColorChoice('YES');
+    setLamPackagingChoice('YES');
+
     const formSection = document.getElementById('qty-form-section');
     if (formSection) { formSection.style.opacity = '0.4'; formSection.style.pointerEvents = 'none'; }
 
@@ -750,6 +871,16 @@ function resetForm() {
     
     const rollingCheck = document.getElementById('rolling-inspection');
     if (rollingCheck) rollingCheck.checked = false;
+
+    const lamRollChk = document.getElementById('lam-roll-checkbox');
+    if (lamRollChk) { lamRollChk.checked = false; toggleLamRollPercentage(); }
+
+    const lamPkgReason = document.getElementById('lam-packaging-reason');
+    if (lamPkgReason) lamPkgReason.value = '';
+    const lamRollPct = document.getElementById('lam-roll-percentage');
+    if (lamRollPct) lamRollPct.value = '';
+    const lamColorRes = document.getElementById('lam-color-result');
+    if (lamColorRes) lamColorRes.value = 'Color OK';
 
     const notesEl = document.getElementById('defect-notes');
     if (notesEl) notesEl.value = '';

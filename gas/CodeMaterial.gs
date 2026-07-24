@@ -30,7 +30,9 @@ var INSPECTION_HEADERS = [
   'no', 'material_name', 'item_description', 'color', 'uom', 'suppliers', 'supplier_pengirim', 'po_no',
   'qty_receive', 'ok', 'no_qty', 'style', 'shoe_model', 'bucket', 'check_color', 'receive_date',
   'in_lab', 'lot', 'status', 'uploaded_at', 'inspection_id', 'inspector_nik',
-  'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date'
+  'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date',
+  'inspection_type', 'color_check_status', 'color_check_result', 'packaging_status',
+  'packaging_reject_reason', 'roll_inspection_flag', 'roll_inspection_percentage'
 ];
 
 // ─── ENTRY POINTS ─────────────────────────────────────────────
@@ -508,7 +510,15 @@ function submitInspection(payload) {
       else if (h === 'approved_by_leader') newRow.push(payload.approved_by_leader || '');
       else if (h === 'evidence_url') newRow.push(evidenceUrl || '');
       else if (h === 'inspection_date') newRow.push(payload.inspection_date || now);
-      
+
+      else if (h === 'inspection_type') newRow.push(payload.inspection_type || 'Raw Material');
+      else if (h === 'color_check_status') newRow.push(payload.color_check_status || '');
+      else if (h === 'color_check_result') newRow.push(payload.color_check_result || payload.check_color || '');
+      else if (h === 'packaging_status') newRow.push(payload.packaging_status || '');
+      else if (h === 'packaging_reject_reason') newRow.push(payload.packaging_reject_reason || '');
+      else if (h === 'roll_inspection_flag') newRow.push(payload.roll_inspection_flag || payload.rolling_inspection || '');
+      else if (h === 'roll_inspection_percentage') newRow.push(payload.roll_inspection_percentage || '');
+
       else if (h === 'status') newRow.push(payload.status || 'done');
       else if (h === 'uploaded_at') newRow.push(now);
       
