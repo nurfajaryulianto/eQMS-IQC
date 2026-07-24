@@ -208,13 +208,13 @@ function getMasterData(params) {
 
       inspMap[pNo].checked_qty += (okQty + noQty);
 
-      if (iType === 'Raw Material' && (iStatus === 'done' || (okQty + noQty) > 0)) {
+      if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
         if (iStatus === 'done') inspMap[pNo].raw_done = true;
       }
-      if (iType === 'Laminating Material' || colorStatus !== '') {
+      if (iType.indexOf('Laminating Material') >= 0) {
         inspMap[pNo].laminating_done = true;
       }
-      if (iType === 'Bonding Test' || bondingUrl !== '') {
+      if (iType.indexOf('Bonding Test') >= 0 || bondingUrl !== '') {
         inspMap[pNo].bonding_done = true;
       }
 
@@ -653,12 +653,12 @@ function submitInspection(payload) {
       else if (h === 'inspection_date') newRow.push(payload.inspection_date || now);
 
       else if (h === 'inspection_type') newRow.push(payload.inspection_type || 'Raw Material');
-      else if (h === 'color_check_status') newRow.push(payload.color_check_status || '');
-      else if (h === 'color_check_result') newRow.push(payload.color_check_result || payload.check_color || '');
-      else if (h === 'packaging_status') newRow.push(payload.packaging_status || '');
-      else if (h === 'packaging_reject_reason') newRow.push(payload.packaging_reject_reason || '');
-      else if (h === 'roll_inspection_flag') newRow.push(payload.roll_inspection_flag || payload.rolling_inspection || '');
-      else if (h === 'roll_inspection_percentage') newRow.push(payload.roll_inspection_percentage || '');
+      else if (h === 'color_check_status') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.color_check_status || 'YES') : '');
+      else if (h === 'color_check_result') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.color_check_result || 'Color OK') : '');
+      else if (h === 'packaging_status') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.packaging_status || 'YES') : '');
+      else if (h === 'packaging_reject_reason') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.packaging_reject_reason || '') : '');
+      else if (h === 'roll_inspection_flag') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.roll_inspection_flag || 'No') : '');
+      else if (h === 'roll_inspection_percentage') newRow.push(payload.inspection_type === 'Laminating Material' ? (payload.roll_inspection_percentage || '') : '');
       else if (h === 'bonding_test_url') newRow.push(payload.bonding_test_url || (payload.inspection_type === 'Bonding Test' ? evidenceUrl : ''));
 
       else if (h === 'status') newRow.push(payload.status || 'done');

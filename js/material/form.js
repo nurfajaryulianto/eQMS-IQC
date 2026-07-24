@@ -450,9 +450,9 @@ async function fetchMasterData() {
                 balance_qty: balanceQty,
                 receive_date: row.receive_date || row.ReceiveDate || '',
                 status: statusVal,
-                raw_done: row.raw_done !== undefined ? Boolean(row.raw_done) : (statusVal === 'done' || (checkedQty >= plannedQty && plannedQty > 0)),
-                laminating_done: row.laminating_done !== undefined ? Boolean(row.laminating_done) : (statusVal === 'done'),
-                bonding_done: row.bonding_done !== undefined ? Boolean(row.bonding_done) : false
+                raw_done: Boolean(row.raw_done),
+                laminating_done: Boolean(row.laminating_done),
+                bonding_done: Boolean(row.bonding_done)
             };
         });
 
