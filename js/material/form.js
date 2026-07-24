@@ -457,7 +457,39 @@ function formatReceiveDate(raw) {
 
 // ─── SELECT PO ────────────────────────────────────────────────
 
-function selectPO(po, cardEl) {
+function showSwitchPOModal(fromPO, toPO) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('switch-po-modal');
+        const fromEl = document.getElementById('switch-from-po');
+        const toEl = document.getElementById('switch-to-po');
+        const cancelBtn = document.getElementById('switch-po-cancel-btn');
+        const confirmBtn = document.getElementById('switch-po-confirm-btn');
+
+        if (!modal || !cancelBtn || !confirmBtn) {
+            resolve(confirm(`Anda sedang mengisi form / memilih file untuk PO ${fromPO}.\n\nYakin ingin mengganti ke PO ${toPO}? Berkas yang sudah dipilih akan ter-reset.`));
+            return;
+        }
+
+        if (fromEl) fromEl.textContent = fromPO;
+        if (toEl) toEl.textContent = toPO;
+
+        modal.style.display = 'flex';
+
+        const cleanup = () => {
+            modal.style.display = 'none';
+            cancelBtn.removeEventListener('click', onCancel);
+            confirmBtn.removeEventListener('click', onConfirm);
+        };
+
+        const onCancel = () => { cleanup(); resolve(false); };
+        const onConfirm = () => { cleanup(); resolve(true); };
+
+        cancelBtn.addEventListener('click', onCancel);
+        confirmBtn.addEventListener('click', onConfirm);
+    });
+}
+
+async function selectPO(po, cardEl) {
     // Safety check: if user already chose a file or entered input for a different PO, confirm switch
     const bondingFileEl = document.getElementById('bonding-file');
     const evidenceFileEl = document.getElementById('evidence-file');
@@ -467,7 +499,7 @@ function selectPO(po, cardEl) {
         (qtyInspectEl && qtyInspectEl.value && parseInt(qtyInspectEl.value, 10) > 0);
 
     if (selectedPO && selectedPO.po_number !== po.po_number && hasUnsubmittedData) {
-        const confirmSwitch = confirm(`Anda sedang mengisi form / memilih file untuk PO ${selectedPO.po_number}.\n\nYakin ingin mengganti ke PO ${po.po_number}? Berkas yang sudah dipilih akan ter-reset.`);
+        const confirmSwitch = await showSwitchPOModal(selectedPO.po_number, po.po_number);
         if (!confirmSwitch) {
             return; // Cancel PO switch
         }
@@ -743,8 +775,8 @@ window.openValidationDialog = function () {
         const statusChecking = document.getElementById('checking-status')?.value === 'in-progress' ? 'In-Progress (Belum Selesai)' : 'Done (Selesai)';
 
         let summaryHtml = `
-            ${summaryRow('PO Number', selectedPO.po_number)}
-            ${summaryRow('Material', selectedPO.material_name)}
+            ${summaryRow('Target PO Number', selectedPO.po_number, true)}
+            ${summaryRow('Material Name', selectedPO.material_name)}
             ${summaryRow('Vendor', selectedPO.vendor_name)}
             ${summaryRow('Jenis Inspeksi', inspectTypeLabel)}
         `;
@@ -796,9 +828,17 @@ window.openValidationDialog = function () {
     overlay.style.display = 'flex';
 };
 
-function summaryRow(label, value) {
-    return `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
-        <span style="color:#94a3b8; font-weight:600; font-size:12px; white-space:nowrap;">${label}</span>
+function summaryRow(label, value, isHighlight = false) {
+    if (isHighlight) {
+        return `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(16, 185, 129, 0.12); border:1.5px solid rgba(16, 185, 129, 0.3); padding:10px 14px; border-radius:12px; margin-bottom:4px;">
+            <span style="color:#34d399; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px;">
+                <span class="material-symbols-outlined" style="font-size:16px;">receipt_long</span>${label}
+            </span>
+            <span style="color:white; font-weight:800; font-size:14px; letter-spacing:0.02em;">${esc(String(value))}</span>
+        </div>`;
+    }
+    return `<div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:2px 0;">
+        <span style="color:rgba(255,255,255,0.5); font-weight:600; font-size:12px; white-space:nowrap;">${label}</span>
         <span style="color:white; font-weight:600; font-size:13px; text-align:right;">${esc(String(value))}</span>
     </div>`;
 }
