@@ -470,6 +470,47 @@ function submitInspection(payload) {
       throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
     }
 
+    // IF BONDING TEST: Update existing PO row in place if it exists!
+    if (payload.inspection_type === 'Bonding Test') {
+      var targetPO = String(payload.po_number || '').trim().toLowerCase();
+      var existingRowIndex = -1;
+      var existingRowData = null;
+
+      if (targetPO && sheet.getLastRow() > 1) {
+        var allRows = sheet.getDataRange().getValues();
+        for (var r = allRows.length - 1; r >= 1; r--) {
+          var rowPO = String(allRows[r][7] || '').trim().toLowerCase(); // Index 7 is po_no
+          if (rowPO === targetPO) {
+            existingRowIndex = r + 1; // 1-based row index in Sheet
+            existingRowData = allRows[r];
+            break;
+          }
+        }
+      }
+
+      if (existingRowIndex > 1) {
+        // Update existing row in place: Col 35 (AI) is bonding_test_url
+        var bondingUrl = evidenceUrl || payload.bonding_test_url || '';
+        sheet.getRange(existingRowIndex, 35).setValue(bondingUrl);
+
+        // Append bonding notes to defect_notes if provided (Col 23 / W)
+        var newNotes = payload.bonding_notes || payload.defect_notes || '';
+        if (newNotes) {
+          var oldNotes = String(existingRowData[22] || '').trim();
+          var mergedNotes = oldNotes ? (oldNotes + '; [Bonding Test]: ' + newNotes) : ('[Bonding Test]: ' + newNotes);
+          sheet.getRange(existingRowIndex, 23).setValue(mergedNotes);
+        }
+
+        // Update status to 'done' (Col 19 / S)
+        sheet.getRange(existingRowIndex, 19).setValue('done');
+
+        // Update master_data status as well
+        updateMasterDataStatus(ss, payload.po_number, 'done', 0);
+
+        return { status: 'ok', inspection_id: String(existingRowData[20] || inspectionId), message: 'Bonding Test berhasil diperbarui pada baris PO yang sama.' };
+      }
+    }
+
     // Accumulate previous in-progress inspection results & delete old in-progress rows
     var prevOK = 0;
     var prevNO = 0;
@@ -525,7 +566,7 @@ function submitInspection(payload) {
       else if (h === 'defect_notes') newRow.push(combinedNotes);
       else if (h === 'rolling_inspection') newRow.push(payload.rolling_inspection || 'No');
       else if (h === 'approved_by_leader') newRow.push(payload.approved_by_leader || '');
-      else if (h === 'evidence_url') newRow.push(evidenceUrl || '');
+      else if (h === 'evidence_url') newRow.push(payload.inspection_type === 'Bonding Test' ? '' : (evidenceUrl || ''));
       else if (h === 'inspection_date') newRow.push(payload.inspection_date || now);
 
       else if (h === 'inspection_type') newRow.push(payload.inspection_type || 'Raw Material');
