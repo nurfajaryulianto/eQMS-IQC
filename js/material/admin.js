@@ -517,6 +517,7 @@ window.confirmPassAll = async function () {
         setLoading(false);
         showToast(json.message || 'Pass berhasil!', 'success');
         await loadMasterData();
+        if (typeof renderMasterTable === 'function') renderMasterTable();
         await loadPassAllPreview();
 
     } catch (err) {
