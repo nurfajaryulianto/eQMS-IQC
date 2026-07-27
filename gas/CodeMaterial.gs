@@ -223,6 +223,7 @@ function getMasterData(params) {
   }
 
   var result = [];
+  var mdUpdated = false;
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
@@ -249,6 +250,20 @@ function getMasterData(params) {
       dynamicStatus = 'done';
     } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
       dynamicStatus = 'in-progress';
+    }
+
+    // --- SELF-HEALING DATABASE SYNC ---
+    // If the physical cell values for status (Col S / index 18) or checked_qty (Col V / index 21)
+    // in master_data sheet differ from the dynamically computed status, update them in real-time.
+    var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
+    var currentStoredQty = row[21] === '' ? 0 : (Number(row[21]) || 0);
+
+    var expectedStoredQty = (dynamicStatus === 'done' || dynamicStatus === 'pending') ? '' : checkedQty;
+
+    if (currentStoredStatus !== dynamicStatus || String(currentStoredQty) !== String(expectedStoredQty)) {
+      row[18] = dynamicStatus;
+      row[21] = expectedStoredQty;
+      mdUpdated = true;
     }
 
     if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
@@ -286,6 +301,17 @@ function getMasterData(params) {
       laminating_done:  lamDone,
       bonding_done:     bondDone
     });
+  }
+
+  // Save the self-healed changes to master_data sheet in 1 single bulk API call
+  if (mdUpdated) {
+    var numCols = Math.max(data[0].length, 22);
+    for (var i = 0; i < data.length; i++) {
+      while (data[i].length < numCols) {
+        data[i].push('');
+      }
+    }
+    sheet.getRange(1, 1, data.length, numCols).setValues(data);
   }
 
   return { data: result, total: result.length };
