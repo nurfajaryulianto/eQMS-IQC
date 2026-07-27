@@ -979,22 +979,6 @@ function generateTemplate() {
     .setMimeType(ContentService.MimeType.CSV);
 }
 
-// ─── VERIFY SUPABASE TOKEN (opsional) ────────────────────────
-
-function verifySupabaseToken(token) {
-  if (!token) return null;
-  try {
-    var res = UrlFetchApp.fetch(SUPABASE_URL + '/auth/v1/user', {
-      headers: { 'Authorization': 'Bearer ' + token },
-      muteHttpExceptions: true,
-    });
-    if (res.getResponseCode() !== 200) return null;
-    return JSON.parse(res.getContentText());
-  } catch (err) {
-    return null;
-  }
-}
-
 // ─── SETUP SPREADSHEET HEADERS ────────────────────────────────
 
 function setupSpreadsheetHeaders() {
