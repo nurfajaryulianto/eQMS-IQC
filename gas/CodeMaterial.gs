@@ -738,6 +738,7 @@ function passAll(payload) {
     var adminName = payload.admin_name || 'Admin Material';
     var count = 0;
     var newInspRows = [];
+    var existingInspUpdated = false;
 
     // Load material assignments map from USERS sheet and ASSIGNMENTS sheet
     var assignMap = {};
@@ -883,6 +884,14 @@ function passAll(payload) {
         existingRow[19] = now;
         existingRow[21] = assignedInspectorName;
         existingRow[26] = now;
+
+        // Also update inspection_type to contain 'Raw Material'
+        var curType = String(existingRow[27] || '').trim();
+        if (!curType.includes('Raw Material')) {
+          existingRow[27] = curType ? ('Raw Material, ' + curType) : 'Raw Material';
+        }
+
+        existingInspUpdated = true;
       } else {
         var newRow = [];
         var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
@@ -901,6 +910,7 @@ function passAll(payload) {
           else if (h === 'status') newRow.push('done');
           else if (h === 'uploaded_at') newRow.push(now);
           else if (h === 'inspection_date') newRow.push(now);
+          else if (h === 'inspection_type') newRow.push('Raw Material');
           
           // Map static elements
           else if (h === 'material_name') newRow.push(data[i][1]);
@@ -920,13 +930,18 @@ function passAll(payload) {
 
       // Update in-memory data for master_data sheet (Col S is index 18, Col V is index 21)
       data[i][18] = 'done';
-      data[i][21] = 0; // Clear checked_qty
+      data[i][21] = ''; // Clear checked_qty
       count++;
     }
 
     // Single bulk write to master_data sheet for all updated rows (15-50x speed improvement)
     if (count > 0) {
       mdSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    }
+
+    // Bulk write updated existing rows back to inspections sheet
+    if (existingInspUpdated && existingInspData.length > 0) {
+      inspSheet.getRange(1, 1, existingInspData.length, existingInspData[0].length).setValues(existingInspData);
     }
 
     // Single bulk append for new inspection rows
