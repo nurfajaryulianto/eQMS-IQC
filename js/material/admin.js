@@ -79,7 +79,25 @@ window.loadMasterData = async function () {
             const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData&status=all`);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
-            allMasterData = json.data || [];
+            
+            // Normalize keys to lowercase to avoid inconsistent casing issues from backend
+            allMasterData = (json.data || []).map(row => {
+                const plannedQty = Number(row.planned_qty || row.PlannedQty || row.plannedQty) || 0;
+                const checkedQty = Number(row.checked_qty || row.CheckedQty || row.checkedQty) || 0;
+                return {
+                    row_idx: row.row_idx || row.rowIdx || null,
+                    po_number: row.po_number || row.PONumber || row.poNumber || '',
+                    material_name: row.material_name || row.MaterialName || row.materialName || '',
+                    item_description: row.item_description || row.ItemDescription || row.itemDescription || '',
+                    uom: row.uom || row.UOM || '',
+                    vendor_name: row.vendor_name || row.VendorName || row.vendorName || '',
+                    style: row.style || row.Style || '',
+                    model_shoe: row.model_shoe || row.ModelShoe || row.modelShoe || '',
+                    planned_qty: plannedQty,
+                    checked_qty: checkedQty,
+                    status: (row.status || row.Status || 'pending').toLowerCase()
+                };
+            });
         }
         renderMasterTable();
     } catch (err) {
@@ -126,7 +144,7 @@ window.renderMasterTable = function () {
 // ─── UPLOAD TAB: GENERATE TEMPLATE ───────────────────────────
 
 window.downloadTemplate = async function () {
-    if (UI_TEST_MODE) {
+    if (MATERIAL_TEST_MODE) {
         // Generate CSV in browser
         const headers = [
             'Material Name', 'Material Description', 'UOM', 'Supplier',
