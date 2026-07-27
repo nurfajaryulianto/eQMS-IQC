@@ -788,13 +788,20 @@ function passAll(payload) {
       }
     }
 
-    // Filter by specific PO numbers if provided (case-insensitive key map)
-    var targetPOs = null;
+    // Filter by specific PO numbers if provided (handles single & comma-separated PO strings)
+    var targetPOsMap = null;
     if (payload.po_numbers && Array.isArray(payload.po_numbers)) {
-      targetPOs = {};
-      payload.po_numbers.forEach(function(po) {
-        var cleanPO = String(po || '').trim().toLowerCase();
-        if (cleanPO) targetPOs[cleanPO] = true;
+      targetPOsMap = {};
+      payload.po_numbers.forEach(function(poStr) {
+        var str = String(poStr || '').trim().toLowerCase();
+        if (str) {
+          targetPOsMap[str] = true;
+          var parts = str.split(',');
+          parts.forEach(function(p) {
+            var sub = p.trim().toLowerCase();
+            if (sub) targetPOsMap[sub] = true;
+          });
+        }
       });
     }
 
@@ -804,7 +811,12 @@ function passAll(payload) {
     for (var r = 1; r < existingInspData.length; r++) {
       var poKey = String(existingInspData[r][7] || '').trim().toLowerCase();
       if (poKey) {
-        inspMapByPO[poKey] = r + 1; // 1-based row index in Sheet
+        inspMapByPO[poKey] = r + 1;
+        var pParts = poKey.split(',');
+        pParts.forEach(function(pp) {
+          var cleanSub = pp.trim().toLowerCase();
+          if (cleanSub) inspMapByPO[cleanSub] = r + 1;
+        });
       }
     }
 
@@ -814,8 +826,25 @@ function passAll(payload) {
 
       var poLower = poRaw.toLowerCase();
 
-      // If specific target POs provided, skip POs not in selection
-      if (targetPOs && !targetPOs[poLower]) continue;
+      // Check if this row's PO matches targetPOsMap
+      var isMatched = false;
+      if (!targetPOsMap) {
+        isMatched = true; // No selection filter, process all
+      } else if (targetPOsMap[poLower]) {
+        isMatched = true; // Exact match
+      } else {
+        // Check sub-parts if row or selection contains comma-separated POs
+        var subParts = poLower.split(',');
+        for (var s = 0; s < subParts.length; s++) {
+          var subClean = subParts[s].trim();
+          if (subClean && targetPOsMap[subClean]) {
+            isMatched = true;
+            break;
+          }
+        }
+      }
+
+      if (!isMatched) continue; // Skip if not matched
 
       var currentStatus = String(data[i][18] || '').trim().toLowerCase(); // status is Col S (index 18)
       if (currentStatus === 'done') continue; // Skip items already completed
@@ -827,10 +856,24 @@ function passAll(payload) {
       var foundList = assignMap[matType] || assignMap[matName] || [];
       var assignedInspectorName = (Array.isArray(foundList) && foundList.length > 0) ? foundList.join(', ') : adminName;
 
-      // Update existing inspection row if present, otherwise create new row
+      // Check if any sub-PO already exists in inspMapByPO
+      var existingRowIdx = -1;
       if (inspMapByPO[poLower]) {
-        var targetRowIdx = inspMapByPO[poLower];
-        var existingRow = existingInspData[targetRowIdx - 1];
+        existingRowIdx = inspMapByPO[poLower];
+      } else {
+        var subParts2 = poLower.split(',');
+        for (var s2 = 0; s2 < subParts2.length; s2++) {
+          var sub2 = subParts2[s2].trim();
+          if (sub2 && inspMapByPO[sub2]) {
+            existingRowIdx = inspMapByPO[sub2];
+            break;
+          }
+        }
+      }
+
+      // Update existing inspection row if present, otherwise create new row
+      if (existingRowIdx > 1 && existingInspData[existingRowIdx - 1]) {
+        var existingRow = existingInspData[existingRowIdx - 1];
 
         // Col indices: 9 (ok), 10 (no_qty), 14 (check_color), 18 (status), 19 (uploaded_at), 21 (inspector_nik), 26 (inspection_date)
         existingRow[9] = qty;
@@ -840,8 +883,6 @@ function passAll(payload) {
         existingRow[19] = now;
         existingRow[21] = assignedInspectorName;
         existingRow[26] = now;
-
-        inspSheet.getRange(targetRowIdx, 1, 1, existingRow.length).setValues([existingRow]);
       } else {
         var newRow = [];
         var uniqueId = 'INSP-BATCH-' + Date.now() + '-' + i;
