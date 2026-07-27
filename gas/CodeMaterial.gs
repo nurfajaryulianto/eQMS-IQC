@@ -368,12 +368,15 @@ function bulkUpsertMasterData(payload) {
     var data    = sheet.getDataRange().getValues();
     var existingMap = {};
     
-    // Map existing POs + Receive Date (Column M is index 12, Column L is index 11)
+    // Map existing POs + Receive Date + Material Name + Receive Number (GRN) to allow multiple distinct items
     for (var i = 1; i < data.length; i++) {
-      var poKey = String(data[i][12]).trim();
+      var poKey = String(data[i][12] || '').trim();
       var dateKey = normalizeDateStr(data[i][11]);
+      var matKey = String(data[i][1] || '').trim();
+      var recNumKey = String(data[i][16] || '').trim();
       if (poKey) {
-        existingMap[(poKey + '___' + dateKey).toLowerCase()] = true;
+        var fullKey = (poKey + '___' + dateKey + '___' + matKey + '___' + recNumKey).toLowerCase();
+        existingMap[fullKey] = true;
       }
     }
 
@@ -404,7 +407,7 @@ function bulkUpsertMasterData(payload) {
       var poArea = getExcelVal(row, ['PO Area', 'po_area']);
       var matType = getExcelVal(row, ['Material Type', 'material_type']);
 
-      var dupKey = (po + '___' + normalizeDateStr(receiveDate)).toLowerCase();
+      var dupKey = (po + '___' + normalizeDateStr(receiveDate) + '___' + matName + '___' + receiveNum).toLowerCase();
 
       var newRow = [];
       MASTER_DATA_HEADERS.forEach(function(h) {
@@ -433,7 +436,7 @@ function bulkUpsertMasterData(payload) {
       });
 
       if (existingMap[dupKey]) {
-        rejectedPOs.push(po + ' (Tgl: ' + (receiveDate || 'N/A') + ')');
+        rejectedPOs.push(po + ' (' + matName + ' - Tgl: ' + (receiveDate || 'N/A') + ')');
       } else {
         existingMap[dupKey] = true;
         insertRows.push(newRow);

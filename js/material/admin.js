@@ -253,11 +253,11 @@ window.confirmUpload = async function () {
         if (MATERIAL_TEST_MODE) {
             await delay(1500);
             
-            // Map existing POs + Receive Date in cache to check duplicates
+            // Map existing POs + Receive Date + Material Name + Receive Number in cache to check duplicates
             const existingMap = {};
             allMasterData.forEach(d => {
                 if (d.po_number) {
-                    const key = (d.po_number + '___' + (d.receive_date || '')).toLowerCase();
+                    const key = (d.po_number + '___' + (d.receive_date || '') + '___' + (d.material_name || '') + '___' + (d.receive_number || '')).toLowerCase();
                     existingMap[key] = true;
                 }
             });
@@ -265,11 +265,13 @@ window.confirmUpload = async function () {
             parsedFileData.forEach(row => {
                 const po = String(row['PO Number'] || row.po_number || '').trim();
                 const recDate = String(row['Receive Date'] || row.receive_date || '').trim();
+                const matName = String(row['Material Name'] || row.material_name || '').trim();
+                const recNum = String(row['Receive Number'] || row.receive_number || '').trim();
                 if (!po) return;
                 
-                const key = (po + '___' + recDate).toLowerCase();
+                const key = (po + '___' + recDate + '___' + matName + '___' + recNum).toLowerCase();
                 if (existingMap[key]) {
-                    rejected.push(po + ' (Tgl: ' + (recDate || 'N/A') + ')');
+                    rejected.push(`${po} (${matName} - Tgl: ${recDate || 'N/A'})`);
                 } else {
                     existingMap[key] = true;
                     inserted++;
