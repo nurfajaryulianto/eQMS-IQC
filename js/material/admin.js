@@ -420,7 +420,7 @@ window.applyPassAllDateFilter = function () {
 
     listEl.innerHTML = filteredPending.map((d, i) => `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ffffff;">
@@ -479,29 +479,33 @@ window.updatePassAllSelectedCount = function () {
 
 window.confirmPassAll = async function () {
     const checkboxes = document.querySelectorAll('.passall-item-checkbox');
-    const selectedPos = Array.from(checkboxes)
+    const selectedItems = Array.from(checkboxes)
         .filter(cb => cb.checked)
-        .map(cb => cb.dataset.po);
+        .map(cb => ({
+            po: cb.dataset.po,
+            rowIdx: cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null
+        }));
 
-    if (!selectedPos.length) {
+    if (!selectedItems.length) {
         showToast('Tidak ada item yang dipilih untuk di-pass.', 'info');
         return;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menandai ${selectedPos.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menandai ${selectedItems.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
 
-    setLoading(true, `Memproses ${selectedPos.length} item...`);
+    setLoading(true, `Memproses ${selectedItems.length} item...`);
 
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(2000);
             allMasterData.forEach(d => {
-                if (d.status === 'pending' && selectedPos.includes(d.po_number)) {
+                const isSelected = selectedItems.some(item => (item.rowIdx && d.row_idx === item.rowIdx) || (!item.rowIdx && d.po_number === item.po));
+                if (d.status === 'pending' && isSelected) {
                     d.status = 'done';
                 }
             });
             setLoading(false);
-            showToast(`Pass berhasil: ${selectedPos.length} item ditandai sebagai Pass. (simulasi)`, 'success');
+            showToast(`Pass berhasil: ${selectedItems.length} item ditandai sebagai Pass. (simulasi)`, 'success');
             await loadPassAllPreview();
             renderMasterTable();
             return;
@@ -511,7 +515,8 @@ window.confirmPassAll = async function () {
             action: 'passAll',
             admin_nik: currentUser?.nik || 'admin',
             admin_name: currentUser?.name || 'Admin Material',
-            po_numbers: selectedPos
+            po_numbers: selectedItems.map(item => item.po),
+            row_indexes: selectedItems.filter(item => item.rowIdx).map(item => item.rowIdx)
         };
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();

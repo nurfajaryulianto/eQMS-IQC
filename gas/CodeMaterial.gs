@@ -284,6 +284,7 @@ function getMasterData(params) {
     var balanceQty = Math.max(0, plannedQty - checkedQty);
 
     result.push({
+      row_idx:          r + 1,
       po_number:        poVal,
       material_name:    String(row[1] || '').trim(),
       item_description: String(row[2] || '').trim(),
@@ -829,9 +830,18 @@ function passAll(payload) {
       }
     }
 
-    // Filter by specific PO numbers if provided (handles single & comma-separated PO strings)
+    // Filter by specific row indexes if provided (allows unique matching for duplicate PO rows)
+    var targetRowIndexes = null;
+    if (payload.row_indexes && Array.isArray(payload.row_indexes)) {
+      targetRowIndexes = {};
+      payload.row_indexes.forEach(function(idx) {
+        targetRowIndexes[Number(idx)] = true;
+      });
+    }
+
+    // Filter by specific PO numbers if provided (fallback for backward compatibility)
     var targetPOsMap = null;
-    if (payload.po_numbers && Array.isArray(payload.po_numbers)) {
+    if (!targetRowIndexes && payload.po_numbers && Array.isArray(payload.po_numbers)) {
       targetPOsMap = {};
       payload.po_numbers.forEach(function(poStr) {
         var str = String(poStr || '').trim().toLowerCase();
@@ -862,14 +872,20 @@ function passAll(payload) {
     }
 
     for (var i = 1; i < data.length; i++) {
+      var rowIdx = i + 1; // 1-based row index in Sheet
+
       var poRaw = String(data[i][12] || '').trim(); // po_number is Col M (index 12)
       if (!poRaw) continue;
 
       var poLower = poRaw.toLowerCase();
 
-      // Check if this row's PO matches targetPOsMap
+      // Check if this row is selected (by row index first, fallback to PO string matching)
       var isMatched = false;
-      if (!targetPOsMap) {
+      if (targetRowIndexes) {
+        if (targetRowIndexes[rowIdx]) {
+          isMatched = true;
+        }
+      } else if (!targetPOsMap) {
         isMatched = true; // No selection filter, process all
       } else if (targetPOsMap[poLower]) {
         isMatched = true; // Exact match
