@@ -253,11 +253,11 @@ window.confirmUpload = async function () {
         if (MATERIAL_TEST_MODE) {
             await delay(1500);
             
-            // Map existing POs + Receive Date + Material Name + Receive Number in cache to check duplicates
+            // Map existing POs + Receive Date + Material Name + Receive Number + Quantity in cache to check duplicates
             const existingMap = {};
             allMasterData.forEach(d => {
                 if (d.po_number) {
-                    const key = (d.po_number + '___' + (d.receive_date || '') + '___' + (d.material_name || '') + '___' + (d.receive_number || '')).toLowerCase();
+                    const key = (d.po_number + '___' + (d.receive_date || '') + '___' + (d.material_name || '') + '___' + (d.receive_number || '') + '___' + (Number(d.planned_qty) || 0)).toLowerCase();
                     existingMap[key] = true;
                 }
             });
@@ -267,11 +267,12 @@ window.confirmUpload = async function () {
                 const recDate = String(row['Receive Date'] || row.receive_date || '').trim();
                 const matName = String(row['Material Name'] || row.material_name || '').trim();
                 const recNum = String(row['Receive Number'] || row.receive_number || '').trim();
+                const batchSize = Number(row['Batch Size'] || row.planned_qty) || 0;
                 if (!po) return;
                 
-                const key = (po + '___' + recDate + '___' + matName + '___' + recNum).toLowerCase();
+                const key = (po + '___' + recDate + '___' + matName + '___' + recNum + '___' + batchSize).toLowerCase();
                 if (existingMap[key]) {
-                    rejected.push(`${po} (${matName} - Tgl: ${recDate || 'N/A'})`);
+                    rejected.push(`${po} (${matName} Qty: ${batchSize} - Tgl: ${recDate || 'N/A'})`);
                 } else {
                     existingMap[key] = true;
                     inserted++;
