@@ -733,6 +733,16 @@ function passAll(payload) {
     if (!inspSheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
     var data  = mdSheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'ok', message: 'Tidak ada data.', count: 0 };
+
+    // Normalize data grid to ensure all rows have at least 22 columns (Col V is index 21)
+    var numCols = Math.max(data[0].length, 22);
+    for (var r = 0; r < data.length; r++) {
+      while (data[r].length < numCols) {
+        data[r].push('');
+      }
+    }
+
     var now   = new Date().toISOString();
     var adminNik  = payload.admin_nik || 'admin';
     var adminName = payload.admin_name || 'Admin Material';
