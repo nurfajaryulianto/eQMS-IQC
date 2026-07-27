@@ -857,9 +857,6 @@ function passAll(payload) {
 
       if (!isMatched) continue; // Skip if not matched
 
-      var currentStatus = String(data[i][18] || '').trim().toLowerCase(); // status is Col S (index 18)
-      if (currentStatus === 'done') continue; // Skip items already completed
-
       var qty = Number(data[i][7]) || 0; // batch_size is Col H (index 7)
       var matType = String(data[i][17] || '').trim().toLowerCase(); // material_type is Col R (index 17)
       var matName = String(data[i][1] || '').trim().toLowerCase();  // material_name is Col B (index 1)
@@ -880,6 +877,28 @@ function passAll(payload) {
             break;
           }
         }
+      }
+
+      // Check actual dynamic status based on inspections sheet
+      var actualInspStatus = '';
+      var okQty = 0;
+      var noQty = 0;
+      var iType = '';
+      if (existingRowIdx > 1 && existingInspData[existingRowIdx - 1]) {
+        var existingRow = existingInspData[existingRowIdx - 1];
+        actualInspStatus = String(existingRow[18] || '').trim().toLowerCase();
+        okQty = Number(existingRow[9]) || 0;
+        noQty = Number(existingRow[10]) || 0;
+        iType = String(existingRow[27] || '').trim();
+      }
+
+      var checkedQty = okQty + noQty;
+      var rawDone = (iType.indexOf('Raw Material') >= 0 && (actualInspStatus === 'done' || (checkedQty >= qty && qty > 0)));
+      var isDynamicallyDone = (rawDone || actualInspStatus === 'done');
+
+      // If user explicitly selected this PO, we process it. Otherwise, skip if dynamically done.
+      if (!targetPOsMap && isDynamicallyDone) {
+        continue;
       }
 
       // Update existing inspection row if present, otherwise create new row
