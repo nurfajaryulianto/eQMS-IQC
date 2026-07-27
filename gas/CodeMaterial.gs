@@ -896,8 +896,8 @@ function passAll(payload) {
       var rawDone = (iType.indexOf('Raw Material') >= 0 && (actualInspStatus === 'done' || (checkedQty >= qty && qty > 0)));
       var isDynamicallyDone = (rawDone || actualInspStatus === 'done');
 
-      // If user explicitly selected this PO, we process it. Otherwise, skip if dynamically done.
-      if (!targetPOsMap && isDynamicallyDone) {
+      // Skip if dynamically done (already completed in inspections sheet)
+      if (isDynamicallyDone) {
         continue;
       }
 
