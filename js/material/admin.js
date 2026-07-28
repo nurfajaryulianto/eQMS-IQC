@@ -95,7 +95,11 @@ window.loadMasterData = async function () {
                     model_shoe: row.model_shoe || row.ModelShoe || row.modelShoe || '',
                     planned_qty: plannedQty,
                     checked_qty: checkedQty,
-                    status: (row.status || row.Status || 'pending').toLowerCase()
+                    receive_date: row.receive_date || row.ReceiveDate || row.receiveDate || '',
+                    status: (row.status || row.Status || 'pending').toLowerCase(),
+                    raw_done: Boolean(row.raw_done || row.RawDone),
+                    laminating_done: Boolean(row.laminating_done || row.LaminatingDone),
+                    bonding_done: Boolean(row.bonding_done || row.BondingDone)
                 };
             });
         }
@@ -200,6 +204,24 @@ window.handleDragLeave = function () {
     document.getElementById('drop-zone').classList.remove('drag-over');
 };
 
+function detectHeaderRow(sheet) {
+    // Read the first 10 rows as a 2D array to find the header row
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: '' });
+    for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+        const row = rawRows[i];
+        if (Array.isArray(row)) {
+            const hasHeaderKey = row.some(cell => {
+                const s = String(cell || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                return s === 'ponumber' || s === 'materialname' || s === 'pono' || s === 'supplier';
+            });
+            if (hasHeaderKey) {
+                return i;
+            }
+        }
+    }
+    return 0;
+}
+
 function processFile(file) {
     const validTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -217,8 +239,10 @@ function processFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            // ADF Layout headers are on the second row (index 1)
-            parsedFileData = XLSX.utils.sheet_to_json(sheet, { range: 1, defval: '' });
+            
+            // Auto-detect header row index (handles both generated template at row 0 and ADF layout at row 1)
+            const headerRowIndex = detectHeaderRow(sheet);
+            parsedFileData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '' });
 
             document.getElementById('file-name').textContent = file.name;
             document.getElementById('file-rows').textContent = `${parsedFileData.length} baris data`;
