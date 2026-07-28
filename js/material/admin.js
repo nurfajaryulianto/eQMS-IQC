@@ -79,7 +79,7 @@ window.loadMasterData = async function () {
             const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData&status=all`);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
-            
+
             // Normalize keys to lowercase to avoid inconsistent casing issues from backend
             allMasterData = (json.data || []).map(row => {
                 const plannedQty = Number(row.planned_qty || row.PlannedQty || row.plannedQty) || 0;
@@ -135,10 +135,10 @@ window.renderMasterTable = function () {
             ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`
             : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
-            <td style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;white-space:nowrap;">${esc(d.po_number)}</td>
-            <td style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;max-width:200px;">${esc(d.material_name)}</td>
-            <td style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;white-space:nowrap;">${esc(d.vendor_name)}</td>
-            <td style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
+            <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
+            <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
+            <td class="truncate" title="${esc(d.vendor_name)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(d.vendor_name)}</td>
+            <td class="truncate" style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
             <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
         </tr>`;
@@ -239,7 +239,7 @@ function processFile(file) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            
+
             // Auto-detect header row index (handles both generated template at row 0 and ADF layout at row 1)
             const headerRowIndex = detectHeaderRow(sheet);
             parsedFileData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex, defval: '' });
@@ -294,7 +294,7 @@ window.confirmUpload = async function () {
 
         if (MATERIAL_TEST_MODE) {
             await delay(1500);
-            
+
             // Map existing POs + Receive Date + Material Name + Receive Number + Quantity in cache to check duplicates
             const existingMap = {};
             allMasterData.forEach(d => {
@@ -311,7 +311,7 @@ window.confirmUpload = async function () {
                 const recNum = String(row['Receive Number'] || row.receive_number || '').trim();
                 const batchSize = Number(row['Batch Size'] || row.planned_qty) || 0;
                 if (!po) return;
-                
+
                 const key = (po + '___' + recDate + '___' + matName + '___' + recNum + '___' + batchSize).toLowerCase();
                 if (existingMap[key]) {
                     rejected.push(`${po} (${matName} Qty: ${batchSize} - Tgl: ${recDate || 'N/A'})`);
@@ -352,7 +352,7 @@ window.confirmUpload = async function () {
             alertMessage += `\n\n⚠️ ${rejected.length} data duplikat ditolak oleh sistem karena Nomor PO sudah ada di database:\n${rejected.join(', ')}`;
             alertType = 'warning';
         }
-        
+
         clearFile();
         if (MATERIAL_TEST_MODE) {
             renderMasterTable();
@@ -684,7 +684,7 @@ async function populateAssignmentFormOptions() {
                 allUsers = json.data || [];
             }
         }
-        
+
         inspectorSelect.innerHTML = `<option value="">Pilih Inspector...</option>` +
             allUsers.map(u => `<option value="${esc(u.name || u.nik)}" data-nik="${esc(u.nik)}">${esc(u.name || u.nik)} (${esc(u.nik)} - ${u.role})</option>`).join('');
     } catch (e) {
@@ -786,7 +786,7 @@ window.editAssignment = function (materialType) {
 
     editingAssignmentMaterialType = item.material_type;
     document.getElementById('assign-material-type').value = item.material_type;
-    
+
     const inspSelect = document.getElementById('assign-inspector');
     if (inspSelect) {
         inspSelect.value = item.inspector_name || item.inspector_nik || '';

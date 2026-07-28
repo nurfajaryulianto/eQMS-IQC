@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +8,19 @@
     <meta name="description" content="Admin panel IQC Material: upload template, master data, dan batch pass all.">
     <link rel="icon" href="../assets/images/logo.png" type="image/png">
     <link rel="stylesheet" href="../assets/css/tailwind.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+        rel="stylesheet">
     <style>
-        * { box-sizing: border-box; }
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; user-select: none; }
-        
+        * {
+            box-sizing: border-box;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            user-select: none;
+        }
+
         :root {
             --emerald: #10b981;
             --emerald-dark: #059669;
@@ -45,8 +54,8 @@
             position: fixed;
             inset: 0;
             background-image:
-                linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+                linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
             background-size: 40px 40px;
             z-index: -1;
         }
@@ -70,19 +79,21 @@
             font-weight: 600;
             cursor: pointer;
             border: 1px solid transparent;
-            color: rgba(255,255,255,0.55);
+            color: rgba(255, 255, 255, 0.55);
             background: transparent;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         .tab-btn.active {
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
             color: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
+
         .tab-btn:not(.active):hover {
             background: rgba(255, 255, 255, 0.04);
             color: white;
@@ -95,8 +106,9 @@
             border-radius: 20px;
             border: 1px solid rgba(255, 255, 255, 0.08);
             overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
         }
+
         .card-header {
             background: rgba(255, 255, 255, 0.02);
             padding: 16px 20px;
@@ -107,8 +119,17 @@
         }
 
         /* Status badge */
-        .badge-pending { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-        .badge-done    { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-done {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
 
         .drop-zone {
             border: 2px dashed rgba(255, 255, 255, 0.2);
@@ -119,29 +140,54 @@
             transition: all 0.25s;
             background: rgba(255, 255, 255, 0.01);
         }
-        .drop-zone:hover, .drop-zone.drag-over {
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
             border-color: var(--emerald-light);
             background: rgba(16, 185, 129, 0.05);
         }
-        .drop-zone input[type=file] { display: none; }
+
+        .drop-zone input[type=file] {
+            display: none;
+        }
 
         #loading-overlay {
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,0.6);
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(6px);
             -webkit-backdrop-filter: blur(6px);
             z-index: 300;
             display: none;
-            align-items: center; justify-content: center;
+            align-items: center;
+            justify-content: center;
         }
-        #loading-overlay.visible { display: flex; }
 
-        .thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
-        .thin-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 99px; }
+        #loading-overlay.visible {
+            display: flex;
+        }
+
+        .thin-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .thin-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .thin-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 99px;
+        }
 
         #alert-toast {
-            position: fixed; top: 70px; right: 20px; z-index: 400; display: none; max-width: 340px;
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 400;
+            display: none;
+            max-width: 340px;
         }
 
         /* Inputs */
@@ -156,11 +202,13 @@
             outline: none;
             transition: all 0.2s;
         }
+
         .styled-input:focus {
             background: rgba(255, 255, 255, 0.08);
             border-color: var(--emerald-light);
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
         }
+
         select option {
             background-color: #ffffff !important;
             color: #1e293b !important;
@@ -175,33 +223,69 @@
             cursor: pointer;
             border: none;
         }
+
         .btn-gradient:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
         }
+
         .btn-secondary {
-            border: 1.5px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.03);
-            color: rgba(255,255,255,0.7);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.7);
             font-size: 13px;
             font-weight: 600;
             transition: all 0.2s;
             cursor: pointer;
         }
+
         .btn-secondary:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: rgba(255,255,255,0.15);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
             color: white;
             transform: translateY(-1px);
         }
 
         /* Table */
-        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .data-table th { padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.05em; background: rgba(255,255,255,0.01); border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .data-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.85); }
-        .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            table-layout: fixed;
+        }
+
+        .data-table td.truncate,
+        .data-table th.truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-table th {
+            padding: 12px 14px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.01);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .data-table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
     </style>
 </head>
+
 <body>
 
     <!-- Background overlays -->
@@ -210,10 +294,12 @@
 
     <!-- Navbar -->
     <nav class="navbar">
-        <div style="max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
+        <div
+            style="max-width: 1200px; margin: 0 auto; padding: 0 20px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <div style="width:28px;height:28px;background:linear-gradient(135deg,#10b981,#047857);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                    <div
+                        style="width:28px;height:28px;background:linear-gradient(135deg,#10b981,#047857);border-radius:8px;display:flex;align-items:center;justify-content:center;box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
                         <span class="material-symbols-outlined" style="color:white;font-size:16px;">inventory_2</span>
                     </div>
                     <div>
@@ -223,17 +309,25 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-                <a class="btn-secondary" href="index.html" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:13px;text-decoration:none;">
+                <a class="btn-secondary" href="index.html"
+                    style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:13px;text-decoration:none;">
                     <span class="material-symbols-outlined" style="font-size:16px;">assignment</span>Form Inspeksi
                 </a>
-                <a class="btn-secondary" href="dashboard.html" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:13px;text-decoration:none;">
+                <a class="btn-secondary" href="dashboard.html"
+                    style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;font-size:13px;text-decoration:none;">
                     <span class="material-symbols-outlined" style="font-size:16px;">analytics</span>Dashboard
                 </a>
-                <div style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
-                    <span class="material-symbols-outlined" style="font-size:16px;color:rgba(255,255,255,0.4);">shield_person</span>
-                    <span id="nav-user-name" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.855);">Admin</span>
+                <div
+                    style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);">
+                    <span class="material-symbols-outlined"
+                        style="font-size:16px;color:rgba(255,255,255,0.4);">shield_person</span>
+                    <span id="nav-user-name"
+                        style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.855);">Admin</span>
                 </div>
-                <button id="nav-logout-btn" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:10px;border:1.5px solid rgba(239, 68, 68, 0.2);background:rgba(239,68,68,0.05);color:#f87171;font-size:13px;font-weight:600;cursor:pointer;transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'; this.style.borderColor='#ef4444'; this.style.color='white'" onmouseout="this.style.background='rgba(239,68,68,0.05)'; this.style.borderColor='rgba(239,68,68,0.2)'; this.style.color='#f87171'">
+                <button id="nav-logout-btn"
+                    style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:10px;border:1.5px solid rgba(239, 68, 68, 0.2);background:rgba(239,68,68,0.05);color:#f87171;font-size:13px;font-weight:600;cursor:pointer;transition: all 0.2s;"
+                    onmouseover="this.style.background='rgba(239,68,68,0.15)'; this.style.borderColor='#ef4444'; this.style.color='white'"
+                    onmouseout="this.style.background='rgba(239,68,68,0.05)'; this.style.borderColor='rgba(239,68,68,0.2)'; this.style.color='#f87171'">
                     <span class="material-symbols-outlined" style="font-size:16px;">logout</span>
                 </button>
             </div>
@@ -242,8 +336,10 @@
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
-        <div style="background:#0c1829;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:28px 32px;display:flex;align-items:center;gap:14px;box-shadow:0 16px 48px rgba(0,0,0,0.5);">
-            <svg class="animate-spin" style="width:24px;height:24px;color:#34d399;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <div
+            style="background:#0c1829;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:28px 32px;display:flex;align-items:center;gap:14px;box-shadow:0 16px 48px rgba(0,0,0,0.5);">
+            <svg class="animate-spin" style="width:24px;height:24px;color:#34d399;" xmlns="http://www.w3.org/2000/svg"
+                fill="none" viewBox="0 0 24 24">
                 <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>
@@ -253,7 +349,8 @@
 
     <!-- Toast -->
     <div id="alert-toast">
-        <div style="background:#0f1c2e;border-radius:14px;padding:14px 16px;box-shadow:0 12px 36px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.08);display:flex;align-items:flex-start;gap:10px;">
+        <div
+            style="background:#0f1c2e;border-radius:14px;padding:14px 16px;box-shadow:0 12px 36px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.08);display:flex;align-items:flex-start;gap:10px;">
             <span id="toast-icon" class="material-symbols-outlined" style="font-size:20px;flex-shrink:0;"></span>
             <span id="toast-text" style="font-size:13px;color:rgba(255,255,255,0.85);line-height:1.5;"></span>
         </div>
@@ -264,12 +361,15 @@
 
         <!-- Page Header -->
         <div style="margin-bottom:24px;">
-            <h1 style="font-size:22px;font-weight:800;color:white;letter-spacing:-0.02em;margin:0 0 4px;">Admin Panel — IQC Material</h1>
-            <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;">Kelola master data PO, upload template, dan proses batch inspeksi.</p>
+            <h1 style="font-size:22px;font-weight:800;color:white;letter-spacing:-0.02em;margin:0 0 4px;">Admin Panel —
+                IQC Material</h1>
+            <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;">Kelola master data PO, upload template, dan
+                proses batch inspeksi.</p>
         </div>
 
         <!-- Tabs -->
-        <div style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);padding:4px;border-radius:12px;margin-bottom:20px;width:fit-content;backdrop-filter:blur(8px);">
+        <div
+            style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);padding:4px;border-radius:12px;margin-bottom:20px;width:fit-content;backdrop-filter:blur(8px);">
             <button class="tab-btn active" id="tab-master" onclick="switchTab('master')">
                 <span class="material-symbols-outlined" style="font-size:16px;">table_view</span>
                 Master Data
@@ -301,44 +401,52 @@
             <div class="card">
                 <div class="card-header" style="justify-content:space-between;">
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.4);">table_view</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;color:rgba(255,255,255,0.4);">table_view</span>
                         <span style="font-size:14px;font-weight:700;color:white;">Daftar PO / Master Data</span>
-                        <span id="master-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
+                        <span id="master-count"
+                            style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <select id="master-status-filter" onchange="renderMasterTable()" class="styled-input" style="padding:6px 10px; width:auto; cursor:pointer;">
+                        <select id="master-status-filter" onchange="renderMasterTable()" class="styled-input"
+                            style="padding:6px 10px; width:auto; cursor:pointer;">
                             <option value="all">Semua Status</option>
                             <option value="pending">Pending</option>
                             <option value="in-progress">In-Progress</option>
                             <option value="done">Done</option>
                         </select>
-                        <button onclick="loadMasterData()" class="btn-secondary" style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
+                        <button onclick="loadMasterData()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
                             <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
                         </button>
                     </div>
                 </div>
                 <div class="thin-scroll" style="overflow-x:auto;">
                     <table class="data-table">
+                        <colgroup>
+                            <col style="width: 20%;"> <!-- PO Number -->
+                            <col style="width: 28%;"> <!-- Material -->
+                            <col style="width: 20%;"> <!-- Vendor -->
+                            <col style="width: 10%;"> <!-- UOM -->
+                            <col style="width: 12%;"> <!-- Planned Qty -->
+                            <col style="width: 10%;"> <!-- Status -->
+                        </colgroup>
                         <thead>
-                            <tr>
-                                <th>PO Number</th>
-                                <th>Material</th>
-                                <th>Vendor</th>
-                                <th>UOM</th>
-                                <th style="text-align:right;">Planned Qty</th>
-                                <th style="text-align:center;">Status</th>
-                            </tr>
-                        </thead>
                         <tbody id="master-tbody">
-                            <tr><td colspan="6" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
-                                <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-                                    <svg class="animate-spin" style="width:24px;height:24px;color:#34d399;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                                    </svg>
-                                    <span style="font-size:13px;font-weight:500;">Memuat data...</span>
-                                </div>
-                            </td></tr>
+                            <tr>
+                                <td colspan="6" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                                        <svg class="animate-spin" style="width:24px;height:24px;color:#34d399;"
+                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor"
+                                                stroke-width="4"></circle>
+                                            <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z">
+                                            </path>
+                                        </svg>
+                                        <span style="font-size:13px;font-weight:500;">Memuat data...</span>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -352,29 +460,52 @@
                 <!-- Generate Template -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">download</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;color:rgba(255,255,255,0.45);">download</span>
                         <span style="font-size:14px;font-weight:700;color:white;">1. Generate Template</span>
                     </div>
                     <div style="padding:24px;">
                         <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0 0 16px;line-height:1.6;">
-                            Download template CSV kosong yang berisi semua kolom yang diperlukan. Isi template ini dengan data PO/Material, lalu upload kembali.
+                            Download template CSV kosong yang berisi semua kolom yang diperlukan. Isi template ini
+                            dengan data PO/Material, lalu upload kembali.
                         </p>
-                        <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;margin-bottom:16px;">
-                            <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Kolom Template</div>
+                        <div
+                            style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;margin-bottom:16px;">
+                            <div
+                                style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">
+                                Kolom Template</div>
                             <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Material Name</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Material Description</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">UOM</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Supplier</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Batch Size</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Product Code</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Model Name</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Bucket</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Receive Date</span>
-                                <span style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">PO Number</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Material
+                                    Name</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Material
+                                    Description</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">UOM</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Supplier</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Batch
+                                    Size</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Product
+                                    Code</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Model
+                                    Name</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Bucket</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">Receive
+                                    Date</span>
+                                <span
+                                    style="font-size:11px;padding:3px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-family:monospace;color:rgba(255,255,255,0.7);">PO
+                                    Number</span>
                             </div>
                         </div>
-                        <button onclick="downloadTemplate()" class="btn-gradient" style="width:100%;padding:11px;border-radius:10px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">
+                        <button onclick="downloadTemplate()" class="btn-gradient"
+                            style="width:100%;padding:11px;border-radius:10px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">
                             <span class="material-symbols-outlined" style="font-size:18px;">download</span>
                             Download Template CSV
                         </button>
@@ -384,19 +515,27 @@
                 <!-- Upload Template -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">upload_file</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;color:rgba(255,255,255,0.45);">upload_file</span>
                         <span style="font-size:14px;font-weight:700;color:white;">2. Upload Template Terisi</span>
                     </div>
                     <div style="padding:24px;">
 
-                        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
-                            <span class="material-symbols-outlined" style="font-size:40px;color:rgba(255,255,255,0.3);margin-bottom:10px;display:block;">cloud_upload</span>
-                            <p style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.7);margin:0 0 4px;">Klik atau drag file ke sini</p>
-                            <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Format: .xlsx, .xls, atau .csv</p>
+                        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+                            ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
+                            ondragleave="handleDragLeave(event)">
+                            <input type="file" id="file-input" accept=".xlsx,.xls,.csv"
+                                onchange="handleFileSelect(event)">
+                            <span class="material-symbols-outlined"
+                                style="font-size:40px;color:rgba(255,255,255,0.3);margin-bottom:10px;display:block;">cloud_upload</span>
+                            <p style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.7);margin:0 0 4px;">Klik
+                                atau drag file ke sini</p>
+                            <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0;">Format: .xlsx, .xls, atau
+                                .csv</p>
                         </div>
                         <div id="mock-adf-load-container" style="display:none; margin-top:10px;">
-                            <button type="button" onclick="loadMockADFFile()" class="btn-secondary" style="width:100%; padding:8px; border-radius:10px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px;">
+                            <button type="button" onclick="loadMockADFFile()" class="btn-secondary"
+                                style="width:100%; padding:8px; border-radius:10px; font-size:12px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px;">
                                 <span class="material-symbols-outlined" style="font-size:16px;">biotech</span>
                                 🧪 Load Mock ADF Raw Material Layout
                             </button>
@@ -404,21 +543,27 @@
 
                         <!-- File preview -->
                         <div id="file-preview" style="display:none;margin-top:16px;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                                 <div style="display:flex;align-items:center;gap:8px;">
-                                    <span class="material-symbols-outlined" style="font-size:20px;color:#34d399;">description</span>
+                                    <span class="material-symbols-outlined"
+                                        style="font-size:20px;color:#34d399;">description</span>
                                     <span id="file-name" style="font-size:13px;font-weight:600;color:white;"></span>
                                 </div>
-                                <span id="file-rows" style="font-size:12px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:6px;"></span>
+                                <span id="file-rows"
+                                    style="font-size:12px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:6px;"></span>
                             </div>
-                            <div class="thin-scroll" style="overflow-x:auto;max-height:200px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow-y:auto;background:rgba(0,0,0,0.2);">
+                            <div class="thin-scroll"
+                                style="overflow-x:auto;max-height:200px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow-y:auto;background:rgba(0,0,0,0.2);">
                                 <table id="preview-table" class="data-table" style="font-size:12px;"></table>
                             </div>
                             <div style="display:flex;gap:8px;margin-top:12px;">
-                                <button onclick="clearFile()" class="btn-secondary" style="flex:1;padding:9px;border-radius:9px;font-size:13px;">
+                                <button onclick="clearFile()" class="btn-secondary"
+                                    style="flex:1;padding:9px;border-radius:9px;font-size:13px;">
                                     Batal
                                 </button>
-                                <button onclick="confirmUpload()" class="btn-gradient" style="flex:2;padding:9px;border-radius:9px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                <button onclick="confirmUpload()" class="btn-gradient"
+                                    style="flex:2;padding:9px;border-radius:9px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;">
                                     <span class="material-symbols-outlined" style="font-size:16px;">upload</span>
                                     Upload ke Spreadsheet
                                 </button>
@@ -435,35 +580,48 @@
         <div id="panel-passall" style="display:none;">
             <div class="card">
                 <div class="card-header">
-                    <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">done_all</span>
+                    <span class="material-symbols-outlined"
+                        style="font-size:18px;color:rgba(255,255,255,0.45);">done_all</span>
                     <span style="font-size:14px;font-weight:700;color:white;">Pass All — Batch Processing</span>
                 </div>
                 <div style="padding:24px;">
-                    <div style="background:rgba(245, 158, 11, 0.08);border:1px solid rgba(245, 158, 11, 0.2);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start;">
-                        <span class="material-symbols-outlined" style="color:#fbbf24;flex-shrink:0;font-size:20px;">warning</span>
+                    <div
+                        style="background:rgba(245, 158, 11, 0.08);border:1px solid rgba(245, 158, 11, 0.2);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;gap:10px;align-items:flex-start;">
+                        <span class="material-symbols-outlined"
+                            style="color:#fbbf24;flex-shrink:0;font-size:20px;">warning</span>
                         <div>
                             <p style="font-size:13px;font-weight:700;color:#fbbf24;margin:0 0 4px;">Perhatian</p>
                             <p style="font-size:12px;color:rgba(255,255,255,0.55);margin:0;line-height:1.55;">
-                                Tombol <strong>Pass All</strong> akan menandai <strong>semua item dengan status Pending</strong> sebagai "Pass" secara otomatis — dengan Qty Fail = 0. Tindakan ini tidak dapat dibatalkan. Gunakan hanya jika yakin semua item yang tersisa sudah lolos inspeksi.
+                                Tombol <strong>Pass All</strong> akan menandai <strong>semua item dengan status
+                                    Pending</strong> sebagai "Pass" secara otomatis — dengan Qty Fail = 0. Tindakan ini
+                                tidak dapat dibatalkan. Gunakan hanya jika yakin semua item yang tersisa sudah lolos
+                                inspeksi.
                             </p>
                         </div>
                     </div>
 
                     <!-- Date Filter Controls -->
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <div
+                        style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
                         <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal (Receive Date)</label>
-                            <input type="date" id="passall-filter-start" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal
+                                (Receive Date)</label>
+                            <input type="date" id="passall-filter-start" class="styled-input"
+                                style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
                         </div>
                         <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal (Receive Date)</label>
-                            <input type="date" id="passall-filter-end" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal
+                                (Receive Date)</label>
+                            <input type="date" id="passall-filter-end" class="styled-input"
+                                style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
                         </div>
                         <div style="display:flex;gap:8px;">
-                            <button onclick="applyPassAllDateFilter()" class="btn-gradient" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                            <button onclick="applyPassAllDateFilter()" class="btn-gradient"
+                                style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                                 <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>Filter
                             </button>
-                            <button onclick="resetPassAllDateFilter()" class="btn-secondary" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                            <button onclick="resetPassAllDateFilter()" class="btn-secondary"
+                                style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                                 <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>Reset
                             </button>
                         </div>
@@ -471,22 +629,32 @@
 
                     <!-- Pending items summary -->
                     <div id="passall-summary" style="margin-bottom:20px;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                        <div
+                            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
                             <div style="display:flex;align-items:center;gap:8px;">
-                                <span style="font-size:13px;font-weight:700;color:white;">Item Pending yang akan di-Pass:</span>
-                                <span id="passall-count" style="font-size:13px;font-weight:700;color:#34d399;background:rgba(16, 185, 129, 0.1);padding:3px 10px;border-radius:99px;border:1px solid rgba(16,185,129,0.2);">—</span>
+                                <span style="font-size:13px;font-weight:700;color:white;">Item Pending yang akan
+                                    di-Pass:</span>
+                                <span id="passall-count"
+                                    style="font-size:13px;font-weight:700;color:#34d399;background:rgba(16, 185, 129, 0.1);padding:3px 10px;border-radius:99px;border:1px solid rgba(16,185,129,0.2);">—</span>
                             </div>
-                            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.6);">
-                                <input type="checkbox" id="passall-select-all" checked onchange="togglePassAllSelectAll(this)" style="cursor:pointer;width:15px;height:15px;">
-                                <label for="passall-select-all" style="cursor:pointer;user-select:none;">Pilih Semua</label>
+                            <div
+                                style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.6);">
+                                <input type="checkbox" id="passall-select-all" checked
+                                    onchange="togglePassAllSelectAll(this)"
+                                    style="cursor:pointer;width:15px;height:15px;">
+                                <label for="passall-select-all" style="cursor:pointer;user-select:none;">Pilih
+                                    Semua</label>
                             </div>
                         </div>
-                        <div id="passall-list" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;max-height:280px;overflow-y:auto;" class="thin-scroll">
+                        <div id="passall-list"
+                            style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;max-height:280px;overflow-y:auto;"
+                            class="thin-scroll">
                             <!-- Populated by JS -->
                         </div>
                     </div>
 
-                    <button id="passall-btn" onclick="confirmPassAll()" class="btn-gradient" style="padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
+                    <button id="passall-btn" onclick="confirmPassAll()" class="btn-gradient"
+                        style="padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
                         <span class="material-symbols-outlined" style="font-size:18px;">done_all</span>
                         Jalankan Pass
                     </button>
@@ -501,11 +669,15 @@
                 <div class="card">
                     <div class="card-header" style="justify-content:space-between;">
                         <div style="display:flex;align-items:center;gap:8px;">
-                            <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">group</span>
-                            <span style="font-size:14px;font-weight:700;color:white;">Daftar Pengguna IQC Material</span>
-                            <span id="users-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">0</span>
+                            <span class="material-symbols-outlined"
+                                style="font-size:18px;color:rgba(255,255,255,0.45);">group</span>
+                            <span style="font-size:14px;font-weight:700;color:white;">Daftar Pengguna IQC
+                                Material</span>
+                            <span id="users-count"
+                                style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">0</span>
                         </div>
-                        <button onclick="loadUsersList()" class="btn-secondary" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;font-size:12px;">
+                        <button onclick="loadUsersList()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;font-size:12px;">
                             <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
                         </button>
                     </div>
@@ -522,9 +694,12 @@
                                 </tr>
                             </thead>
                             <tbody id="users-tbody">
-                                <tr><td colspan="6" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
-                                    Memuat daftar user...
-                                </td></tr>
+                                <tr>
+                                    <td colspan="6"
+                                        style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                        Memuat daftar user...
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -533,30 +708,38 @@
                 <!-- Add/Edit User Form Card -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">person_add</span>
-                        <span id="user-form-title" style="font-size:14px;font-weight:700;color:white;">Tambah Pengguna Baru</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;color:rgba(255,255,255,0.45);">person_add</span>
+                        <span id="user-form-title" style="font-size:14px;font-weight:700;color:white;">Tambah Pengguna
+                            Baru</span>
                     </div>
                     <div style="padding:20px;">
-                        <form id="user-form" onsubmit="handleUserSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
+                        <form id="user-form" onsubmit="handleUserSubmit(event)"
+                            style="display:flex; flex-direction:column; gap:16px;">
                             <!-- NIK Input -->
                             <div>
-                                <label for="user-nik" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                <label for="user-nik"
+                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
                                     NIK / Username <span style="color:#ef4444;">*</span>
                                 </label>
-                                <input type="text" id="user-nik" class="styled-input" placeholder="Masukkan NIK/username" required>
+                                <input type="text" id="user-nik" class="styled-input"
+                                    placeholder="Masukkan NIK/username" required>
                             </div>
 
                             <!-- Name Input -->
                             <div>
-                                <label for="user-name" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                <label for="user-name"
+                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
                                     Nama Lengkap <span style="color:#ef4444;">*</span>
                                 </label>
-                                <input type="text" id="user-name" class="styled-input" placeholder="Masukkan nama lengkap" required>
+                                <input type="text" id="user-name" class="styled-input"
+                                    placeholder="Masukkan nama lengkap" required>
                             </div>
 
                             <!-- Role Select -->
                             <div>
-                                <label for="user-role" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                <label for="user-role"
+                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
                                     Role Akses <span style="color:#ef4444;">*</span>
                                 </label>
                                 <select id="user-role" class="styled-input" style="cursor:pointer;" required>
@@ -569,29 +752,40 @@
 
                             <!-- Material Assignment Input -->
                             <div>
-                                <label for="user-material-assignment" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                <label for="user-material-assignment"
+                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
                                     Material Assignment
                                 </label>
-                                <input type="text" id="user-material-assignment" list="mat-type-suggestions" class="styled-input" placeholder="Misal: LEATHER, TEXTILE, SYNTHETIC...">
+                                <input type="text" id="user-material-assignment" list="mat-type-suggestions"
+                                    class="styled-input" placeholder="Misal: LEATHER, TEXTILE, SYNTHETIC...">
                                 <datalist id="mat-type-suggestions"></datalist>
-                                <p style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:4px;">Gunakan koma (,) untuk menugaskan lebih dari 1 jenis/kode material (contoh: LEATHER, TEXTILE, SYNTHETIC).</p>
+                                <p style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:4px;">Gunakan koma (,)
+                                    untuk menugaskan lebih dari 1 jenis/kode material (contoh: LEATHER, TEXTILE,
+                                    SYNTHETIC).</p>
                             </div>
 
                             <!-- Password Input -->
                             <div>
-                                <label for="user-password" style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                <label for="user-password"
+                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
                                     Password <span id="pwd-required-star" style="color:#ef4444;">*</span>
                                 </label>
-                                <input type="password" id="user-password" class="styled-input" placeholder="Minimal 6 karakter" required>
-                                <p id="user-password-hint" style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px;">Minimal 6 karakter.</p>
+                                <input type="password" id="user-password" class="styled-input"
+                                    placeholder="Minimal 6 karakter" required>
+                                <p id="user-password-hint"
+                                    style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:4px;">Minimal 6
+                                    karakter.</p>
                             </div>
 
                             <!-- Buttons -->
                             <div style="display:flex; gap:8px; margin-top:8px;">
-                                <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="btn-secondary" style="flex:1; padding:10px; border-radius:10px; font-size:13px; display:none;">
+                                <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()"
+                                    class="btn-secondary"
+                                    style="flex:1; padding:10px; border-radius:10px; font-size:13px; display:none;">
                                     Batal
                                 </button>
-                                <button type="submit" class="btn-gradient" style="flex:2; padding:10px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                <button type="submit" class="btn-gradient"
+                                    style="flex:2; padding:10px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
                                     <span class="material-symbols-outlined" style="font-size:16px;">save</span>
                                     Simpan User
                                 </button>
@@ -607,27 +801,34 @@
             <div class="card">
                 <div class="card-header" style="justify-content:space-between;">
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.4);">monitoring</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;color:rgba(255,255,255,0.4);">monitoring</span>
                         <span style="font-size:14px;font-weight:700;color:white;">Leader Monitoring Panel</span>
                     </div>
-                    <button onclick="window.loadLeaderMonitorLog()" class="btn-secondary" style="padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <button onclick="window.loadLeaderMonitorLog()" class="btn-secondary"
+                        style="padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:4px;cursor:pointer;">
                         <span class="material-symbols-outlined" style="font-size:14px;">refresh</span> Refresh Data
                     </button>
                 </div>
-                
+
                 <!-- Filters -->
-                <div style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                <div
+                    style="padding:16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
                     <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
                         <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal</label>
-                        <input type="date" id="leadermonitor-filter-start" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                        <input type="date" id="leadermonitor-filter-start" class="styled-input"
+                            style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
                     </div>
                     <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
                         <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal</label>
-                        <input type="date" id="leadermonitor-filter-end" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                        <input type="date" id="leadermonitor-filter-end" class="styled-input"
+                            style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
                     </div>
                     <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
-                        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Status Approval</label>
-                        <select id="leadermonitor-filter-status" class="styled-input" style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;cursor:pointer;">
+                        <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Status
+                            Approval</label>
+                        <select id="leadermonitor-filter-status" class="styled-input"
+                            style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;cursor:pointer;">
                             <option value="all">Semua Status</option>
                             <option value="pending">Pending Leader Approval</option>
                             <option value="approved">Approved</option>
@@ -635,10 +836,12 @@
                         </select>
                     </div>
                     <div style="display:flex;gap:8px;">
-                        <button onclick="window.applyLeaderMonitorFilter()" class="btn-gradient" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                        <button onclick="window.applyLeaderMonitorFilter()" class="btn-gradient"
+                            style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                             <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>Filter
                         </button>
-                        <button onclick="window.resetLeaderMonitorFilter()" class="btn-secondary" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                        <button onclick="window.resetLeaderMonitorFilter()" class="btn-secondary"
+                            style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                             <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>Reset
                         </button>
                     </div>
@@ -648,19 +851,36 @@
                     <table class="data-table" style="width:100%;">
                         <thead>
                             <tr>
-                                <th style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Tanggal</th>
-                                <th style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Inspector</th>
-                                <th style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">PO / Material</th>
-                                <th style="padding:12px 14px; text-align:right; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Qty Inspect</th>
-                                <th style="padding:12px 14px; text-align:right; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Qty Fail</th>
-                                <th style="padding:12px 14px; text-align:center; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Status</th>
-                                <th style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Approved By</th>
-                                <th style="padding:12px 14px; text-align:center; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">Evidence</th>
+                                <th
+                                    style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Tanggal</th>
+                                <th
+                                    style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Inspector</th>
+                                <th
+                                    style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    PO / Material</th>
+                                <th
+                                    style="padding:12px 14px; text-align:right; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Qty Inspect</th>
+                                <th
+                                    style="padding:12px 14px; text-align:right; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Qty Fail</th>
+                                <th
+                                    style="padding:12px 14px; text-align:center; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Status</th>
+                                <th
+                                    style="padding:12px 14px; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Approved By</th>
+                                <th
+                                    style="padding:12px 14px; text-align:center; background: rgba(15, 28, 46, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: rgba(255, 255, 255, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: sticky; top: 0; z-index: 10;">
+                                    Evidence</th>
                             </tr>
                         </thead>
                         <tbody id="leadermonitor-tbody">
                             <tr>
-                                <td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">Loading data...</td>
+                                <td colspan="8" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                    Loading data...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -672,23 +892,29 @@
         <div id="panel-spreadsheet" style="display:none;">
             <div class="card" style="max-width: 600px;">
                 <div class="card-header">
-                    <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">grid_on</span>
+                    <span class="material-symbols-outlined"
+                        style="font-size:18px;color:rgba(255,255,255,0.45);">grid_on</span>
                     <span style="font-size:14px;font-weight:700;color:white;">Google Spreadsheet Integration</span>
                 </div>
                 <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
                     <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;line-height:1.6;">
-                        Aplikasi IQC Material menggunakan Google Spreadsheet sebagai database utama untuk menyimpan data transaksi hasil inspeksi, master data PO, vendor, dan user.
-                     </p>
-                    
-                    <div style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
-                        <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Status Spreadsheet Aktif</span>
+                        Aplikasi IQC Material menggunakan Google Spreadsheet sebagai database utama untuk menyimpan data
+                        transaksi hasil inspeksi, master data PO, vendor, dan user.
+                    </p>
+
+                    <div
+                        style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
+                        <span
+                            style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Status
+                            Spreadsheet Aktif</span>
                         <div id="admin-spreadsheet-info" style="font-size:13px;font-weight:600;color:white;">
                             Menghubungkan ke Google Apps Script...
                         </div>
                     </div>
-                    
+
                     <div style="display:flex;gap:12px;">
-                        <a id="admin-open-spreadsheet-btn" target="_blank" href="#" class="btn-gradient" style="padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;display:none;align-items:center;gap:8px;justify-content:center;">
+                        <a id="admin-open-spreadsheet-btn" target="_blank" href="#" class="btn-gradient"
+                            style="padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;display:none;align-items:center;gap:8px;justify-content:center;">
                             <span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span>
                             Buka Spreadsheet Aktif
                         </a>
@@ -705,7 +931,7 @@
 
     <script>
         // Tab switching (needs to be non-module for onclick)
-        window.switchTab = function(tab) {
+        window.switchTab = function (tab) {
             let role = null;
             try {
                 const userRaw = localStorage.getItem('eqms_material_user');
@@ -713,8 +939,8 @@
                     const parsed = JSON.parse(userRaw);
                     role = parsed.role;
                 }
-            } catch (e) {}
-            
+            } catch (e) { }
+
             if (window.__currentUserRole) {
                 role = window.__currentUserRole;
             }
@@ -723,7 +949,7 @@
                 tab = 'leadermonitor';
             }
 
-            ['master','upload','passall','users','leadermonitor','spreadsheet'].forEach(t => {
+            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -741,4 +967,5 @@
         };
     </script>
 </body>
+
 </html>
