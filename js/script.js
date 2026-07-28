@@ -246,6 +246,7 @@ function resetContextSelection() {
 }
 
 function resetAllFields() {
+    editingSessionId = null;
     const mtSelectEl = document.getElementById("material-type");
     if (mtSelectEl) mtSelectEl.value = '';
     selectedMaterialType = '';
@@ -794,6 +795,7 @@ async function saveData() {
     const finalRedoRate = parseFloat(redoRateValueText) / 100;
 
     const dataToSend = {
+        sessionId: editingSessionId || undefined,
         timestamp: new Date().toISOString(),
         auditor: document.getElementById("auditor").value,
         tanggalIncoming: document.getElementById("tanggal-incoming") ? document.getElementById("tanggal-incoming").value : '',
@@ -835,9 +837,28 @@ async function saveData() {
         // ── UI TESTING MODE: Skip POST ke GAS, simulasikan respons sukses ──
         if (UI_TEST_MODE) {
             console.log("[TEST MODE] Data yang akan dikirim:", JSON.stringify(dataToSend, null, 2));
+            if (editingSessionId) {
+                const idx = allInspectionSessions.findIndex(s => String(s.sessionId) === String(editingSessionId));
+                if (idx !== -1) {
+                    allInspectionSessions[idx] = {
+                        ...allInspectionSessions[idx],
+                        tanggalIncoming: dataToSend.tanggalIncoming,
+                        tanggalInspection: dataToSend.tanggalInspection,
+                        tanggalBucket: dataToSend.tanggalBucket,
+                        materialType: dataToSend.materialType,
+                        vendor: dataToSend.vendor,
+                        styleNumber: dataToSend.styleNumber,
+                        modelName: dataToSend.modelName,
+                        approvedByLeader: dataToSend.approvedByLeader,
+                        status: dataToSend.status,
+                        items: dataToSend.items
+                    };
+                }
+            }
             await showAlert('Data berhasil disimpan! (simulasi — tidak ada data yang dikirim ke server)', 'success', '[TEST MODE]');
 
             resetAllFields();
+            if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
             return;
         }
         // ── Akhir UI TESTING MODE ──
@@ -854,6 +875,7 @@ async function saveData() {
         if (isSuccess) {
             await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
             resetAllFields();
+            if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
         } else {
             await showAlert(parsedResult.message || resultText || 'Gagal menyimpan data.', 'error');
         }
@@ -1695,6 +1717,7 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVo
 
 let allInspectionSessions = [];
 let filterOptionsInitialized = false;
+let editingSessionId = null;
 
 /** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
 window.loadInspectionResults = async function() {
@@ -1850,8 +1873,15 @@ function renderInspectionResultTable(sessions) {
                (compStr || '').toLowerCase().includes(searchVal) ||
                (procStr || '').toLowerCase().includes(searchVal);
 
+        const stLower = (s.status || 'Done').toLowerCase();
         const matchesStatus = statusFilter === 'all' || 
-               (s.status || '').toLowerCase() === statusFilter.toLowerCase();
+               (statusFilter === 'Done' && stLower === 'done') ||
+               (statusFilter === 'In-Progress' && stLower.includes('progress')) ||
+               (statusFilter === 'Pending Leader Approval' && (
+                   stLower.includes('leader') || 
+                   stLower.includes('approval') || 
+                   (Boolean(s.approvedByLeader) && stLower !== 'done')
+               ));
 
         const matchesAuditor = auditorFilter === 'all' || 
                (s.auditor || '').toLowerCase() === auditorFilter.toLowerCase();
@@ -1976,18 +2006,32 @@ function renderInspectionResultTable(sessions) {
     });
 
     gallery.innerHTML = Object.values(grouped).map(g => {
+        const hasPendingApproval = [...g.statuses].some(st => st.includes('leader') || st.includes('approval'));
         const hasInProgress = [...g.statuses].some(st => st.includes('progress') || st.includes('in-progress') || st.includes('in progress'));
-        const statusBadgeHTML = hasInProgress ? `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                In-Progress
-            </span>
-        ` : `
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                Done
-            </span>
-        `;
+
+        let statusBadgeHTML = '';
+        if (hasPendingApproval) {
+            statusBadgeHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    Pending Approval
+                </span>
+            `;
+        } else if (hasInProgress) {
+            statusBadgeHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    In-Progress
+                </span>
+            `;
+        } else {
+            statusBadgeHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Done
+                </span>
+            `;
+        }
 
         const dateArr = [...g.dates].sort();
         const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length-1]}` : (dateArr[0] || '—');
@@ -2017,9 +2061,9 @@ function renderInspectionResultTable(sessions) {
         const aggregatedItems = Object.values(itemAgg);
 
         return `
-            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${hasInProgress ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 320px;">
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${(hasInProgress || hasPendingApproval) ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 320px;">
                 <!-- Decorative top bar -->
-                <div class="h-1.5 w-full ${hasInProgress ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
+                <div class="h-1.5 w-full ${(hasInProgress || hasPendingApproval) ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
                 
                 <div class="p-5 flex-1 flex flex-col gap-4">
                     <!-- Style and model name & Status -->
@@ -2063,18 +2107,24 @@ function renderInspectionResultTable(sessions) {
                                         let actionHTML = '';
                                         const sessionIds = [...item.sessions];
                                         
-                                        // Find if any session for this item is in-progress
+                                        // Find active session for editing (In-Progress, Pending Leader Approval, etc.)
                                         const activeInProgSession = sessionIds.find(sid => {
                                             const sObj = sessions.find(sess => sess.sessionId === sid);
-                                            return sObj && (sObj.status || '').toLowerCase().includes('progress');
-                                        });
+                                            if (!sObj) return false;
+                                            const st = (sObj.status || '').toLowerCase();
+                                            return st.includes('progress') || st.includes('leader') || st.includes('approval') || (Boolean(sObj.approvedByLeader) && st !== 'done');
+                                        }) || sessionIds[0];
 
-                                        if (activeInProgSession) {
+                                        const targetObj = sessions.find(sess => sess.sessionId === activeInProgSession);
+                                        const isDone = targetObj && (targetObj.status || '').toLowerCase() === 'done';
+
+                                        if (!isDone && activeInProgSession) {
                                             actionHTML = `
                                                 <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
-                                                        title="Continue Sesi ${activeInProgSession}" 
-                                                        class="inline-flex items-center justify-center p-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded cursor-pointer transition-all duration-150">
-                                                    <span class="material-symbols-outlined text-[12px]">play_arrow</span>
+                                                        title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
+                                                        class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                                                    <span class="material-symbols-outlined text-[12px]">edit</span>
+                                                    <span>Edit</span>
                                                 </button>
                                             `;
                                         } else {
@@ -2115,13 +2165,15 @@ function renderInspectionResultTable(sessions) {
     }).join('');
 }
 
-/** Continue/Load an in-progress session back into the form */
+/** Continue/Load an in-progress or pending approval session back into the form */
 window.continueInProgressSession = function(sessionId) {
     const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
     if (!session) {
         showAlert('Data sesi tidak ditemukan.', 'error');
         return;
     }
+
+    editingSessionId = session.sessionId;
 
     // Set header fields
     const mtSelect = document.getElementById('material-type');
@@ -2150,10 +2202,30 @@ window.continueInProgressSession = function(sessionId) {
     if (modelEl && session.modelName) modelEl.value = session.modelName;
 
     const statusSelect = document.getElementById('inspection-status');
-    if (statusSelect) statusSelect.value = 'In-Progress';
+    if (statusSelect) statusSelect.value = session.status || 'In-Progress';
 
-    if (Array.isArray(session.items)) {
-        inspectionItems = session.items;
+    const leaderSelect = document.getElementById('approved-by-leader');
+    const leaderSelectMobile = document.getElementById('approved-by-leader-mobile');
+    if (session.approvedByLeader) {
+        if (leaderSelect) leaderSelect.value = session.approvedByLeader;
+        if (leaderSelectMobile) leaderSelectMobile.value = session.approvedByLeader;
+        const desktopContainer = document.getElementById('evidence-upload-container');
+        const mobileContainer = document.getElementById('evidence-upload-container-mobile');
+        if (desktopContainer) desktopContainer.classList.remove('hidden');
+        if (mobileContainer) mobileContainer.classList.remove('hidden');
+    }
+
+    if (Array.isArray(session.items) && session.items.length > 0) {
+        inspectionItems = [...session.items];
+    } else if (session.component) {
+        inspectionItems = [{
+            component: session.component,
+            process: session.process || '',
+            qtyIncoming: Number(session.qtyIncoming || 0),
+            qtyInspect: Number(session.qtyInspect || 0),
+            pass: Number(session.pass || 0),
+            defect: Number(session.defect || 0)
+        }];
     }
 
     renderInspectedItems();
@@ -2165,5 +2237,5 @@ window.continueInProgressSession = function(sessionId) {
         window.showView('dashboard');
     }
 
-    showAlert(`Sesi inspeksi ${session.vendor} berhasil dimuat ke form!`, 'success', 'Sesi Dimuat');
+    showAlert(`Sesi inspeksi ${session.vendor} (${session.sessionId}) berhasil dimuat ke form untuk di-edit/dilanjutkan!`, 'success', 'Sesi Dimuat');
 };

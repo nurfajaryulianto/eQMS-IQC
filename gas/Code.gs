@@ -148,12 +148,25 @@ function doPost(e) {
     const defectSheet  = getOrCreateSheet(ss, 'DefectDetails', DEFECT_HEADERS);
     const pivotSheet   = getOrCreateSheet(ss, 'PivotReady',     PIVOT_HEADERS);
 
-    const statusVal = data.status || 'Done';
+    // Auto status determination: If approvedByLeader is present, mark status as Done
+    let statusVal = data.status || 'Done';
+    if (data.approvedByLeader && String(data.approvedByLeader).trim() !== '') {
+      statusVal = 'Done';
+    }
+
     const itemsJsonStr = Array.isArray(data.items) ? JSON.stringify(data.items) : '';
 
-    // Buat sessionId unik: tanggal + random 4 karakter
-    const baseSessionId = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
-      + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+    // Self-healing update: if sessionId exists, overwrite existing session rows
+    const isUpdate = Boolean(data.sessionId);
+    const baseSessionId = isUpdate ? String(data.sessionId).trim() : (
+      Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd-HHmmss')
+      + '-' + Math.random().toString(36).substr(2, 4).toUpperCase()
+    );
+
+    if (isUpdate) {
+      deleteRowsBySessionId(sessionSheet, baseSessionId);
+      deleteRowsBySessionId(defectSheet, baseSessionId);
+    }
 
     if (Array.isArray(data.items) && data.items.length > 0) {
       // Loop untuk setiap item inspeksi
@@ -544,6 +557,20 @@ function getOrCreateSubfolder(parentFolder, folderName) {
     return folders.next();
   } else {
     return parentFolder.createFolder(folderName);
+  }
+}
+
+/**
+ * Hapus baris lama berdasarkan SessionId untuk self-healing update
+ */
+function deleteRowsBySessionId(sheet, sid) {
+  if (!sheet || !sid) return;
+  const values = sheet.getDataRange().getValues();
+  for (let r = values.length - 1; r >= 1; r--) {
+    const rowSid = String(values[r][0] || '').trim();
+    if (rowSid === sid || rowSid.startsWith(sid + '-')) {
+      sheet.deleteRow(r + 1);
+    }
   }
 }
 
