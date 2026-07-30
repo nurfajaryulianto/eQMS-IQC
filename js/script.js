@@ -288,10 +288,20 @@ function resetAllFields() {
     
     const leaderSelect = document.getElementById("approved-by-leader");
     if (leaderSelect) leaderSelect.value = '';
+    const leaderSelectMobile = document.getElementById("approved-by-leader-mobile");
+    if (leaderSelectMobile) leaderSelectMobile.value = '';
     const fileInput = document.getElementById("evidence-file");
     if (fileInput) fileInput.value = '';
+    const fileInputMobile = document.getElementById("evidence-file-mobile");
+    if (fileInputMobile) fileInputMobile.value = '';
     const container = document.getElementById("evidence-upload-container");
     if (container) container.classList.add('hidden');
+    const containerMobile = document.getElementById("evidence-upload-container-mobile");
+    if (containerMobile) containerMobile.classList.add('hidden');
+
+    if (typeof window.__syncInspectionStatusState === 'function') {
+        window.__syncInspectionStatusState('Done');
+    }
 
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
@@ -1203,11 +1213,16 @@ function renderModalLoggedDefects() {
             const div = document.createElement('div');
             div.className = 'flex items-center justify-between py-1 text-xs text-slate-700';
             div.innerHTML = `
-                <span class="font-medium">${type}</span>
+                <span class="font-medium text-slate-800">${type}</span>
                 <div class="flex items-center gap-1.5">
-                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold rounded hover:bg-slate-200 cursor-pointer" onclick="window.adjustModalDefect('${type}', -1)">-1</button>
-                    <span class="font-bold text-slate-800 min-w-[20px] text-center">${count}</span>
-                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold rounded hover:bg-slate-200 cursor-pointer" onclick="window.adjustModalDefect('${type}', 1)">+1</button>
+                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', -1)">-1</button>
+                    <input type="number" min="0" value="${count}"
+                           title="Klik untuk ubah jumlah secara langsung" 
+                           class="w-14 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-text shadow-xs" 
+                           onchange="window.setModalDefectCount('${type}', this.value)" 
+                           onkeydown="if(event.key==='Enter'){ this.blur(); }" 
+                           onfocus="this.select()" />
+                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', 1)">+1</button>
                 </div>
             `;
             container.appendChild(div);
@@ -1218,6 +1233,27 @@ function renderModalLoggedDefects() {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">Belum ada defect yang tercatat.</span>';
     }
 }
+
+window.setModalDefectCount = function(defectType, val) {
+    const parsed = parseInt(val, 10);
+    const newCount = isNaN(parsed) ? 0 : Math.max(0, parsed);
+    
+    if (newCount === 0) {
+        delete modalItemDefects[defectType];
+    } else {
+        modalItemDefects[defectType] = newCount;
+    }
+    
+    let defectSum = 0;
+    for (const type in modalItemDefects) {
+        defectSum += modalItemDefects[type] || 0;
+    }
+    if (defectSum > modalQtyInspectVal) {
+        modalQtyInspectVal = defectSum;
+    }
+    
+    updateModalGradeState();
+};
 
 window.adjustModalDefect = function(defectType, amount) {
     if (!modalItemDefects[defectType]) modalItemDefects[defectType] = 0;
@@ -1490,6 +1526,24 @@ async function initApp() {
         leaderSelectMobile.addEventListener('change', () => {
             syncLeaderState(leaderSelectMobile.value);
         });
+    }
+
+    // Populate and sync Status Inspeksi (Desktop & Mobile)
+    const statusSelect = document.getElementById('inspection-status');
+    const statusSelectMobile = document.getElementById('inspection-status-mobile');
+
+    function syncInspectionStatusState(val) {
+        if (statusSelect && statusSelect.value !== val) statusSelect.value = val;
+        if (statusSelectMobile && statusSelectMobile.value !== val) statusSelectMobile.value = val;
+    }
+
+    window.__syncInspectionStatusState = syncInspectionStatusState;
+
+    if (statusSelect) {
+        statusSelect.addEventListener('change', () => syncInspectionStatusState(statusSelect.value));
+    }
+    if (statusSelectMobile) {
+        statusSelectMobile.addEventListener('change', () => syncInspectionStatusState(statusSelectMobile.value));
     }
 
     // Render defect buttons dynamically from admin-managed catalog (not rendering flat defect buttons anymore)
@@ -2201,8 +2255,9 @@ window.continueInProgressSession = function(sessionId) {
     const modelEl = document.getElementById('model-name');
     if (modelEl && session.modelName) modelEl.value = session.modelName;
 
-    const statusSelect = document.getElementById('inspection-status');
-    if (statusSelect) statusSelect.value = session.status || 'In-Progress';
+    if (typeof window.__syncInspectionStatusState === 'function') {
+        window.__syncInspectionStatusState(session.status || 'In-Progress');
+    }
 
     const leaderSelect = document.getElementById('approved-by-leader');
     const leaderSelectMobile = document.getElementById('approved-by-leader-mobile');

@@ -1040,7 +1040,18 @@
                         </div>
 
                         <!-- MOBILE SAVE BUTTON CARD -->
-                        <div class="col-span-1 lg:hidden bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-2 space-y-2">
+                        <div class="col-span-1 lg:hidden bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-2 space-y-3">
+                            <!-- Status Inspeksi: mobile-only, syncs to the real select via JS -->
+                            <div class="pb-2 border-b border-slate-100">
+                                <label for="inspection-status-mobile"
+                                    class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status Inspeksi</label>
+                                <select id="inspection-status-mobile"
+                                    class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                    <option value="In-Progress">In-Progress (Belum Selesai)</option>
+                                    <option value="Done" selected>Done (Selesai)</option>
+                                </select>
+                            </div>
+
                             <!-- Approved By Leader: mobile-only, syncs to the real select via JS -->
                             <div class="pb-2 border-b border-slate-100">
                                 <label for="approved-by-leader-mobile"
