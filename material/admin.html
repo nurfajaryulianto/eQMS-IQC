@@ -394,6 +394,10 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
                 Spreadsheet
             </button>
+            <button class="tab-btn" id="tab-claims" onclick="switchTab('claims')">
+                <span class="material-symbols-outlined" style="font-size:16px;">flag</span>
+                Claims
+            </button>
         </div>
 
         <!-- ── TAB: MASTER DATA ── -->
@@ -433,24 +437,13 @@
                         </colgroup>
                         <thead>
                             <tr>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
-                                    PO Number</th>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
-                                    Material</th>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
-                                    Vendor</th>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
-                                    UOM</th>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:right;">
-                                    Planned Qty</th>
-                                <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">
-                                    Status</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">PO Number</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">Material</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">Vendor</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">UOM</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:right;">Planned Qty</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">Status</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">Klaim</th>
                             </tr>
                         </thead>
                         <tbody id="master-tbody">
@@ -622,19 +615,23 @@
                     </div>
 
                     <!-- Date Filter Controls -->
-                    <div
-                        style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
                         <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal
-                                (Receive Date)</label>
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Mulai Tanggal (Receive Date)</label>
                             <input type="date" id="passall-filter-start" class="styled-input"
                                 style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
                         </div>
                         <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal
-                                (Receive Date)</label>
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Sampai Tanggal (Receive Date)</label>
                             <input type="date" id="passall-filter-end" class="styled-input"
                                 style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:6px;min-width:160px;flex:1;">
+                            <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6)">Material Type</label>
+                            <select id="passall-filter-material-type" class="styled-input"
+                                style="padding:8px 12px;font-size:13px;border-radius:8px;background:rgba(15,28,46,0.5);border:1px solid rgba(255,255,255,0.15);color:white;width:100%;cursor:pointer;">
+                                <option value="all">Semua Material Type</option>
+                            </select>
                         </div>
                         <div style="display:flex;gap:8px;">
                             <button onclick="applyPassAllDateFilter()" class="btn-gradient"
@@ -942,9 +939,127 @@
                     </div>
                 </div>
             </div>
+        <!-- ── TAB: CLAIMS ── -->
+        <div id="panel-claims" style="display:none;">
+            <div class="card">
+                <div class="card-header" style="justify-content:space-between;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">flag</span>
+                        <span style="font-size:14px;font-weight:700;color:white;">Riwayat Klaim Material</span>
+                        <span id="claims-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
+                    </div>
+                    <button onclick="window.loadClaimsHistory()" class="btn-secondary"
+                        style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
+                        <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
+                    </button>
+                </div>
+                <div style="background:rgba(239,68,68,0.06);border-bottom:1px solid rgba(239,68,68,0.15);padding:12px 20px;display:flex;gap:10px;align-items:center;">
+                    <span class="material-symbols-outlined" style="color:#f87171;font-size:18px;flex-shrink:0;">info</span>
+                    <p style="font-size:12px;color:rgba(255,255,255,0.55);margin:0;line-height:1.5;">
+                        Riwayat klaim material. Setiap klaim yang diajukan akan mengurangi <strong style="color:white;">Planned Qty</strong> secara otomatis di master data. Data diurutkan dari klaim terbaru.
+                    </p>
+                </div>
+                <div class="thin-scroll" style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Tanggal Klaim</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">PO Number</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Material</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Vendor</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Mat. Type</th>
+                                <th style="padding:12px 14px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Qty Diklaim</th>
+                                <th style="padding:12px 14px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Qty Perubahan</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Alasan</th>
+                                <th style="padding:12px 14px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Oleh</th>
+                            </tr>
+                        </thead>
+                        <tbody id="claims-tbody">
+                            <tr>
+                                <td colspan="9" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                    Memuat data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
     </main>
+
+    <!-- ── CLAIM MODAL ── -->
+    <div id="claim-modal" style="display:none;opacity:0;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;transition:opacity 0.2s;">
+        <div class="claim-modal-box" style="background:#0d1a2e;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:0;max-width:480px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,0.6);transform:scale(0.95);transition:transform 0.2s;overflow:hidden;">
+            <!-- Header -->
+            <div style="background:rgba(239,68,68,0.08);border-bottom:1px solid rgba(239,68,68,0.2);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="material-symbols-outlined" style="color:#f87171;font-size:22px;">flag</span>
+                    <div>
+                        <p style="font-size:15px;font-weight:800;color:white;margin:0;">Ajukan Klaim Material</p>
+                        <p style="font-size:11px;color:rgba(255,255,255,0.45);margin:0;">Qty yang diklaim akan dikurangi dari Planned Qty</p>
+                    </div>
+                </div>
+                <button onclick="window.closeClaimModal()" style="background:transparent;border:none;cursor:pointer;color:rgba(255,255,255,0.5);font-size:22px;line-height:1;padding:4px;">&#x2715;</button>
+            </div>
+            <!-- Body -->
+            <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+                <!-- Material Info -->
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div>
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 3px;">PO Number</p>
+                        <p id="claim-po-display" style="font-size:13px;font-weight:700;color:white;margin:0;">—</p>
+                    </div>
+                    <div>
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 3px;">Material Type</p>
+                        <p id="claim-mattype-display" style="font-size:13px;font-weight:600;color:#60a5fa;margin:0;">—</p>
+                    </div>
+                    <div>
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 3px;">Material Name</p>
+                        <p id="claim-material-display" style="font-size:13px;font-weight:600;color:#34d399;margin:0;">—</p>
+                    </div>
+                    <div>
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 3px;">Vendor</p>
+                        <p id="claim-vendor-display" style="font-size:13px;color:rgba(255,255,255,0.7);margin:0;">—</p>
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 3px;">Planned Qty Saat Ini</p>
+                        <p id="claim-planned-display" style="font-size:14px;font-weight:800;color:#fbbf24;margin:0;">—</p>
+                    </div>
+                </div>
+                <!-- Qty Klaim -->
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:6px;">Qty yang Diklaim <span style="color:#f87171;">*</span></label>
+                    <input type="number" id="claim-qty-input" min="1" placeholder="Masukkan qty yang diklaim..."
+                        style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;color:white;font-size:14px;font-weight:700;outline:none;font-family:inherit;"
+                        onfocus="this.style.borderColor='rgba(96,165,250,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+                </div>
+                <!-- Alasan -->
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:6px;">Alasan Klaim <span style="color:#f87171;">*</span></label>
+                    <textarea id="claim-reason-input" rows="3" placeholder="Jelaskan alasan klaim (kondisi material, nomor roll, dll.)..."
+                        style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;color:white;font-size:13px;outline:none;font-family:inherit;resize:vertical;"
+                        onfocus="this.style.borderColor='rgba(96,165,250,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'"></textarea>
+                </div>
+                <!-- Ref Number (optional) -->
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:6px;">Nomor Referensi Klaim <span style="color:rgba(255,255,255,0.3);font-weight:400;">(Opsional)</span></label>
+                    <input type="text" id="claim-ref-input" placeholder="Contoh: CLM-2026-001..."
+                        style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;color:white;font-size:13px;outline:none;font-family:inherit;"
+                        onfocus="this.style.borderColor='rgba(96,165,250,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'">
+                </div>
+                <!-- Error msg -->
+                <p id="claim-error-msg" style="color:#f87171;font-size:12px;font-weight:600;margin:0;min-height:16px;"></p>
+            </div>
+            <!-- Footer -->
+            <div style="padding:16px 24px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="window.closeClaimModal()" class="btn-secondary" style="padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;">Batal</button>
+                <button id="claim-submit-btn" onclick="window.submitClaim()" class="btn-gradient" style="padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#dc2626,#b91c1c);box-shadow:0 4px 14px rgba(220,38,38,0.35);display:flex;align-items:center;gap:6px;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">flag</span>Ajukan Klaim
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- SheetJS CDN for Excel parsing -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -970,7 +1085,7 @@
                 tab = 'leadermonitor';
             }
 
-            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet'].forEach(t => {
+            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet', 'claims'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -984,6 +1099,9 @@
             }
             if (tab === 'spreadsheet' && typeof window.loadSpreadsheetStatus === 'function') {
                 window.loadSpreadsheetStatus();
+            }
+            if (tab === 'claims' && typeof window.loadClaimsHistory === 'function') {
+                window.loadClaimsHistory();
             }
         };
     </script>
