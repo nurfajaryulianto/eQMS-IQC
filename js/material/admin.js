@@ -110,7 +110,7 @@ window.loadMasterData = async function () {
     } catch (err) {
         console.error(err);
         showToast('Gagal memuat data: ' + err.message, 'error');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
     }
 };
 
@@ -125,7 +125,7 @@ window.renderMasterTable = function () {
     if (!tbody) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding:48px;text-align:center;">
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:48px;text-align:center;">
             <div style="color:#94a3b8;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
                 <span class="material-symbols-outlined" style="font-size:32px;">inbox</span>
                 Tidak ada data untuk filter ini.
