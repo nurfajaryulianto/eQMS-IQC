@@ -567,22 +567,22 @@
             border-right: 2.5px solid #3b82f6 !important;
         }
 
-        /* General layout cards (Vivid Translucent Glassmorphism) */
+        /* General layout cards — matches IQC Material: rgba(255,255,255,0.03) */
         .bg-white, .card, .stat-card {
-            background: rgba(255, 255, 255, 0.07) !important;
-            backdrop-filter: blur(16px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.13) !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 16px !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
             color: #f1f5f9 !important;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
         .bg-white:hover, .card:hover, .stat-card:hover {
-            border-color: rgba(96, 165, 250, 0.4) !important;
-            background: rgba(255, 255, 255, 0.12) !important;
-            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+            border-color: rgba(59, 130, 246, 0.25) !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.12) !important;
         }
 
         /* Subcont metric numbers colors */
@@ -685,9 +685,20 @@
         .text-slate-500, .text-slate-400 {
             color: rgba(255, 255, 255, 0.45) !important;
         }
-        .bg-blue-50, .bg-orange-50, .bg-slate-100, div.bg-slate-50, tr.bg-slate-50, .bg-green-50, .bg-red-50, .bg-amber-50 {
+        .bg-blue-50, .bg-orange-50, .bg-slate-100, div.bg-slate-50, tr.bg-slate-50, .bg-green-50, .bg-red-50, .bg-amber-50,
+        .bg-slate-50, [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-gray-50"] {
             background: rgba(255, 255, 255, 0.02) !important;
-            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(255, 255, 255, 0.06) !important;
+        }
+
+        /* Sub-containers inside cards (rounded inner panels) */
+        .rounded-lg, .rounded-xl, .rounded-2xl {
+            border-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        div.rounded-lg[class*="bg-"], div.rounded-xl[class*="bg-"], div.rounded-2xl[class*="bg-"],
+        div.p-4.rounded-lg, div.p-3.rounded-lg, div.p-2.rounded-lg,
+        div.p-4.rounded-xl, div.p-3.rounded-xl, div.p-2.rounded-xl {
+            background: rgba(255, 255, 255, 0.02) !important;
         }
 
         /* Defect Library text overrides */
