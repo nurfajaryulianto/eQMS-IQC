@@ -450,46 +450,90 @@
             margin-left: 4px;
         }
 
-        /* ── VIVID NIGHT SKY GLASSMORPHISM THEME OVERRIDES ── */
+        /* ── VIVID NIGHT SKY GLASSMORPHISM THEME (mirrors login.html) ── */
         body {
-            background: #020617 !important;
+            background: #070f1e !important;
             color: #f1f5f9 !important;
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
         }
 
-        /* ── VIVID NIGHT SKY CELESTIAL GRADIENT BACKGROUND ── */
+        /* ── NIGHT SKY GRADIENT BACKGROUND (z-index: 0, same as login.html) ── */
         .bg-gradient {
             position: fixed;
             inset: 0;
             background:
-                radial-gradient(ellipse 85% 65% at 10% 15%, rgba(37, 99, 235, 0.35) 0%, transparent 65%),
-                radial-gradient(ellipse 75% 60% at 90% 85%, rgba(30, 64, 175, 0.38) 0%, transparent 65%),
-                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(56, 189, 248, 0.18) 0%, transparent 65%),
-                linear-gradient(135deg, #020617 0%, #0a1835 50%, #030816 100%);
-            z-index: -2;
-            pointer-events: none;
+                radial-gradient(ellipse 80% 60% at 10% 20%, rgba(59, 130, 246, 0.18) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at 90% 80%, rgba(30, 58, 138, 0.25) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 70% at 50% 50%, rgba(29, 78, 216, 0.12) 0%, transparent 70%),
+                linear-gradient(135deg, #070f1e 0%, #0a1c36 40%, #08162b 70%, #070f1e 100%);
+            z-index: 0;
         }
 
-        /* ── CRISP & VISIBLE 40PX GRID PATTERN OVERLAY (SAME AS IQC MATERIAL) ── */
+        /* ── ANIMATED GLOWING ORBS (same as login.html) ── */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            animation: orbFloat linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .orb-1 {
+            width: 500px; height: 500px;
+            top: -15%; left: -10%;
+            background: radial-gradient(circle, rgba(59,130,246,0.22) 0%, transparent 70%);
+            animation-duration: 18s;
+        }
+        .orb-2 {
+            width: 400px; height: 400px;
+            bottom: -10%; right: -5%;
+            background: radial-gradient(circle, rgba(29,78,216,0.18) 0%, transparent 70%);
+            animation-duration: 22s;
+            animation-direction: reverse;
+        }
+        .orb-3 {
+            width: 300px; height: 300px;
+            top: 50%; left: 60%;
+            background: radial-gradient(circle, rgba(96,165,250,0.1) 0%, transparent 70%);
+            animation-duration: 15s;
+        }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -20px) scale(1.05); }
+            50% { transform: translate(-15px, 30px) scale(0.97); }
+            75% { transform: translate(20px, 10px) scale(1.03); }
+        }
+
+        /* ── CRISP 40PX GRID PATTERN OVERLAY (z-index: 0, same as login.html) ── */
         .grid-overlay, .grid-bg {
             position: fixed;
             inset: 0;
             background-image:
-                linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
-            z-index: -1;
+            z-index: 0;
             pointer-events: none;
+        }
+
+        /* Page content sits above background layers */
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
         /* Header / Navbar */
         header {
-            background: rgba(8, 16, 32, 0.7) !important;
+            background: rgba(7, 15, 30, 0.7) !important;
             backdrop-filter: blur(20px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45) !important;
             color: white !important;
         }
@@ -499,10 +543,10 @@
 
         /* Side Navigation */
         aside {
-            background: rgba(8, 16, 32, 0.55) !important;
+            background: rgba(7, 15, 30, 0.55) !important;
             backdrop-filter: blur(16px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
         }
 
         /* Navigation links styling */
@@ -525,20 +569,20 @@
 
         /* General layout cards (Vivid Translucent Glassmorphism) */
         .bg-white, .card, .stat-card {
-            background: rgba(10, 22, 40, 0.45) !important;
+            background: rgba(255, 255, 255, 0.07) !important;
             backdrop-filter: blur(16px) saturate(180%) !important;
             -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border: 1px solid rgba(255, 255, 255, 0.13) !important;
             border-radius: 16px !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
             color: #f1f5f9 !important;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
         .bg-white:hover, .card:hover, .stat-card:hover {
-            border-color: rgba(96, 165, 250, 0.45) !important;
-            background: rgba(14, 30, 56, 0.6) !important;
-            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+            border-color: rgba(96, 165, 250, 0.4) !important;
+            background: rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
         }
 
         /* Subcont metric numbers colors */
@@ -730,9 +774,16 @@
 </head>
 
 <body class="h-full flex flex-col text-slate-900">
+    <!-- Background elements (z-index: 0) -->
     <div class="bg-gradient"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
     <div class="grid-overlay"></div>
     <div class="grid-bg"></div>
+
+    <!-- Page content wrapper (z-index: 1) -->
+    <div class="page-wrapper">
 
     <!-- Top App Bar -->
     <header
@@ -2487,6 +2538,7 @@
     </nav>
 
     <script src="js/script.js" type="module"></script>
+    </div><!-- end .page-wrapper -->
 </body>
 
 </html>
