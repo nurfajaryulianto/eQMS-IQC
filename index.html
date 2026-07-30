@@ -450,59 +450,46 @@
             margin-left: 4px;
         }
 
-        /* ── GLASSMORPHISM BLUE THEME OVERRIDES ── */
+        /* ── NIGHT SKY GLASSMORPHISM THEME OVERRIDES ── */
         body {
-            background: #070f1e !important;
+            background: #040914 !important;
             color: #f1f5f9 !important;
+            min-height: 100vh;
             position: relative;
+            overflow-x: hidden;
         }
 
-        /* Ambient glowing background orbs */
-        body::before {
-            content: '';
+        /* ── ANIMATED NIGHT SKY GRADIENT BACKGROUND ── */
+        .bg-gradient {
             position: fixed;
-            top: -20%;
-            left: -15%;
-            width: 700px;
-            height: 700px;
-            background: radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 15% 15%, rgba(59, 130, 246, 0.15) 0%, transparent 60%),
+                radial-gradient(ellipse 65% 55% at 85% 85%, rgba(30, 64, 175, 0.20) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 50% at 50% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 70%),
+                linear-gradient(135deg, #030712 0%, #071326 50%, #040914 100%);
             z-index: -2;
-            animation: none !important;
+            pointer-events: none;
         }
 
-        body::after {
-            content: '';
-            position: fixed;
-            bottom: -20%;
-            right: -15%;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: -2;
-            animation: none !important;
-        }
-
-        .grid-bg {
+        /* ── CRISP 40PX GRID PATTERN OVERLAY (SAME AS IQC MATERIAL) ── */
+        .grid-overlay, .grid-bg {
             position: fixed;
             inset: 0;
             background-image:
-                linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
-            background-size: 50px 50px;
+                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+            background-size: 40px 40px;
             z-index: -1;
             pointer-events: none;
         }
 
         /* Header / Navbar */
         header {
-            background: rgba(13, 27, 49, 0.75) !important;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: rgba(10, 18, 35, 0.75) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
             box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4) !important;
             color: white !important;
         }
@@ -512,10 +499,10 @@
 
         /* Side Navigation */
         aside {
-            background: rgba(13, 27, 49, 0.5) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: rgba(10, 18, 35, 0.6) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.09) !important;
         }
 
         /* Navigation links styling */
@@ -525,7 +512,7 @@
         }
         .nav-link:hover, .sidenav-link:hover {
             color: white !important;
-            background: rgba(255, 255, 255, 0.05) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
         }
         .nav-link.active, .sidenav-link.active {
             color: #60a5fa !important;
@@ -536,15 +523,22 @@
             border-right: 2.5px solid #3b82f6 !important;
         }
 
-        /* General layout cards */
+        /* General layout cards (Vivid Glassmorphism) */
         .bg-white, .card, .stat-card {
-            background: rgba(255, 255, 255, 0.03) !important;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: rgba(13, 23, 42, 0.65) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.09) !important;
             border-radius: 16px !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
             color: #f1f5f9 !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        .bg-white:hover, .card:hover, .stat-card:hover {
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            background: rgba(15, 28, 52, 0.75) !important;
+            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.12) !important;
         }
 
         /* Subcont metric numbers colors */
@@ -735,7 +729,9 @@
     </style>
 </head>
 
-<body class="h-full flex flex-col bg-slate-50 text-slate-900">
+<body class="h-full flex flex-col text-slate-900">
+    <div class="bg-gradient"></div>
+    <div class="grid-overlay"></div>
     <div class="grid-bg"></div>
 
     <!-- Top App Bar -->
