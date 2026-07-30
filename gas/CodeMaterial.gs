@@ -187,47 +187,51 @@ function getMasterData(params) {
   var inspMap = {};
   if (inspSheet && inspSheet.getLastRow() > 1) {
     var inspData = inspSheet.getDataRange().getValues();
-    // Col indices in inspections sheet:
-    // 7: po_no
-    // 9: ok, 10: no_qty
-    // 18: status ('done' / 'in-progress')
-    // 27: inspection_type ('Raw Material', 'Laminating Material', 'Bonding Test')
-    // 28: color_check_status
-    // 34: bonding_test_url (Col AI / index 34)
     for (var i = 1; i < inspData.length; i++) {
-      var pNo = String(inspData[i][7] || '').trim().toLowerCase();
+      var mName = String(inspData[i][1] || '').trim().toLowerCase(); // Col B (index 1) is material_name
+      var pNo = String(inspData[i][7] || '').trim().toLowerCase();   // Col H (index 7) is po_no
+      var rQty = String(Number(inspData[i][8]) || 0).trim();         // Col I (index 8) is qty_receive
+      var rDate = normalizeDateStr(inspData[i][15]);                 // Col P (index 15) is receive_date
       if (!pNo) continue;
-      if (!inspMap[pNo]) {
-        inspMap[pNo] = {
-          checked_qty: 0,
-          raw_done: false,
-          laminating_done: false,
-          bonding_done: false,
-          has_any_inspection: true,
-          last_status: ''
-        };
-      }
+
+      var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
+      var key3    = pNo + '___' + mName + '___' + rQty;
+      var key2    = mName ? (pNo + '___' + mName) : pNo;
+
+      var keys = [fullKey, key3, key2];
+      keys.forEach(function(k) {
+        if (!inspMap[k]) {
+          inspMap[k] = {
+            checked_qty: 0,
+            raw_done: false,
+            laminating_done: false,
+            bonding_done: false,
+            has_any_inspection: true,
+            last_status: ''
+          };
+        }
+      });
 
       var iType = String(inspData[i][27] || '').trim();
       var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
       var okQty = Number(inspData[i][9]) || 0;
       var noQty = Number(inspData[i][10]) || 0;
-      var colorStatus = String(inspData[i][28] || '').trim();
       var bondingUrl = String(inspData[i][34] || '').trim();
 
-      inspMap[pNo].checked_qty += (okQty + noQty);
+      keys.forEach(function(k) {
+        inspMap[k].checked_qty += (okQty + noQty);
 
-      if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
-        if (iStatus === 'done') inspMap[pNo].raw_done = true;
-      }
-      if (iType.indexOf('Laminating Material') >= 0) {
-        inspMap[pNo].laminating_done = true;
-      }
-      if (iType.indexOf('Bonding Test') >= 0 || bondingUrl !== '') {
-        inspMap[pNo].bonding_done = true;
-      }
-
-      inspMap[pNo].last_status = iStatus;
+        if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
+          if (iStatus === 'done') inspMap[k].raw_done = true;
+        }
+        if (iType.indexOf('Laminating Material') >= 0) {
+          inspMap[k].laminating_done = true;
+        }
+        if (iType.indexOf('Bonding Test') >= 0 || bondingUrl !== '') {
+          inspMap[k].bonding_done = true;
+        }
+        inspMap[k].last_status = iStatus;
+      });
     }
   }
 
@@ -241,9 +245,17 @@ function getMasterData(params) {
     var poVal = String(row[12] || '').trim();
     if (!poVal) continue; // skip rows without PO number
 
+    var matNameVal = String(row[1] || '').trim().toLowerCase();
     var plannedQty = Number(row[7]) || 0;
-    var poKey = poVal.toLowerCase();
-    var inspInfo = inspMap[poKey];
+    var poKey      = poVal.toLowerCase();
+    var rDateVal   = normalizeDateStr(row[11]);
+    var qtyKeyStr  = String(plannedQty).trim();
+
+    var fullKey = poKey + '___' + rDateVal + '___' + matNameVal + '___' + qtyKeyStr;
+    var key3    = poKey + '___' + matNameVal + '___' + qtyKeyStr;
+    var key2    = poKey + '___' + matNameVal;
+
+    var inspInfo = inspMap[fullKey] || inspMap[key3] || inspMap[key2];
 
     // Calculate dynamic checked_qty & status based on live inspections sheet
     var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
@@ -542,14 +554,17 @@ function submitInspection(payload) {
     var inspectionId = 'INSP-' + new Date().getTime();
     var now = new Date().toISOString();
 
-    // Find PO in master_data (using MASTER_DATA_HEADERS layout)
+    // Find PO & Material in master_data (using MASTER_DATA_HEADERS layout)
     var mdSheet = ss.getSheetByName(SHEET.MASTER_DATA);
     var mdRowData = null;
     if (mdSheet) {
       var mdData = mdSheet.getDataRange().getValues();
-      // po_number is Col M (index 12)
+      var targetPo = String(payload.po_number || '').trim().toLowerCase();
+      var targetMat = String(payload.material_name || '').trim().toLowerCase();
       for (var i = 1; i < mdData.length; i++) {
-        if (String(mdData[i][12]).trim() === String(payload.po_number).trim()) {
+        var rowPo = String(mdData[i][12] || '').trim().toLowerCase();
+        var rowMat = String(mdData[i][1] || '').trim().toLowerCase();
+        if (rowPo === targetPo && (!targetMat || rowMat === targetMat)) {
           mdRowData = mdData[i];
           break;
         }
@@ -569,17 +584,19 @@ function submitInspection(payload) {
       throw new Error('Qty Inspect (' + inspectQty + ') tidak boleh melebihi ' + labelTypeBackend + ' (' + maxAllowedBackend + ').');
     }
 
-    // STRICT SINGLE-ROW PER PO MECHANISM:
-    // Check if a row for this PO already exists in sheet "inspections"
+    // STRICT SINGLE-ROW PER PO & MATERIAL MECHANISM:
+    // Check if a row for this PO & Material already exists in sheet "inspections"
     var targetPO = String(payload.po_number || '').trim().toLowerCase();
+    var targetMat = String(payload.material_name || '').trim().toLowerCase();
     var existingRowIndex = -1;
     var existingRowValues = null;
 
     if (targetPO && sheet.getLastRow() > 1) {
       var allRows = sheet.getDataRange().getValues();
       for (var r = 1; r < allRows.length; r++) {
-        var rowPO = String(allRows[r][7] || '').trim().toLowerCase(); // Index 7 is po_no
-        if (rowPO === targetPO) {
+        var rowPO = String(allRows[r][7] || '').trim().toLowerCase();   // Index 7 is po_no
+        var rowMat = String(allRows[r][1] || '').trim().toLowerCase();  // Index 1 is material_name
+        if (rowPO === targetPO && (!targetMat || rowMat === targetMat)) {
           existingRowIndex = r + 1; // 1-based row index in Sheet
           existingRowValues = allRows[r];
           break;
@@ -660,7 +677,7 @@ function submitInspection(payload) {
       sheet.getRange(existingRowIndex, 1, 1, 35).setValues([existingRowValues]);
 
       var qtyInspected = Number(payload.qty_inspect) || 0;
-      updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
+      updateMasterDataStatus(ss, payload.po_number, payload.material_name, payload.status || 'done', qtyInspected);
 
       return { status: 'ok', inspection_id: String(existingRowValues[20] || inspectionId), message: 'Data inspeksi berhasil diperbarui pada baris PO yang sama.' };
     }
@@ -726,7 +743,7 @@ function submitInspection(payload) {
 
     // Update status and checked_qty in master_data
     var qtyInspected = Number(payload.qty_inspect) || 0;
-    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
+    updateMasterDataStatus(ss, payload.po_number, payload.material_name, payload.status || 'done', qtyInspected);
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 
@@ -735,15 +752,20 @@ function submitInspection(payload) {
   }
 }
 
-function updateMasterDataStatus(ss, poNumber, newStatus, qtyInspected) {
+function updateMasterDataStatus(ss, poNumber, materialName, newStatus, qtyInspected) {
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) return;
 
-  var data    = sheet.getDataRange().getValues();
+  var data      = sheet.getDataRange().getValues();
+  var targetPo  = String(poNumber || '').trim().toLowerCase();
+  var targetMat = String(materialName || '').trim().toLowerCase();
+
   // status is Col S (index 18), checked_qty is Col V (index 21)
-  // po_number is Col M (index 12)
+  // po_number is Col M (index 12), material_name is Col B (index 1)
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][12]).trim() === String(poNumber).trim()) {
+    var rowPo  = String(data[i][12] || '').trim().toLowerCase();
+    var rowMat = String(data[i][1] || '').trim().toLowerCase();
+    if (rowPo === targetPo && (!targetMat || rowMat === targetMat)) {
       sheet.getRange(i + 1, 19).setValue(newStatus);
 
       // Update checked_qty column (index 21 = col 22)

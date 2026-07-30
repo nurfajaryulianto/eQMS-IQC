@@ -4,6 +4,28 @@
 // Session disimpan di localStorage, diverifikasi via GAS backend.
 // ============================================================
 
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// ─── SUPABASE CONFIG ─────────────────────────────────────────
+const SUPABASE_URL = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bXpzenVmcndtcGtwbW1sbm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzgwODksImV4cCI6MjA5Mjg1NDA4OX0.gGu3xJ0yjUmLncz277gGSP8qiV8TiBrlJvg3C-t6ZJw';
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+        storage: window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        storageKey: 'eqms_material_auth_v1',
+    }
+});
+
+export function nikToEmail(nik) {
+    const clean = String(nik || '').trim().toLowerCase();
+    if (clean.includes('@')) return clean;
+    return `${clean}@eqms.internal`;
+}
+
 // ─── CONFIG ──────────────────────────────────────────────────
 // Sama dengan URL GAS Material — akan di-overrride oleh import di setiap module
 // tapi kita export agar mudah di-update dari satu tempat
@@ -140,29 +162,57 @@ export async function materialLogin(nik, password) {
         return { success: true, session };
     }
 
-    const res  = await fetch(MATERIAL_GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'login', nik: nik.trim(), password }),
-    });
-    const json = await res.json();
-    if (json.error) return { success: false, message: json.error };
+    // 1. Primary: Login via Supabase Auth (Fast, bypasses GAS)
+    try {
+        const email = nikToEmail(nik);
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    const session = {
-        nik:                 json.nik,
-        name:                json.name,
-        role:                json.role,
-        material_assignment: json.material_assignment || '',
-        token:               json.token,
-        expires_at:          json.expires_at,
-    };
-    setSession(session);
-    return { success: true, session };
+        if (!error && data?.user) {
+            const meta = data.user.user_metadata || {};
+            const session = {
+                nik:                 meta.nik || nik.trim(),
+                name:                meta.display_name || meta.name || nik.trim(),
+                role:                meta.role || MATERIAL_ROLES.INSPECTOR,
+                material_assignment: meta.material_assignment || '',
+                token:               data.session?.access_token || ('token_' + Date.now()),
+                expires_at:          new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+            };
+            setSession(session);
+            return { success: true, session };
+        }
+    } catch (e) {
+        console.warn('Supabase Auth error, attempting GAS fallback...', e);
+    }
+
+    // 2. Fallback: Login via GAS Backend (for users not yet in Supabase)
+    try {
+        const res  = await fetch(MATERIAL_GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'login', nik: nik.trim(), password }),
+        });
+        const json = await res.json();
+        if (json.error) return { success: false, message: json.error };
+
+        const session = {
+            nik:                 json.nik,
+            name:                json.name,
+            role:                json.role,
+            material_assignment: json.material_assignment || '',
+            token:               json.token,
+            expires_at:          json.expires_at,
+        };
+        setSession(session);
+        return { success: true, session };
+    } catch (err) {
+        return { success: false, message: 'Gagal terhubung ke server auth.' };
+    }
 }
 
 // ─── LOGOUT ──────────────────────────────────────────────────
 
 export async function materialLogout() {
     clearSession();
+    try { await supabase.auth.signOut(); } catch(e) {}
     window.location.replace(LOGIN_PAGE);
 }
 
