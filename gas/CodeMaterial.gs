@@ -6,14 +6,6 @@
 // ─── SPREADSHEET CONFIG ──────────────────────────────────────
 var SPREADSHEET_ID = '13C5MdJR_WN1A6wUzlRXCPCz6hKRoiR3Mg-0p_lMLblQ';
 
-var _ssCache = null;
-function getSpreadsheet() {
-  if (!_ssCache) {
-    _ssCache = SpreadsheetApp.openById(SPREADSHEET_ID);
-  }
-  return _ssCache;
-}
-
 var SHEET = {
   VENDORS:      'vendors',
   MASTER_DATA:  'master_data',
@@ -21,14 +13,7 @@ var SHEET = {
   USERS:        'users',
   SETTINGS:     'settings',
   ASSIGNMENTS:  'material_assignments',
-  CLAIMS:       'claims',
 };
-
-// Header columns for claims sheet
-var CLAIMS_HEADERS = [
-  'no', 'claim_date', 'po_number', 'material_name', 'vendor_name', 'material_type',
-  'claimed_qty', 'reason', 'ref_number', 'submitted_by', 'original_planned_qty', 'new_planned_qty'
-];
 
 var SUPABASE_URL  = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 
@@ -77,9 +62,8 @@ function doGet(e) {
     if (action === 'getUsers')               return jsonResponse(getUsers());
     if (action === 'getMaterialAssignments') return jsonResponse(getMaterialAssignments());
     if (action === 'generateTemplate')       return generateTemplate();
-    if (action === 'getClaims')              return jsonResponse(getClaims(e.parameter));
     if (action === 'getStatus') {
-      var ss = getSpreadsheet();
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       return jsonResponse({
         status: 'ok',
         spreadsheetId: SPREADSHEET_ID,
@@ -112,7 +96,6 @@ function doPost(e) {
     if (action === 'deleteUser')             return jsonResponse(deleteUser(payload));
     if (action === 'saveMaterialAssignment')   return jsonResponse(saveMaterialAssignment(payload));
     if (action === 'deleteMaterialAssignment') return jsonResponse(deleteMaterialAssignment(payload));
-    if (action === 'submitClaim')            return jsonResponse(submitClaim(payload));
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -126,7 +109,7 @@ function login(payload) {
   var password = String(payload.password || '');
   if (!nik || !password) throw new Error('NIK dan password harus diisi');
 
-  var ss = getSpreadsheet();
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(SHEET.USERS);
   
   if (!sheet) {
@@ -182,11 +165,12 @@ function login(payload) {
 
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
-  var ss    = getSpreadsheet();
+  var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
-  var data = sheet.getDataRange().getValues();
+  var data        = sheet.getDataRange().getValues();
+  var displayData = sheet.getDataRange().getDisplayValues();
   if (data.length < 2) return { data: [] };
 
   // DYNAMIC LIVE LOOKUP from "inspections" sheet for single source of truth & per-inspection status
@@ -194,6 +178,13 @@ function getMasterData(params) {
   var inspMap = {};
   if (inspSheet && inspSheet.getLastRow() > 1) {
     var inspData = inspSheet.getDataRange().getValues();
+    // Col indices in inspections sheet:
+    // 7: po_no
+    // 9: ok, 10: no_qty
+    // 18: status ('done' / 'in-progress')
+    // 27: inspection_type ('Raw Material', 'Laminating Material', 'Bonding Test')
+    // 28: color_check_status
+    // 34: bonding_test_url (Col AI / index 34)
     for (var i = 1; i < inspData.length; i++) {
       var pNo = String(inspData[i][7] || '').trim().toLowerCase();
       if (!pNo) continue;
@@ -212,6 +203,7 @@ function getMasterData(params) {
       var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
       var okQty = Number(inspData[i][9]) || 0;
       var noQty = Number(inspData[i][10]) || 0;
+      var colorStatus = String(inspData[i][28] || '').trim();
       var bondingUrl = String(inspData[i][34] || '').trim();
 
       inspMap[pNo].checked_qty += (okQty + noQty);
@@ -231,10 +223,12 @@ function getMasterData(params) {
   }
 
   var result = [];
-  var dirtyRowIndices = [];
+  var mdUpdated = false;
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
+    var disp = displayData[r];
+
     var poVal = String(row[12] || '').trim();
     if (!poVal) continue; // skip rows without PO number
 
@@ -250,6 +244,7 @@ function getMasterData(params) {
 
     var dynamicStatus = 'pending';
     if (!inspInfo) {
+      // No active rows in inspections sheet -> automatically reset to 'pending'!
       dynamicStatus = 'pending';
     } else if (rawDone || checkedQty >= plannedQty) {
       dynamicStatus = 'done';
@@ -258,29 +253,31 @@ function getMasterData(params) {
     }
 
     // --- SELF-HEALING DATABASE SYNC ---
+    // If the physical cell values for status (Col S / index 18) or checked_qty (Col V / index 21)
+    // in master_data sheet differ from the dynamically computed status, update them in real-time.
     var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
     var currentStoredQty = row[21] === '' ? 0 : (Number(row[21]) || 0);
+
     var expectedStoredQty = (dynamicStatus === 'done' || dynamicStatus === 'pending') ? '' : checkedQty;
 
     if (currentStoredStatus !== dynamicStatus || String(currentStoredQty) !== String(expectedStoredQty)) {
       row[18] = dynamicStatus;
       row[21] = expectedStoredQty;
-      dirtyRowIndices.push(r + 1); // 1-based row index in Sheet
+      mdUpdated = true;
     }
 
     if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
 
-    var rdVal = '';
-    var rawDate = row[11];
-    if (rawDate != null && rawDate !== '') {
-      if (rawDate instanceof Date || (typeof rawDate === 'object' && rawDate.getTime)) {
-        try {
-          rdVal = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        } catch(e) {
-          rdVal = String(rawDate).trim();
+    var rdVal = disp[11] || '';
+    if (!rdVal && row[11] != null && row[11] !== '') {
+      try {
+        if (row[11] instanceof Date || (typeof row[11] === 'object' && row[11].getTime)) {
+          rdVal = Utilities.formatDate(row[11], Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        } else {
+          rdVal = String(row[11]).trim();
         }
-      } else {
-        rdVal = String(rawDate).trim();
+      } catch(e) {
+        rdVal = String(row[11]).trim();
       }
     }
 
@@ -303,18 +300,19 @@ function getMasterData(params) {
       status:           dynamicStatus,
       raw_done:         rawDone,
       laminating_done:  lamDone,
-      bonding_done:     bondDone,
-      material_type:    String(row[17] || '').trim()
+      bonding_done:     bondDone
     });
   }
 
-  // Self-healing write: Update ONLY the specific rows that changed (huge performance gain)
-  if (dirtyRowIndices.length > 0) {
-    dirtyRowIndices.forEach(function(rowIdx) {
-      var rowData = data[rowIdx - 1];
-      sheet.getRange(rowIdx, 19).setValue(rowData[18]); // Col S (Status)
-      sheet.getRange(rowIdx, 22).setValue(rowData[21]); // Col V (Checked Qty)
-    });
+  // Save the self-healed changes to master_data sheet in 1 single bulk API call
+  if (mdUpdated) {
+    var numCols = Math.max(data[0].length, 22);
+    for (var i = 0; i < data.length; i++) {
+      while (data[i].length < numCols) {
+        data[i].push('');
+      }
+    }
+    sheet.getRange(1, 1, data.length, numCols).setValues(data);
   }
 
   return { data: result, total: result.length };
@@ -364,7 +362,7 @@ function bulkUpsertMasterData(payload) {
     var rows = payload.rows || [];
     if (!rows.length) return { status: 'ok', message: 'Tidak ada data untuk diproses.', count: 0 };
 
-    var ss    = getSpreadsheet();
+    var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
     if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
@@ -471,34 +469,33 @@ function bulkUpsertMasterData(payload) {
 // ─── GET INSPECTION DATA (untuk Dashboard) ────────────────────
 
 function getInspectionData(params) {
-  var ss       = getSpreadsheet();
+  var ss       = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet    = ss.getSheetByName(SHEET.INSPECTIONS);
   if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
   var data    = sheet.getDataRange().getValues();
   if (data.length < 3) return { data: [] }; // 2 header rows
 
-  var rows        = data.slice(2);
-  var numHeaders  = INSPECTION_HEADERS.length;
-  var inspections = [];
+  var rows    = data.slice(2);
 
-  for (var r = 0; r < rows.length; r++) {
-    var row = rows[r];
+  var inspections = rows.map(function(row) {
     var obj = {};
-    for (var i = 0; i < numHeaders; i++) {
-      obj[INSPECTION_HEADERS[i]] = row[i] !== undefined ? row[i] : '';
-    }
-    // Fast compatibility mapping for dashboard
-    var ok = Number(obj.ok) || 0;
-    var fail = Number(obj.no_qty) || 0;
+    INSPECTION_HEADERS.forEach(function(h, i) { 
+      obj[h] = row[i] !== undefined ? row[i] : ''; 
+    });
+    // Compatibility mapping for dashboard
     obj.po_number = obj.po_no || '';
-    obj.qty_inspect = ok + fail;
-    obj.qty_fail = fail;
-    obj.result_status = fail === 0 ? 'Pass' : 'Fail';
+    obj.qty_inspect = (Number(obj.ok) || 0) + (Number(obj.no_qty) || 0);
+    obj.qty_fail = Number(obj.no_qty) || 0;
+    obj.result_status = obj.qty_fail === 0 ? 'Pass' : 'Fail';
+    obj.inspection_date = obj.inspection_date || '';
+    obj.material_name = obj.material_name || '';
     obj.vendor_name = obj.suppliers || '';
+    obj.style = obj.style || '';
     obj.model_shoe = obj.shoe_model || '';
-    inspections.push(obj);
-  }
+    obj.item_description = obj.item_description || '';
+    return obj;
+  });
 
   return { data: inspections, total: inspections.length };
 }
@@ -510,7 +507,7 @@ function submitInspection(payload) {
   lock.waitLock(15000);
 
   try {
-    var ss    = getSpreadsheet();
+    var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName(SHEET.INSPECTIONS);
     if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
@@ -653,7 +650,7 @@ function submitInspection(payload) {
       sheet.getRange(existingRowIndex, 1, 1, 35).setValues([existingRowValues]);
 
       var qtyInspected = Number(payload.qty_inspect) || 0;
-      updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected, mdRowIdx, mdRowData);
+      updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
 
       return { status: 'ok', inspection_id: String(existingRowValues[20] || inspectionId), message: 'Data inspeksi berhasil diperbarui pada baris PO yang sama.' };
     }
@@ -717,9 +714,9 @@ function submitInspection(payload) {
 
     sheet.appendRow(newRow);
 
-    // Update status and checked_qty in master_data without re-reading whole sheet
+    // Update status and checked_qty in master_data
     var qtyInspected = Number(payload.qty_inspect) || 0;
-    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected, mdRowIdx, mdRowData);
+    updateMasterDataStatus(ss, payload.po_number, payload.status || 'done', qtyInspected);
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 
@@ -728,33 +725,28 @@ function submitInspection(payload) {
   }
 }
 
-function updateMasterDataStatus(ss, poNumber, newStatus, qtyInspected, targetRowIdx, existingRowData) {
+function updateMasterDataStatus(ss, poNumber, newStatus, qtyInspected) {
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) return;
 
-  var rIdx = targetRowIdx || -1;
-  var rowData = existingRowData || null;
+  var data    = sheet.getDataRange().getValues();
+  // status is Col S (index 18), checked_qty is Col V (index 21)
+  // po_number is Col M (index 12)
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][12]).trim() === String(poNumber).trim()) {
+      sheet.getRange(i + 1, 19).setValue(newStatus);
 
-  if (rIdx < 2 || !rowData) {
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][12]).trim() === String(poNumber).trim()) {
-        rIdx = i + 1;
-        rowData = data[i];
-        break;
+      // Update checked_qty column (index 21 = col 22)
+      if (newStatus === 'in-progress') {
+        // Accumulate: existing checked_qty + newly inspected qty
+        var existingChecked = Number(data[i][21]) || 0;
+        sheet.getRange(i + 1, 22).setValue(existingChecked + (qtyInspected || 0));
+      } else if (newStatus === 'done' || newStatus === 'pending') {
+        // Clear checked_qty when done or pending
+        sheet.getRange(i + 1, 22).setValue('');
       }
+      break;
     }
-  }
-
-  if (rIdx >= 2 && rowData) {
-    sheet.getRange(rIdx, 19).setValue(newStatus); // Col S (Status)
-
-    var checkedVal = '';
-    if (newStatus === 'in-progress') {
-      var existingChecked = Number(rowData[21]) || 0;
-      checkedVal = existingChecked + (qtyInspected || 0);
-    }
-    sheet.getRange(rIdx, 22).setValue(checkedVal); // Col V (Checked Qty)
   }
 }
 
@@ -765,7 +757,7 @@ function passAll(payload) {
   lock.waitLock(15000);
 
   try {
-    var ss       = getSpreadsheet();
+    var ss       = SpreadsheetApp.openById(SPREADSHEET_ID);
     var mdSheet  = ss.getSheetByName(SHEET.MASTER_DATA);
     var inspSheet= ss.getSheetByName(SHEET.INSPECTIONS);
     if (!mdSheet)   throw new Error('Sheet "master_data" tidak ditemukan.');
@@ -1391,135 +1383,4 @@ function getOrCreateSubfolder(parentFolder, folderName) {
   } else {
     return parentFolder.createFolder(folderName);
   }
-}
-
-// ─── CLAIM MECHANISM ──────────────────────────────────────────
-
-/**
- * submitClaim — Kurangi planned_qty di master_data, catat di sheet 'claims'
- * Payload: { po_number, claim_qty, reason, ref_number, submitted_by }
- */
-function submitClaim(payload) {
-  var poNumber    = String(payload.po_number || '').trim();
-  var claimQty    = Number(payload.claim_qty);
-  var reason      = String(payload.reason || '').trim();
-  var refNumber   = String(payload.ref_number || '').trim();
-  var submittedBy = String(payload.submitted_by || 'admin').trim();
-
-  if (!poNumber) throw new Error('PO number tidak boleh kosong.');
-  if (!claimQty || claimQty <= 0) throw new Error('Qty klaim harus lebih dari 0.');
-  if (!reason) throw new Error('Alasan klaim tidak boleh kosong.');
-
-  var ss        = getSpreadsheet();
-  var mdSheet   = ss.getSheetByName(SHEET.MASTER_DATA);
-  if (!mdSheet) throw new Error('Sheet master_data tidak ditemukan.');
-
-  var data    = mdSheet.getDataRange().getValues();
-  var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
-
-  var poCol       = headers.indexOf('po_number');
-  var plannedCol  = headers.indexOf('planned_qty') >= 0 ? headers.indexOf('planned_qty') : 7;
-  var matNameCol  = headers.indexOf('material_name') >= 0 ? headers.indexOf('material_name') : 1;
-  var vendorCol   = headers.indexOf('supplier_name') >= 0 ? headers.indexOf('supplier_name') : 5;
-  var matTypeCol  = headers.indexOf('material_type') >= 0 ? headers.indexOf('material_type') : 17;
-
-  if (poCol < 0) poCol = 12; // fallback: col M (index 12)
-
-  var targetRowIdx = -1;
-  var originalPlannedQty = 0;
-  var materialName = '';
-  var vendorName = '';
-  var materialType = '';
-
-  for (var r = 1; r < data.length; r++) {
-    var rowPo = String(data[r][poCol] || '').trim();
-    if (rowPo.toLowerCase() === poNumber.toLowerCase()) {
-      targetRowIdx = r;
-      originalPlannedQty = Number(data[r][plannedCol]) || 0;
-      materialName = String(data[r][matNameCol] || '').trim();
-      vendorName   = String(data[r][vendorCol] || '').trim();
-      materialType = String(data[r][matTypeCol] || '').trim();
-      break;
-    }
-  }
-
-  if (targetRowIdx < 0) throw new Error('PO "' + poNumber + '" tidak ditemukan di master data.');
-  if (claimQty >= originalPlannedQty) throw new Error('Qty klaim (' + claimQty + ') tidak boleh melebihi atau sama dengan planned qty (' + originalPlannedQty + '). Gunakan mekanisme penghapusan jika seluruh material diklaim.');
-
-  var newPlannedQty = originalPlannedQty - claimQty;
-
-  // Update planned_qty in master_data sheet
-  mdSheet.getRange(targetRowIdx + 1, plannedCol + 1).setValue(newPlannedQty);
-
-  // Write to claims sheet (auto-create if not exist)
-  var claimSheet = ss.getSheetByName(SHEET.CLAIMS);
-  if (!claimSheet) {
-    claimSheet = ss.insertSheet(SHEET.CLAIMS);
-    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length).setValues([CLAIMS_HEADERS]);
-    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length)
-      .setFontWeight('bold')
-      .setBackground('#1d4ed8')
-      .setFontColor('#ffffff');
-  }
-
-  var lastRow     = claimSheet.getLastRow();
-  var nextNo      = lastRow; // row 1 is header, so lastRow gives the count
-  var claimDate   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-
-  var newClaimRow = [
-    nextNo,
-    claimDate,
-    poNumber,
-    materialName,
-    vendorName,
-    materialType,
-    claimQty,
-    reason,
-    refNumber,
-    submittedBy,
-    originalPlannedQty,
-    newPlannedQty
-  ];
-
-  claimSheet.appendRow(newClaimRow);
-
-  return {
-    success: true,
-    po_number: poNumber,
-    original_planned_qty: originalPlannedQty,
-    claimed_qty: claimQty,
-    new_planned_qty: newPlannedQty,
-    message: 'Klaim berhasil. Planned Qty diperbarui dari ' + originalPlannedQty + ' menjadi ' + newPlannedQty + '.'
-  };
-}
-
-/**
- * getClaims — Ambil riwayat klaim dari sheet 'claims'
- * Params: { po_number (optional filter) }
- */
-function getClaims(params) {
-  var poFilter = params && params.po_number ? String(params.po_number).trim().toLowerCase() : '';
-
-  var ss = getSpreadsheet();
-  var claimSheet = ss.getSheetByName(SHEET.CLAIMS);
-  if (!claimSheet || claimSheet.getLastRow() < 2) return { data: [], total: 0 };
-
-  var data    = claimSheet.getDataRange().getValues();
-  var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
-
-  var result = [];
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    var obj = {};
-    for (var c = 0; c < headers.length; c++) {
-      obj[headers[c]] = row[c];
-    }
-    if (poFilter && String(obj.po_number || '').toLowerCase() !== poFilter) continue;
-    result.push(obj);
-  }
-
-  // Sort by claim_date descending (newest first)
-  result.reverse();
-
-  return { data: result, total: result.length };
 }
