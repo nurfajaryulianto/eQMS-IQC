@@ -13,7 +13,14 @@ var SHEET = {
   USERS:        'users',
   SETTINGS:     'settings',
   ASSIGNMENTS:  'material_assignments',
+  CLAIMS:       'claims',
 };
+
+// Header columns for claims sheet
+var CLAIMS_HEADERS = [
+  'no', 'claim_date', 'po_number', 'material_name', 'vendor_name', 'material_type',
+  'claimed_qty', 'reason', 'ref_number', 'submitted_by', 'original_planned_qty', 'new_planned_qty'
+];
 
 var SUPABASE_URL  = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 
@@ -62,6 +69,7 @@ function doGet(e) {
     if (action === 'getUsers')               return jsonResponse(getUsers());
     if (action === 'getMaterialAssignments') return jsonResponse(getMaterialAssignments());
     if (action === 'generateTemplate')       return generateTemplate();
+    if (action === 'getClaims')              return jsonResponse(getClaims(e.parameter));
     if (action === 'getStatus') {
       var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
       return jsonResponse({
@@ -96,6 +104,7 @@ function doPost(e) {
     if (action === 'deleteUser')             return jsonResponse(deleteUser(payload));
     if (action === 'saveMaterialAssignment')   return jsonResponse(saveMaterialAssignment(payload));
     if (action === 'deleteMaterialAssignment') return jsonResponse(deleteMaterialAssignment(payload));
+    if (action === 'submitClaim')            return jsonResponse(submitClaim(payload));
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -300,7 +309,8 @@ function getMasterData(params) {
       status:           dynamicStatus,
       raw_done:         rawDone,
       laminating_done:  lamDone,
-      bonding_done:     bondDone
+      bonding_done:     bondDone,
+      material_type:    String(row[17] || '').trim()
     });
   }
 
@@ -1383,4 +1393,135 @@ function getOrCreateSubfolder(parentFolder, folderName) {
   } else {
     return parentFolder.createFolder(folderName);
   }
+}
+
+// ─── CLAIM MECHANISM ──────────────────────────────────────────
+
+/**
+ * submitClaim — Kurangi planned_qty di master_data, catat di sheet 'claims'
+ * Payload: { po_number, claim_qty, reason, ref_number, submitted_by }
+ */
+function submitClaim(payload) {
+  var poNumber    = String(payload.po_number || '').trim();
+  var claimQty    = Number(payload.claim_qty);
+  var reason      = String(payload.reason || '').trim();
+  var refNumber   = String(payload.ref_number || '').trim();
+  var submittedBy = String(payload.submitted_by || 'admin').trim();
+
+  if (!poNumber) throw new Error('PO number tidak boleh kosong.');
+  if (!claimQty || claimQty <= 0) throw new Error('Qty klaim harus lebih dari 0.');
+  if (!reason) throw new Error('Alasan klaim tidak boleh kosong.');
+
+  var ss        = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var mdSheet   = ss.getSheetByName(SHEET.MASTER_DATA);
+  if (!mdSheet) throw new Error('Sheet master_data tidak ditemukan.');
+
+  var data    = mdSheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+
+  var poCol       = headers.indexOf('po_number');
+  var plannedCol  = headers.indexOf('planned_qty') >= 0 ? headers.indexOf('planned_qty') : 7;
+  var matNameCol  = headers.indexOf('material_name') >= 0 ? headers.indexOf('material_name') : 1;
+  var vendorCol   = headers.indexOf('supplier_name') >= 0 ? headers.indexOf('supplier_name') : 5;
+  var matTypeCol  = headers.indexOf('material_type') >= 0 ? headers.indexOf('material_type') : 17;
+
+  if (poCol < 0) poCol = 12; // fallback: col M (index 12)
+
+  var targetRowIdx = -1;
+  var originalPlannedQty = 0;
+  var materialName = '';
+  var vendorName = '';
+  var materialType = '';
+
+  for (var r = 1; r < data.length; r++) {
+    var rowPo = String(data[r][poCol] || '').trim();
+    if (rowPo.toLowerCase() === poNumber.toLowerCase()) {
+      targetRowIdx = r;
+      originalPlannedQty = Number(data[r][plannedCol]) || 0;
+      materialName = String(data[r][matNameCol] || '').trim();
+      vendorName   = String(data[r][vendorCol] || '').trim();
+      materialType = String(data[r][matTypeCol] || '').trim();
+      break;
+    }
+  }
+
+  if (targetRowIdx < 0) throw new Error('PO "' + poNumber + '" tidak ditemukan di master data.');
+  if (claimQty >= originalPlannedQty) throw new Error('Qty klaim (' + claimQty + ') tidak boleh melebihi atau sama dengan planned qty (' + originalPlannedQty + '). Gunakan mekanisme penghapusan jika seluruh material diklaim.');
+
+  var newPlannedQty = originalPlannedQty - claimQty;
+
+  // Update planned_qty in master_data sheet
+  mdSheet.getRange(targetRowIdx + 1, plannedCol + 1).setValue(newPlannedQty);
+
+  // Write to claims sheet (auto-create if not exist)
+  var claimSheet = ss.getSheetByName(SHEET.CLAIMS);
+  if (!claimSheet) {
+    claimSheet = ss.insertSheet(SHEET.CLAIMS);
+    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length).setValues([CLAIMS_HEADERS]);
+    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length)
+      .setFontWeight('bold')
+      .setBackground('#1d4ed8')
+      .setFontColor('#ffffff');
+  }
+
+  var lastRow     = claimSheet.getLastRow();
+  var nextNo      = lastRow; // row 1 is header, so lastRow gives the count
+  var claimDate   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
+  var newClaimRow = [
+    nextNo,
+    claimDate,
+    poNumber,
+    materialName,
+    vendorName,
+    materialType,
+    claimQty,
+    reason,
+    refNumber,
+    submittedBy,
+    originalPlannedQty,
+    newPlannedQty
+  ];
+
+  claimSheet.appendRow(newClaimRow);
+
+  return {
+    success: true,
+    po_number: poNumber,
+    original_planned_qty: originalPlannedQty,
+    claimed_qty: claimQty,
+    new_planned_qty: newPlannedQty,
+    message: 'Klaim berhasil. Planned Qty diperbarui dari ' + originalPlannedQty + ' menjadi ' + newPlannedQty + '.'
+  };
+}
+
+/**
+ * getClaims — Ambil riwayat klaim dari sheet 'claims'
+ * Params: { po_number (optional filter) }
+ */
+function getClaims(params) {
+  var poFilter = params && params.po_number ? String(params.po_number).trim().toLowerCase() : '';
+
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var claimSheet = ss.getSheetByName(SHEET.CLAIMS);
+  if (!claimSheet || claimSheet.getLastRow() < 2) return { data: [], total: 0 };
+
+  var data    = claimSheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+
+  var result = [];
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var obj = {};
+    for (var c = 0; c < headers.length; c++) {
+      obj[headers[c]] = row[c];
+    }
+    if (poFilter && String(obj.po_number || '').toLowerCase() !== poFilter) continue;
+    result.push(obj);
+  }
+
+  // Sort by claim_date descending (newest first)
+  result.reverse();
+
+  return { data: result, total: result.length };
 }
