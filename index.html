@@ -896,24 +896,28 @@
                                         <input type="text" id="model-name" placeholder="Enter model name" readonly
                                             class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm px-3 py-2 focus:outline-none cursor-default">
                                     </div>
-                                    <div>
-                                        <label for="inspection-status"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status Inspeksi</label>
-                                        <select id="inspection-status"
-                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                            <option value="In-Progress">In-Progress (Belum Selesai)</option>
-                                            <option value="Done" selected>Done (Selesai)</option>
-                                        </select>
+                                    
+                                    <!-- Status Inspeksi & Approved By Leader: desktop only; mobile version is in the mobile save card below -->
+                                    <div class="hidden lg:block space-y-3 pt-2 border-t border-slate-100">
+                                        <div>
+                                            <label for="inspection-status"
+                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status Inspeksi</label>
+                                            <select id="inspection-status"
+                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                                <option value="In-Progress">In-Progress (Belum Selesai)</option>
+                                                <option value="Done" selected>Done (Selesai)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label for="approved-by-leader"
+                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved by Leader <span class="text-[10px] text-slate-400 normal-case">(Opsional)</span></label>
+                                            <select id="approved-by-leader"
+                                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                                <option value="">— Tanpa Persetujuan —</option>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <!-- Approved By Leader: only visible on desktop; mobile version is in the mobile save card below -->
-                                    <div class="hidden lg:block">
-                                        <label for="approved-by-leader"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Approved by Leader <span class="text-[10px] text-slate-400 normal-case">(Opsional)</span></label>
-                                        <select id="approved-by-leader"
-                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                            <option value="">— Tanpa Persetujuan —</option>
-                                        </select>
-                                    </div>
+
                                     <div id="evidence-upload-container" class="hidden" style="background: rgba(255, 255, 255, 0.02); border: 1.5px dashed rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 10px; margin-top: 8px;">
                                         <label for="evidence-file"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Upload Evidence <span class="text-red-500">*</span></label>
