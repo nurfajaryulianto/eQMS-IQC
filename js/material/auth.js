@@ -131,6 +131,11 @@ export async function requireMaterialRole(allowedRoles = []) {
         window.location.replace(LOGIN_PAGE);
         return null;
     }
+    const userModule = String(session.module || 'both').toLowerCase();
+    if (userModule !== 'material' && userModule !== 'both') {
+        window.location.replace('/unauthorized.html');
+        return null;
+    }
     if (allowedRoles.length > 0 && !allowedRoles.includes(session.role)) {
         window.location.replace('/unauthorized.html');
         return null;
@@ -145,16 +150,17 @@ export async function materialLogin(nik, password) {
     if (MATERIAL_TEST_MODE) {
         // In test mode, accept any credentials
         const mockUsers = {
-            'admin':     { name: 'Administrator', role: MATERIAL_ROLES.ADMIN },
-            'inspector': { name: 'Inspector Test', role: MATERIAL_ROLES.INSPECTOR },
-            'spv':       { name: 'Supervisor Test', role: MATERIAL_ROLES.SUPERVISOR },
-            'mgr':       { name: 'Manager Test', role: MATERIAL_ROLES.MANAGER },
+            'admin':     { name: 'Administrator', role: MATERIAL_ROLES.ADMIN, module: 'both' },
+            'inspector': { name: 'Inspector Test', role: MATERIAL_ROLES.INSPECTOR, module: 'material' },
+            'spv':       { name: 'Supervisor Test', role: MATERIAL_ROLES.SUPERVISOR, module: 'material' },
+            'mgr':       { name: 'Manager Test', role: MATERIAL_ROLES.MANAGER, module: 'both' },
         };
-        const user = mockUsers[nik.toLowerCase()] || { name: nik, role: MATERIAL_ROLES.INSPECTOR };
+        const user = mockUsers[nik.toLowerCase()] || { name: nik, role: MATERIAL_ROLES.INSPECTOR, module: 'material' };
         const session = {
             nik:       nik,
             name:      user.name,
             role:      user.role,
+            module:    user.module,
             token:     'mock_' + Date.now(),
             expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
         };
@@ -162,17 +168,36 @@ export async function materialLogin(nik, password) {
         return { success: true, session };
     }
 
-    // 1. Primary: Login via Supabase Auth (Fast, bypasses GAS)
+    // Login via Supabase Auth (Fast, 100% bypasses GAS)
     try {
         const email = nikToEmail(nik);
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-        if (!error && data?.user) {
+        if (error) {
+            return {
+                success: false,
+                message: error.message === 'Invalid login credentials' ? 'NIK atau password salah.' : error.message
+            };
+        }
+
+        if (data?.user) {
             const meta = data.user.user_metadata || {};
+            const userModule = String(meta.module || meta.app_module || 'both').toLowerCase();
+
+            // Module Guard: Validate if user is authorized to access IQC Material
+            if (userModule !== 'material' && userModule !== 'both') {
+                await supabase.auth.signOut();
+                return {
+                    success: false,
+                    message: 'Akun Anda terdaftar khusus untuk modul IQC Subcont dan tidak dapat mengakses IQC Material.'
+                };
+            }
+
             const session = {
                 nik:                 meta.nik || nik.trim(),
                 name:                meta.display_name || meta.name || nik.trim(),
                 role:                meta.role || MATERIAL_ROLES.INSPECTOR,
+                module:              userModule,
                 material_assignment: meta.material_assignment || '',
                 token:               data.session?.access_token || ('token_' + Date.now()),
                 expires_at:          new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
@@ -180,31 +205,11 @@ export async function materialLogin(nik, password) {
             setSession(session);
             return { success: true, session };
         }
+
+        return { success: false, message: 'Gagal mendapatkan data sesi user.' };
     } catch (e) {
-        console.warn('Supabase Auth error, attempting GAS fallback...', e);
-    }
-
-    // 2. Fallback: Login via GAS Backend (for users not yet in Supabase)
-    try {
-        const res  = await fetch(MATERIAL_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'login', nik: nik.trim(), password }),
-        });
-        const json = await res.json();
-        if (json.error) return { success: false, message: json.error };
-
-        const session = {
-            nik:                 json.nik,
-            name:                json.name,
-            role:                json.role,
-            material_assignment: json.material_assignment || '',
-            token:               json.token,
-            expires_at:          json.expires_at,
-        };
-        setSession(session);
-        return { success: true, session };
-    } catch (err) {
-        return { success: false, message: 'Gagal terhubung ke server auth.' };
+        console.error('Supabase Auth error:', e);
+        return { success: false, message: 'Terjadi kesalahan koneksi auth.' };
     }
 }
 
