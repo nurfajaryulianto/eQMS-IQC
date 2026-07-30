@@ -99,11 +99,14 @@ window.loadMasterData = async function () {
                     status: (row.status || row.Status || 'pending').toLowerCase(),
                     raw_done: Boolean(row.raw_done || row.RawDone),
                     laminating_done: Boolean(row.laminating_done || row.LaminatingDone),
-                    bonding_done: Boolean(row.bonding_done || row.BondingDone)
+                    bonding_done: Boolean(row.bonding_done || row.BondingDone),
+                    material_type: (row.material_type || row.MaterialType || '').trim()
                 };
             });
         }
         renderMasterTable();
+        // Populate material type filter after data is loaded
+        populatePassAllMaterialTypeFilter();
     } catch (err) {
         console.error(err);
         showToast('Gagal memuat data: ' + err.message, 'error');
@@ -134,6 +137,10 @@ window.renderMasterTable = function () {
         const badge = d.status === 'done'
             ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`
             : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
+        const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0;
+        const claimBtn = hasInspection
+            ? `<button onclick="window.openClaimModal('${esc(d.po_number)}')" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
+            : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
             <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
@@ -141,6 +148,7 @@ window.renderMasterTable = function () {
             <td class="truncate" style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
             <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
+            <td style="padding:10px 14px;text-align:center;">${claimBtn}</td>
         </tr>`;
     }).join('');
 };
@@ -420,9 +428,11 @@ window.loadPassAllPreview = async function () {
 window.applyPassAllDateFilter = function () {
     const startVal = document.getElementById('passall-filter-start')?.value;
     const endVal = document.getElementById('passall-filter-end')?.value;
+    const materialTypeVal = document.getElementById('passall-filter-material-type')?.value || 'all';
 
     let filteredPending = allMasterData.filter(d => d.status === 'pending');
 
+    // Filter by date
     const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
     const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
 
@@ -430,9 +440,7 @@ window.applyPassAllDateFilter = function () {
         filteredPending = filteredPending.filter(d => {
             const rDate = parseReceiveDate(d.receive_date);
             if (!rDate) return false;
-
             const rDateClear = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate());
-
             if (startDate) {
                 const startClear = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
                 if (rDateClear < startClear) return false;
@@ -443,6 +451,13 @@ window.applyPassAllDateFilter = function () {
             }
             return true;
         });
+    }
+
+    // Filter by material type
+    if (materialTypeVal && materialTypeVal !== 'all') {
+        filteredPending = filteredPending.filter(d =>
+            (d.material_type || '').toLowerCase().trim() === materialTypeVal.toLowerCase().trim()
+        );
     }
 
     const countEl = document.getElementById('passall-count');
@@ -1367,3 +1382,176 @@ window.resetLeaderMonitorFilter = function () {
     if (statusSelect) statusSelect.value = 'all';
     window.renderLeaderMonitorLog();
 };
+
+// ─── PASS ALL MATERIAL TYPE FILTER ────────────────────────────
+
+function populatePassAllMaterialTypeFilter() {
+    const select = document.getElementById('passall-filter-material-type');
+    if (!select) return;
+
+    // Collect unique non-empty material types from allMasterData (pending only)
+    const types = [...new Set(
+        allMasterData
+            .filter(d => d.material_type && d.material_type.trim())
+            .map(d => d.material_type.trim())
+    )].sort();
+
+    select.innerHTML = `<option value="all">Semua Material Type</option>`
+        + types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+}
+
+// ─── CLAIM MECHANISM ──────────────────────────────────────────
+
+let claimTargetData = null;
+
+window.openClaimModal = function (poNumber) {
+    const d = allMasterData.find(m => m.po_number === poNumber);
+    if (!d) { showToast('Data tidak ditemukan.', 'error'); return; }
+
+    claimTargetData = d;
+
+    const el = id => document.getElementById(id);
+    if (el('claim-po-display')) el('claim-po-display').textContent = d.po_number;
+    if (el('claim-material-display')) el('claim-material-display').textContent = d.material_name;
+    if (el('claim-vendor-display')) el('claim-vendor-display').textContent = d.vendor_name;
+    if (el('claim-mattype-display')) el('claim-mattype-display').textContent = d.material_type || '—';
+    if (el('claim-planned-display')) el('claim-planned-display').textContent = `${Number(d.planned_qty).toLocaleString('id-ID')} ${d.uom}`;
+    if (el('claim-qty-input')) { el('claim-qty-input').value = ''; el('claim-qty-input').max = d.planned_qty - 1; }
+    if (el('claim-reason-input')) el('claim-reason-input').value = '';
+    if (el('claim-ref-input')) el('claim-ref-input').value = '';
+    if (el('claim-error-msg')) el('claim-error-msg').textContent = '';
+
+    const modal = document.getElementById('claim-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => {
+            modal.style.opacity = '1';
+            const box = modal.querySelector('.claim-modal-box');
+            if (box) box.style.transform = 'scale(1)';
+        });
+    }
+};
+
+window.closeClaimModal = function () {
+    const modal = document.getElementById('claim-modal');
+    if (modal) {
+        modal.style.opacity = '0';
+        const box = modal.querySelector('.claim-modal-box');
+        if (box) box.style.transform = 'scale(0.95)';
+        setTimeout(() => { modal.style.display = 'none'; }, 200);
+    }
+    claimTargetData = null;
+};
+
+window.submitClaim = async function () {
+    if (!claimTargetData) return;
+
+    const claimQty = Number(document.getElementById('claim-qty-input')?.value);
+    const reason = document.getElementById('claim-reason-input')?.value.trim();
+    const refNumber = document.getElementById('claim-ref-input')?.value.trim() || '';
+    const errorEl = document.getElementById('claim-error-msg');
+
+    if (!claimQty || claimQty <= 0) {
+        if (errorEl) errorEl.textContent = 'Qty klaim harus lebih dari 0.';
+        return;
+    }
+    if (claimQty >= claimTargetData.planned_qty) {
+        if (errorEl) errorEl.textContent = `Qty klaim tidak boleh melebihi atau sama dengan planned qty (${claimTargetData.planned_qty}).`;
+        return;
+    }
+    if (!reason) {
+        if (errorEl) errorEl.textContent = 'Alasan klaim wajib diisi.';
+        return;
+    }
+    if (errorEl) errorEl.textContent = '';
+
+    const submitBtn = document.getElementById('claim-submit-btn');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Memproses...'; }
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            await new Promise(r => setTimeout(r, 1000));
+            // Simulate local update
+            const idx = allMasterData.findIndex(m => m.po_number === claimTargetData.po_number);
+            if (idx >= 0) allMasterData[idx].planned_qty -= claimQty;
+            window.closeClaimModal();
+            renderMasterTable();
+            showToast(`Klaim berhasil (simulasi): Qty dikurangi ${claimQty}. Planned Qty baru: ${claimTargetData.planned_qty - claimQty}`, 'success');
+            return;
+        }
+
+        const payload = {
+            action: 'submitClaim',
+            po_number: claimTargetData.po_number,
+            claim_qty: claimQty,
+            reason,
+            ref_number: refNumber,
+            submitted_by: currentUser?.name || currentUser?.nik || 'admin'
+        };
+
+        const res = await fetch(MATERIAL_GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        window.closeClaimModal();
+        showToast(json.message || 'Klaim berhasil.', 'success');
+        // Reload master data to reflect new planned_qty
+        await loadMasterData();
+        renderMasterTable();
+    } catch (err) {
+        if (errorEl) errorEl.textContent = 'Gagal: ' + err.message;
+        console.error(err);
+    } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Ajukan Klaim'; }
+    }
+};
+
+// ─── CLAIMS HISTORY TAB ───────────────────────────────────────
+
+window.loadClaimsHistory = async function () {
+    const tbody = document.getElementById('claims-tbody');
+    const countEl = document.getElementById('claims-count');
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#94a3b8;">Memuat data...</td></tr>`;
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            tbody.innerHTML = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#94a3b8;">Belum ada riwayat klaim (test mode).</td></tr>`;
+            return;
+        }
+
+        const res = await fetch(`${MATERIAL_GAS_URL}?action=getClaims`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        const data = json.data || [];
+        if (countEl) countEl.textContent = `${data.length} record`;
+
+        if (!data.length) {
+            tbody.innerHTML = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#94a3b8;">Belum ada riwayat klaim.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map((c, i) => {
+            const dateStr = c.claim_date ? String(c.claim_date).substring(0, 16).replace('T', ' ') : '—';
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <td style="padding:10px 14px;color:rgba(255,255,255,0.5);font-size:12px;">${dateStr}</td>
+                <td style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(String(c.po_number || '—'))}</td>
+                <td style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(String(c.material_name || '—'))}</td>
+                <td style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:12px;">${esc(String(c.vendor_name || '—'))}</td>
+                <td style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(String(c.material_type || '—'))}</td>
+                <td style="padding:10px 14px;text-align:right;font-weight:700;color:#f87171;">${Number(c.claimed_qty || 0).toLocaleString('id-ID')}</td>
+                <td style="padding:10px 14px;text-align:right;color:rgba(255,255,255,0.6);font-size:12px;">${Number(c.original_planned_qty || 0).toLocaleString('id-ID')} → <span style='color:#34d399;font-weight:700;'>${Number(c.new_planned_qty || 0).toLocaleString('id-ID')}</span></td>
+                <td style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:12px;max-width:200px;">${esc(String(c.reason || '—'))}</td>
+                <td style="padding:10px 14px;color:rgba(255,255,255,0.5);font-size:12px;">${esc(String(c.submitted_by || '—'))}</td>
+            </tr>`;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#f87171;">Gagal memuat: ${err.message}</td></tr>`;
+        if (countEl) countEl.textContent = '0 record';
+    }
+};
+
