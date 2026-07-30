@@ -450,35 +450,35 @@
             margin-left: 4px;
         }
 
-        /* ── NIGHT SKY GLASSMORPHISM THEME OVERRIDES ── */
+        /* ── VIVID NIGHT SKY GLASSMORPHISM THEME OVERRIDES ── */
         body {
-            background: #040914 !important;
+            background: #020617 !important;
             color: #f1f5f9 !important;
             min-height: 100vh;
             position: relative;
             overflow-x: hidden;
         }
 
-        /* ── ANIMATED NIGHT SKY GRADIENT BACKGROUND ── */
+        /* ── VIVID NIGHT SKY CELESTIAL GRADIENT BACKGROUND ── */
         .bg-gradient {
             position: fixed;
             inset: 0;
             background:
-                radial-gradient(ellipse 80% 60% at 15% 15%, rgba(59, 130, 246, 0.15) 0%, transparent 60%),
-                radial-gradient(ellipse 65% 55% at 85% 85%, rgba(30, 64, 175, 0.20) 0%, transparent 60%),
-                radial-gradient(ellipse 50% 50% at 50% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 70%),
-                linear-gradient(135deg, #030712 0%, #071326 50%, #040914 100%);
+                radial-gradient(ellipse 85% 65% at 10% 15%, rgba(37, 99, 235, 0.35) 0%, transparent 65%),
+                radial-gradient(ellipse 75% 60% at 90% 85%, rgba(30, 64, 175, 0.38) 0%, transparent 65%),
+                radial-gradient(ellipse 60% 50% at 50% 50%, rgba(56, 189, 248, 0.18) 0%, transparent 65%),
+                linear-gradient(135deg, #020617 0%, #0a1835 50%, #030816 100%);
             z-index: -2;
             pointer-events: none;
         }
 
-        /* ── CRISP 40PX GRID PATTERN OVERLAY (SAME AS IQC MATERIAL) ── */
+        /* ── CRISP & VISIBLE 40PX GRID PATTERN OVERLAY (SAME AS IQC MATERIAL) ── */
         .grid-overlay, .grid-bg {
             position: fixed;
             inset: 0;
             background-image:
-                linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+                linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
             background-size: 40px 40px;
             z-index: -1;
             pointer-events: none;
@@ -486,11 +486,11 @@
 
         /* Header / Navbar */
         header {
-            background: rgba(10, 18, 35, 0.75) !important;
-            backdrop-filter: blur(20px) !important;
-            -webkit-backdrop-filter: blur(20px) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4) !important;
+            background: rgba(8, 16, 32, 0.7) !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45) !important;
             color: white !important;
         }
         header div, header button, header span {
@@ -499,46 +499,46 @@
 
         /* Side Navigation */
         aside {
-            background: rgba(10, 18, 35, 0.6) !important;
-            backdrop-filter: blur(16px) !important;
-            -webkit-backdrop-filter: blur(16px) !important;
-            border-right: 1px solid rgba(255, 255, 255, 0.09) !important;
+            background: rgba(8, 16, 32, 0.55) !important;
+            backdrop-filter: blur(16px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
         }
 
         /* Navigation links styling */
         .nav-link, .sidenav-link {
-            color: rgba(255, 255, 255, 0.55) !important;
+            color: rgba(255, 255, 255, 0.6) !important;
             transition: all 0.2s ease !important;
         }
         .nav-link:hover, .sidenav-link:hover {
             color: white !important;
-            background: rgba(255, 255, 255, 0.06) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
         }
         .nav-link.active, .sidenav-link.active {
             color: #60a5fa !important;
-            background: rgba(255, 255, 255, 0.08) !important;
+            background: rgba(255, 255, 255, 0.1) !important;
             font-weight: 600;
         }
         .sidenav-link.active {
             border-right: 2.5px solid #3b82f6 !important;
         }
 
-        /* General layout cards (Vivid Glassmorphism) */
+        /* General layout cards (Vivid Translucent Glassmorphism) */
         .bg-white, .card, .stat-card {
-            background: rgba(13, 23, 42, 0.65) !important;
-            backdrop-filter: blur(16px) !important;
-            -webkit-backdrop-filter: blur(16px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.09) !important;
+            background: rgba(10, 22, 40, 0.45) !important;
+            backdrop-filter: blur(16px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
             border-radius: 16px !important;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
             color: #f1f5f9 !important;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
 
         .bg-white:hover, .card:hover, .stat-card:hover {
-            border-color: rgba(59, 130, 246, 0.3) !important;
-            background: rgba(15, 28, 52, 0.75) !important;
-            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.12) !important;
+            border-color: rgba(96, 165, 250, 0.45) !important;
+            background: rgba(14, 30, 56, 0.6) !important;
+            box-shadow: 0 12px 36px rgba(37, 99, 235, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
         }
 
         /* Subcont metric numbers colors */
