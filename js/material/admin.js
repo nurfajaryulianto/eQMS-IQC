@@ -2,7 +2,7 @@
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload } from './auth.js';
 import { showAlert } from '../dialog.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -12,11 +12,11 @@ let currentUser = null;
 
 // ─── MOCK DATA ────────────────────────────────────────────────
 const MOCK_MASTER_DATA = [
-    { po_number: 'PO-2025-001', material_name: 'Upper Leather — Type A', vendor_name: 'PT Sumber Makmur', uom: 'pcs', planned_qty: 500, status: 'pending' },
-    { po_number: 'PO-2025-002', material_name: 'Outsole Rubber B-Grade', vendor_name: 'CV Karet Nusantara', uom: 'pcs', planned_qty: 300, status: 'pending' },
-    { po_number: 'PO-2025-003', material_name: 'EVA Midsole Foam', vendor_name: 'PT Foam Indo', uom: 'pcs', planned_qty: 200, status: 'done' },
-    { po_number: 'PO-2025-004', material_name: 'Textile Lace Flat 120cm', vendor_name: 'PT Sumber Makmur', uom: 'set', planned_qty: 400, status: 'pending' },
-    { po_number: 'PO-2025-005', material_name: 'Thread Nylon 40 Black', vendor_name: 'CV Benang Jaya', uom: 'spool', planned_qty: 150, status: 'pending' },
+    { po_number: 'PO-2025-001', material_name: 'Upper Leather — Type A', vendor_name: 'PT Sumber Makmur', uom: 'pcs', planned_qty: 500, status: 'pending', row_idx: 2 },
+    { po_number: 'PO-2025-002', material_name: 'Outsole Rubber B-Grade', vendor_name: 'CV Karet Nusantara', uom: 'pcs', planned_qty: 300, status: 'pending', row_idx: 3 },
+    { po_number: 'PO-2025-003', material_name: 'EVA Midsole Foam', vendor_name: 'PT Foam Indo', uom: 'pcs', planned_qty: 200, status: 'done', row_idx: 4 },
+    { po_number: 'PO-2025-004', material_name: 'Textile Lace Flat 120cm', vendor_name: 'PT Sumber Makmur', uom: 'set', planned_qty: 400, status: 'pending', row_idx: 5 },
+    { po_number: 'PO-2025-005', material_name: 'Thread Nylon 40 Black', vendor_name: 'CV Benang Jaya', uom: 'spool', planned_qty: 150, status: 'pending', row_idx: 6 },
 ];
 
 // ─── INIT ─────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ window.loadMasterData = async function () {
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData&status=all`);
+            const res = await fetch(`${gasAuthedUrl('getMasterData')}&status=all`);
             if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke Google Apps Script Web App`);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
@@ -132,12 +132,17 @@ window.renderMasterTable = function () {
     }
 
     tbody.innerHTML = filtered.map(d => {
-        const badge = d.status === 'done'
-            ? `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`
-            : `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
+        let badge;
+        if (d.status === 'done') {
+            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`;
+        } else if (d.status === 'in-progress') {
+            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);">In Progress</span>`;
+        } else {
+            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
+        }
         const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0;
         const claimBtn = hasInspection
-            ? `<button onclick="window.openClaimModal('${esc(d.po_number)}')" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
+            ? `<button onclick="window.openClaimModal(${d.row_idx})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
             : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
@@ -170,7 +175,7 @@ window.downloadTemplate = async function () {
     }
 
     try {
-        const res = await fetch(`${MATERIAL_GAS_URL}?action=generateTemplate`);
+        const res = await fetch(gasAuthedUrl('generateTemplate'));
         const text = await res.text();
         downloadCSV(text, 'template_master_data_iqc_material.csv');
         showToast('Template berhasil didownload!', 'success');
@@ -337,11 +342,11 @@ window.confirmUpload = async function () {
             });
             setLoading(false);
         } else {
-            const payload = {
+            const payload = gasAuthedPayload({
                 action: 'bulkUpsertMasterData',
                 rows: parsedFileData,
                 uploader_nik: currentUser?.nik || 'admin',
-            };
+            });
             const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
             const json = await res.json();
             if (json.error) throw new Error(json.error);
@@ -566,13 +571,13 @@ window.confirmPassAll = async function () {
             return;
         }
 
-        const payload = {
+        const payload = gasAuthedPayload({
             action: 'passAll',
             admin_nik: currentUser?.nik || 'admin',
             admin_name: currentUser?.name || 'Admin Material',
             po_numbers: selectedItems.map(item => item.po),
             row_indexes: selectedItems.filter(item => item.rowIdx).map(item => item.rowIdx)
-        };
+        });
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
@@ -657,7 +662,7 @@ window.loadMaterialAssignments = async function () {
                 { material_type: 'TEXTILE', inspector_nik: 'inspector2', inspector_name: 'Siti Rahma', updated_by: 'Admin Material', updated_at: '2026-07-21T11:30:00Z' },
             ];
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getMaterialAssignments`);
+            const res = await fetch(gasAuthedUrl('getMaterialAssignments'));
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allAssignments = json.data || [];
@@ -692,7 +697,7 @@ async function populateAssignmentFormOptions() {
                     { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector' }
                 ];
             } else {
-                const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+                const res = await fetch(gasAuthedUrl('getUsers'));
                 const json = await res.json();
                 allUsers = json.data || [];
             }
@@ -756,6 +761,7 @@ window.handleAssignmentSubmit = async function (e) {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
+            // FIX: cari berdasarkan material_type di allAssignments, bukan row_idx di allMasterData
             const idx = allAssignments.findIndex(a => a.material_type.toLowerCase() === materialType.toLowerCase());
             const now = new Date().toISOString();
             if (idx >= 0) {
@@ -770,13 +776,13 @@ window.handleAssignmentSubmit = async function (e) {
             return;
         }
 
-        const payload = {
+        const payload = gasAuthedPayload({
             action: 'saveMaterialAssignment',
             material_type: materialType,
             inspector_nik: inspectorNik,
             inspector_name: inspectorName,
             updated_by: currentUser?.name || currentUser?.nik || 'Admin'
-        };
+        });
 
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
@@ -842,7 +848,7 @@ window.deleteAssignment = async function (materialType) {
             return;
         }
 
-        const payload = { action: 'deleteMaterialAssignment', material_type: materialType };
+        const payload = gasAuthedPayload({ action: 'deleteMaterialAssignment', material_type: materialType });
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
@@ -887,7 +893,7 @@ window.loadUsersList = async function () {
                 { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', material_assignment: 'TEXTILE', created_at: '2026-07-14T09:45:00Z' },
             ];
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+            const res = await fetch(gasAuthedUrl('getUsers'));
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allUsers = json.data || [];
@@ -974,14 +980,14 @@ window.handleUserSubmit = async function (e) {
 
     setLoading(true, 'Menyimpan data user...');
 
-    const payload = {
+    const payload = gasAuthedPayload({
         action: 'saveUser',
         nik: nik,
         name: name,
         role: role,
         material_assignment: matAssignment,
         password: password || undefined
-    };
+    });
 
     try {
         if (MATERIAL_TEST_MODE) {
@@ -1072,7 +1078,7 @@ window.deleteUser = async function (nik) {
         } else {
             const res = await fetch(MATERIAL_GAS_URL, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'deleteUser', nik: nikStr })
+                body: JSON.stringify(gasAuthedPayload({ action: 'deleteUser', nik: nikStr }))
             });
             const json = await res.json();
             if (json.error) throw new Error(json.error);
@@ -1135,7 +1141,7 @@ window.loadSpreadsheetStatus = async function () {
             return;
         }
 
-        const res = await fetch(`${MATERIAL_GAS_URL}?action=getStatus`);
+        const res = await fetch(gasAuthedUrl('getStatus'));
         if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
         const data = await res.json();
 
@@ -1267,7 +1273,7 @@ window.loadLeaderMonitorLog = async function () {
                 }
             ];
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getInspectionData`);
+            const res = await fetch(gasAuthedUrl('getInspectionData'));
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allLeaderMonitorInspections = json.data || [];
@@ -1402,8 +1408,8 @@ function populatePassAllMaterialTypeFilter() {
 
 let claimTargetData = null;
 
-window.openClaimModal = function (poNumber) {
-    const d = allMasterData.find(m => m.po_number === poNumber);
+window.openClaimModal = function (rowIdx) {
+    const d = allMasterData.find(m => m.row_idx === rowIdx);
     if (!d) { showToast('Data tidak ditemukan.', 'error'); return; }
 
     claimTargetData = d;
@@ -1469,7 +1475,9 @@ window.submitClaim = async function () {
     try {
         if (MATERIAL_TEST_MODE) {
             await new Promise(r => setTimeout(r, 1000));
-            const idx = allMasterData.findIndex(m => m.po_number === claimTargetData.po_number);
+            // FIX: cari berdasarkan row_idx, bukan po_number, supaya tidak salah sasaran
+            // ketika satu PO punya beberapa baris material.
+            const idx = allMasterData.findIndex(m => m.row_idx === claimTargetData.row_idx);
             if (idx >= 0) allMasterData[idx].planned_qty -= claimQty;
             window.closeClaimModal();
             renderMasterTable();
@@ -1477,14 +1485,16 @@ window.submitClaim = async function () {
             return;
         }
 
-        const payload = {
+        const payload = gasAuthedPayload({
             action: 'submitClaim',
+            row_idx: claimTargetData.row_idx,
             po_number: claimTargetData.po_number,
+            material_name: claimTargetData.material_name,
             claim_qty: claimQty,
             reason,
             ref_number: refNumber,
             submitted_by: currentUser?.name || currentUser?.nik || 'admin'
-        };
+        });
 
         const res = await fetch(MATERIAL_GAS_URL, {
             method: 'POST',
@@ -1519,7 +1529,7 @@ window.loadClaimsHistory = async function () {
             return;
         }
 
-        const res = await fetch(`${MATERIAL_GAS_URL}?action=getClaims`);
+        const res = await fetch(gasAuthedUrl('getClaims'));
         const json = await res.json();
         if (json.error) throw new Error(json.error);
 
@@ -1565,9 +1575,9 @@ window.syncOrphanedStatus = async function () {
 
     setLoading(true, 'Memeriksa sinkronisasi data...');
     try {
-        const res  = await fetch(MATERIAL_GAS_URL, {
+        const res = await fetch(MATERIAL_GAS_URL, {
             method: 'POST',
-            body: JSON.stringify({ action: 'resetOrphanedStatus' })
+            body: JSON.stringify(gasAuthedPayload({ action: 'resetOrphanedStatus' }))
         });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
