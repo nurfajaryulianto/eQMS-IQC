@@ -29,7 +29,7 @@ export function nikToEmail(nik) {
 // ─── CONFIG ──────────────────────────────────────────────────
 // Sama dengan URL GAS Material — akan di-overrride oleh import di setiap module
 // tapi kita export agar mudah di-update dari satu tempat
-export const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
+export const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxPpUaDT-1xipllWqR4d-hrEDCK2AcR5d5oM7euWuTVIcSXyNXohz4dE5MK85WeIL8pRQ/exec';
 
 const SESSION_KEY = 'iqc_material_session_v1';
 const LOGIN_PAGE  = '/material/login.html';
