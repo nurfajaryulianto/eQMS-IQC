@@ -3,6 +3,82 @@
 // Deploy sebagai Web App (akses: Anyone) lalu salin URL ke form.js
 // ============================================================
 
+// ─── AUTH CONFIG ──────────────────────────────────────────────
+var SUPABASE_URL_AUTH = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
+var SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bXpzenVmcndtcGtwbW1sbm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzgwODksImV4cCI6MjA5Mjg1NDA4OX0.gGu3xJ0yjUmLncz277gGSP8qiV8TiBrlJvg3C-t6ZJw'; // jangan hardcode service_role key di sini
+
+// Peta: action mana boleh diakses role apa
+var ACTION_ROLES = {
+  // Read-only, semua role login boleh
+  getMasterData: ['admin','supervisor','manager','inspector'],
+  getInspectionData: ['admin','supervisor','manager','inspector'],
+  getUsers: ['admin'],
+  getMaterialAssignments: ['admin','supervisor','manager'],
+  getClaims: ['admin','supervisor','manager'],
+  getStatus: ['admin','supervisor','manager','inspector'],
+  ping: ['admin','supervisor','manager','inspector'],
+  generateTemplate: ['admin'],
+
+  // Mutating — dibatasi lebih ketat
+  submitInspection: ['admin','inspector'],
+  bulkUpsertMasterData: ['admin'],
+  passAll: ['admin'],
+  saveUser: ['admin'],
+  deleteUser: ['admin'],
+  saveMaterialAssignment: ['admin'],
+  deleteMaterialAssignment: ['admin'],
+  submitClaim: ['admin','supervisor'],
+  resetOrphanedStatus: ['admin'],
+  syncMasterDataStatus: ['admin'],
+};
+
+/**
+ * Memverifikasi access_token Supabase dan mengambil role/module dari user_metadata.
+ * Melempar Error jika token tidak valid/kedaluwarsa.
+ */
+function verifySession(token) {
+  if (!token) throw new Error('Unauthorized: token tidak disertakan.');
+
+  var resp = UrlFetchApp.fetch(SUPABASE_URL_AUTH + '/auth/v1/user', {
+    method: 'get',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + token
+    },
+    muteHttpExceptions: true
+  });
+
+  if (resp.getResponseCode() !== 200) {
+    throw new Error('Unauthorized: sesi tidak valid atau sudah kedaluwarsa.');
+  }
+
+  var body = JSON.parse(resp.getContentText());
+  var meta = body.user_metadata || {};
+  return {
+    nik: meta.nik || '',
+    role: String(meta.role || 'inspector').toLowerCase(),
+    module: String(meta.module || meta.app_module || 'both').toLowerCase()
+  };
+}
+
+/**
+ * Memastikan action diizinkan untuk role yang terverifikasi.
+ * Melempar Error jika tidak diizinkan.
+ */
+function authorizeAction(action, token) {
+  var allowedRoles = ACTION_ROLES[action];
+  if (!allowedRoles) throw new Error('Unauthorized: action tidak dikenali.');
+
+  var session = verifySession(token);
+  if (session.module !== 'material' && session.module !== 'both') {
+    throw new Error('Unauthorized: akun tidak memiliki akses ke modul Material.');
+  }
+  if (allowedRoles.indexOf(session.role) === -1) {
+    throw new Error('Unauthorized: role "' + session.role + '" tidak diizinkan untuk action ini.');
+  }
+  return session;
+}
+
 // ─── SPREADSHEET CONFIG ──────────────────────────────────────
 var SPREADSHEET_ID = '13C5MdJR_WN1A6wUzlRXCPCz6hKRoiR3Mg-0p_lMLblQ';
 
@@ -65,8 +141,12 @@ function setupInspectionHeaders() {
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
+  var token  = (e && e.parameter && e.parameter.token) ? e.parameter.token : '';
   try {
+    authorizeAction(action, token); // ← BARU: validasi sebelum apa pun dieksekusi
+
     if (action === 'getMasterData')          return jsonResponse(getMasterData(e.parameter));
+    if (action === 'syncMasterDataStatus')   return jsonResponse(syncMasterDataStatus());
     if (action === 'getInspectionData')      return jsonResponse(getInspectionData(e.parameter));
     if (action === 'getUsers')               return jsonResponse(getUsers());
     if (action === 'getMaterialAssignments') return jsonResponse(getMaterialAssignments());
@@ -81,7 +161,7 @@ function doGet(e) {
         spreadsheetUrl: ss.getUrl()
       });
     }
-    if (action === 'ping')              return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() });
+    if (action === 'ping') return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() });
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -98,6 +178,8 @@ function doPost(e) {
 
   var action = payload.action || '';
   try {
+    authorizeAction(action, payload.token); // ← BARU: validasi sebelum apa pun dieksekusi
+
     if (action === 'submitInspection')        return jsonResponse(submitInspection(payload));
     if (action === 'bulkUpsertMasterData')    return jsonResponse(bulkUpsertMasterData(payload));
     if (action === 'passAll')                 return jsonResponse(passAll(payload));
@@ -113,15 +195,30 @@ function doPost(e) {
   }
 }
 
+
+
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
+
+  // ─── CACHE CHECK ─────────────────────────────────────────
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'master_data_v1_' + statusFilter;
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
   var data        = sheet.getDataRange().getValues();
   var displayData = sheet.getDataRange().getDisplayValues();
-  if (data.length < 2) return { data: [] };
+  if (data.length < 2) {
+    var emptyResult = { data: [] };
+    cache.put(cacheKey, JSON.stringify(emptyResult), 60);
+    return emptyResult;
+  }
 
   // DYNAMIC LIVE LOOKUP from "inspections" sheet for single source of truth & per-inspection status
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
@@ -129,10 +226,10 @@ function getMasterData(params) {
   if (inspSheet && inspSheet.getLastRow() > 1) {
     var inspData = inspSheet.getDataRange().getValues();
     for (var i = 1; i < inspData.length; i++) {
-      var mName = String(inspData[i][1] || '').trim().toLowerCase(); // Col B (index 1) is material_name
-      var pNo = String(inspData[i][7] || '').trim().toLowerCase();   // Col H (index 7) is po_no
-      var rQty = String(Number(inspData[i][8]) || 0).trim();         // Col I (index 8) is qty_receive
-      var rDate = normalizeDateStr(inspData[i][15]);                 // Col P (index 15) is receive_date
+      var mName = String(inspData[i][1] || '').trim().toLowerCase();
+      var pNo = String(inspData[i][7] || '').trim().toLowerCase();
+      var rQty = String(Number(inspData[i][8]) || 0).trim();
+      var rDate = normalizeDateStr(inspData[i][15]);
       if (!pNo) continue;
 
       var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
@@ -161,7 +258,6 @@ function getMasterData(params) {
 
       keys.forEach(function(k) {
         inspMap[k].checked_qty += (okQty + noQty);
-
         if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
           if (iStatus === 'done') inspMap[k].raw_done = true;
         }
@@ -177,14 +273,13 @@ function getMasterData(params) {
   }
 
   var result = [];
-  var mdUpdated = false;
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
     var disp = displayData[r];
 
     var poVal = String(row[12] || '').trim();
-    if (!poVal) continue; // skip rows without PO number
+    if (!poVal) continue;
 
     var matNameVal = String(row[1] || '').trim().toLowerCase();
     var plannedQty = Number(row[7]) || 0;
@@ -198,7 +293,6 @@ function getMasterData(params) {
 
     var inspInfo = inspMap[fullKey] || inspMap[key3] || inspMap[key2];
 
-    // Calculate dynamic checked_qty & status based on live inspections sheet
     var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
     var rawDone = inspInfo ? (inspInfo.raw_done || (checkedQty >= plannedQty && plannedQty > 0)) : false;
     var lamDone = inspInfo ? inspInfo.laminating_done : false;
@@ -206,7 +300,6 @@ function getMasterData(params) {
 
     var dynamicStatus = 'pending';
     if (!inspInfo) {
-      // No active rows in inspections sheet -> automatically reset to 'pending'!
       dynamicStatus = 'pending';
     } else if (rawDone || checkedQty >= plannedQty) {
       dynamicStatus = 'done';
@@ -214,19 +307,8 @@ function getMasterData(params) {
       dynamicStatus = 'in-progress';
     }
 
-    // --- SELF-HEALING DATABASE SYNC ---
-    // If the physical cell values for status (Col S / index 18) or checked_qty (Col V / index 21)
-    // in master_data sheet differ from the dynamically computed status, update them in real-time.
-    var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
-    var currentStoredQty = row[21] === '' ? 0 : (Number(row[21]) || 0);
-
-    var expectedStoredQty = (dynamicStatus === 'done' || dynamicStatus === 'pending') ? '' : checkedQty;
-
-    if (currentStoredStatus !== dynamicStatus || String(currentStoredQty) !== String(expectedStoredQty)) {
-      row[18] = dynamicStatus;
-      row[21] = expectedStoredQty;
-      mdUpdated = true;
-    }
+    // NOTE: Self-healing write-back DIHAPUS dari sini.
+    // Gunakan action 'syncMasterDataStatus' terpisah untuk itu (lihat fungsi baru di bawah).
 
     if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
 
@@ -267,18 +349,20 @@ function getMasterData(params) {
     });
   }
 
-  // Save the self-healed changes to master_data sheet in 1 single bulk API call
-  if (mdUpdated) {
-    var numCols = Math.max(data[0].length, 22);
-    for (var i = 0; i < data.length; i++) {
-      while (data[i].length < numCols) {
-        data[i].push('');
-      }
+  var finalResult = { data: result, total: result.length };
+
+  // ─── SAVE TO CACHE (60 detik) ──────────────────────────────
+  try {
+    var payload = JSON.stringify(finalResult);
+    // CacheService punya limit 100KB per key; kalau kelewat, skip caching daripada error
+    if (payload.length < 95000) {
+      cache.put(cacheKey, payload, 60);
     }
-    sheet.getRange(1, 1, data.length, numCols).setValues(data);
+  } catch (e) {
+    // Cache put gagal (misal payload kebesaran) — tidak masalah, lanjut tanpa cache
   }
 
-  return { data: result, total: result.length };
+  return finalResult;
 }
 
 // ─── RESET ORPHANED STATUS ────────────────────────────────────
@@ -364,6 +448,121 @@ function resetOrphanedStatus() {
         ? resetCount + ' baris direset ke "pending" karena tidak ada data inspeksi yang sesuai.'
         : 'Semua data sudah sinkron — tidak ada baris yang perlu direset.',
       reset_count: resetCount
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ─── SYNC MASTER DATA STATUS (Manual Trigger) ──────────────────
+// Menjalankan proses self-healing yang dulu berjalan otomatis di getMasterData.
+// Sekarang dipanggil manual lewat tombol "Sync Status" di UI.
+function syncMasterDataStatus() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
+    if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return { status: 'ok', message: 'Tidak ada data.', updated_count: 0 };
+
+    var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+    var inspMap = {};
+    if (inspSheet && inspSheet.getLastRow() > 1) {
+      var inspData = inspSheet.getDataRange().getValues();
+      for (var i = 1; i < inspData.length; i++) {
+        var mName = String(inspData[i][1] || '').trim().toLowerCase();
+        var pNo = String(inspData[i][7] || '').trim().toLowerCase();
+        var rQty = String(Number(inspData[i][8]) || 0).trim();
+        var rDate = normalizeDateStr(inspData[i][15]);
+        if (!pNo) continue;
+
+        var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
+        var key3    = pNo + '___' + mName + '___' + rQty;
+        var key2    = mName ? (pNo + '___' + mName) : pNo;
+
+        var keys = [fullKey, key3, key2];
+        keys.forEach(function(k) {
+          if (!inspMap[k]) {
+            inspMap[k] = { checked_qty: 0, raw_done: false, has_any_inspection: true };
+          }
+        });
+
+        var iType = String(inspData[i][27] || '').trim();
+        var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
+        var okQty = Number(inspData[i][9]) || 0;
+        var noQty = Number(inspData[i][10]) || 0;
+
+        keys.forEach(function(k) {
+          inspMap[k].checked_qty += (okQty + noQty);
+          if (iType.indexOf('Raw Material') >= 0 && iStatus === 'done') {
+            inspMap[k].raw_done = true;
+          }
+        });
+      }
+    }
+
+    var numCols = Math.max(data[0].length, 22);
+    var updatedCount = 0;
+    var mdUpdated = false;
+
+    for (var r = 1; r < data.length; r++) {
+      var row = data[r];
+      while (row.length < numCols) row.push('');
+
+      var poVal = String(row[12] || '').trim();
+      if (!poVal) continue;
+
+      var matNameVal = String(row[1] || '').trim().toLowerCase();
+      var plannedQty = Number(row[7]) || 0;
+      var poKey      = poVal.toLowerCase();
+      var rDateVal   = normalizeDateStr(row[11]);
+      var qtyKeyStr  = String(plannedQty).trim();
+
+      var fullKey = poKey + '___' + rDateVal + '___' + matNameVal + '___' + qtyKeyStr;
+      var key3    = poKey + '___' + matNameVal + '___' + qtyKeyStr;
+      var key2    = poKey + '___' + matNameVal;
+
+      var inspInfo = inspMap[fullKey] || inspMap[key3] || inspMap[key2];
+      var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
+      var rawDone = inspInfo ? (inspInfo.raw_done || (checkedQty >= plannedQty && plannedQty > 0)) : false;
+
+      var dynamicStatus = 'pending';
+      if (!inspInfo) {
+        dynamicStatus = 'pending';
+      } else if (rawDone || checkedQty >= plannedQty) {
+        dynamicStatus = 'done';
+      } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
+        dynamicStatus = 'in-progress';
+      }
+
+      var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
+      var currentStoredQty = row[21] === '' ? 0 : (Number(row[21]) || 0);
+      var expectedStoredQty = (dynamicStatus === 'done' || dynamicStatus === 'pending') ? '' : checkedQty;
+
+      if (currentStoredStatus !== dynamicStatus || String(currentStoredQty) !== String(expectedStoredQty)) {
+        row[18] = dynamicStatus;
+        row[21] = expectedStoredQty;
+        mdUpdated = true;
+        updatedCount++;
+      }
+    }
+
+    if (mdUpdated) {
+      sheet.getRange(1, 1, data.length, numCols).setValues(data);
+      // Invalidate cache karena data sudah berubah
+      var cache = CacheService.getScriptCache();
+      cache.removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+    }
+
+    return {
+      status: 'ok',
+      message: updatedCount > 0
+        ? updatedCount + ' baris berhasil disinkronkan.'
+        : 'Semua data sudah sinkron — tidak ada baris yang perlu diupdate.',
+      updated_count: updatedCount
     };
   } finally {
     lock.releaseLock();
@@ -505,6 +704,8 @@ function bulkUpsertMasterData(payload) {
       });
       sheet.getRange(currentLastRow + 1, 1, insertRows.length, insertRows[0].length).setValues(insertRows);
     }
+
+    CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
 
     return {
       status:  'ok',
@@ -1092,6 +1293,8 @@ function passAll(payload) {
         .setValues(newInspRows);
     }
 
+    CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+
     return {
       status:  'ok',
       message: `Pass All selesai: ${count} item ditandai sebagai Pass.`,
@@ -1456,16 +1659,18 @@ function getOrCreateSubfolder(parentFolder, folderName) {
 
 /**
  * submitClaim — Kurangi planned_qty di master_data, catat di sheet 'claims'
- * Payload: { po_number, claim_qty, reason, ref_number, submitted_by }
+ * Payload: { row_idx, po_number, material_name, claim_qty, reason, ref_number, submitted_by }
  */
 function submitClaim(payload) {
+  var rowIdx      = payload.row_idx ? Number(payload.row_idx) : null;
   var poNumber    = String(payload.po_number || '').trim();
+  var materialName= String(payload.material_name || '').trim().toLowerCase();
   var claimQty    = Number(payload.claim_qty);
   var reason      = String(payload.reason || '').trim();
   var refNumber   = String(payload.ref_number || '').trim();
   var submittedBy = String(payload.submitted_by || 'admin').trim();
 
-  if (!poNumber) throw new Error('PO number tidak boleh kosong.');
+  if (!poNumber && !rowIdx) throw new Error('PO number atau row_idx tidak boleh kosong.');
   if (!claimQty || claimQty <= 0) throw new Error('Qty klaim harus lebih dari 0.');
   if (!reason) throw new Error('Alasan klaim tidak boleh kosong.');
 
@@ -1476,79 +1681,81 @@ function submitClaim(payload) {
   var data    = mdSheet.getDataRange().getValues();
   var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
 
-  var poCol       = headers.indexOf('po_number');
+  var poCol       = headers.indexOf('po_number') >= 0 ? headers.indexOf('po_number') : 12;
   var plannedCol  = headers.indexOf('planned_qty') >= 0 ? headers.indexOf('planned_qty') : 7;
   var matNameCol  = headers.indexOf('material_name') >= 0 ? headers.indexOf('material_name') : 1;
   var vendorCol   = headers.indexOf('supplier_name') >= 0 ? headers.indexOf('supplier_name') : 5;
   var matTypeCol  = headers.indexOf('material_type') >= 0 ? headers.indexOf('material_type') : 17;
 
-  if (poCol < 0) poCol = 12; // fallback: col M (index 12)
-
   var targetRowIdx = -1;
   var originalPlannedQty = 0;
-  var materialName = '';
+  var materialNameActual = '';
   var vendorName = '';
   var materialType = '';
 
-  for (var r = 1; r < data.length; r++) {
-    var rowPo = String(data[r][poCol] || '').trim();
-    if (rowPo.toLowerCase() === poNumber.toLowerCase()) {
-      targetRowIdx = r;
-      originalPlannedQty = Number(data[r][plannedCol]) || 0;
-      materialName = String(data[r][matNameCol] || '').trim();
-      vendorName   = String(data[r][vendorCol] || '').trim();
-      materialType = String(data[r][matTypeCol] || '').trim();
-      break;
+  // PRIORITAS 1: cari via row_idx (paling presisi — row_idx = r+1 dari getMasterData)
+  if (rowIdx && data[rowIdx - 1]) {
+    var candidate = data[rowIdx - 1];
+    var candidatePo = String(candidate[poCol] || '').trim();
+    // Verifikasi PO cocok, untuk jaga-jaga kalau sheet berubah antara load & submit
+    if (candidatePo.toLowerCase() === poNumber.toLowerCase()) {
+      targetRowIdx = rowIdx - 1;
+      originalPlannedQty = Number(candidate[plannedCol]) || 0;
+      materialNameActual = String(candidate[matNameCol] || '').trim();
+      vendorName   = String(candidate[vendorCol] || '').trim();
+      materialType = String(candidate[matTypeCol] || '').trim();
     }
   }
 
-  if (targetRowIdx < 0) throw new Error('PO "' + poNumber + '" tidak ditemukan di master data.');
-  if (claimQty >= originalPlannedQty) throw new Error('Qty klaim (' + claimQty + ') tidak boleh melebihi atau sama dengan planned qty (' + originalPlannedQty + '). Gunakan mekanisme penghapusan jika seluruh material diklaim.');
+  // FALLBACK: cari via po_number + material_name (kompatibilitas lama)
+  if (targetRowIdx < 0) {
+    for (var r = 1; r < data.length; r++) {
+      var rowPo = String(data[r][poCol] || '').trim();
+      var rowMat = String(data[r][matNameCol] || '').trim().toLowerCase();
+      if (rowPo.toLowerCase() === poNumber.toLowerCase() && (!materialName || rowMat === materialName)) {
+        targetRowIdx = r;
+        originalPlannedQty = Number(data[r][plannedCol]) || 0;
+        materialNameActual = String(data[r][matNameCol] || '').trim();
+        vendorName   = String(data[r][vendorCol] || '').trim();
+        materialType = String(data[r][matTypeCol] || '').trim();
+        break;
+      }
+    }
+  }
+
+  if (targetRowIdx < 0) throw new Error('Data material untuk PO "' + poNumber + '" tidak ditemukan atau tidak cocok lagi — silakan refresh data dan coba lagi.');
+  if (claimQty >= originalPlannedQty) throw new Error('Qty klaim (' + claimQty + ') tidak boleh melebihi atau sama dengan planned qty (' + originalPlannedQty + ').');
 
   var newPlannedQty = originalPlannedQty - claimQty;
-
-  // Update planned_qty in master_data sheet
   mdSheet.getRange(targetRowIdx + 1, plannedCol + 1).setValue(newPlannedQty);
 
-  // Write to claims sheet (auto-create if not exist)
   var claimSheet = ss.getSheetByName(SHEET.CLAIMS);
   if (!claimSheet) {
     claimSheet = ss.insertSheet(SHEET.CLAIMS);
     claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length).setValues([CLAIMS_HEADERS]);
-    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length)
-      .setFontWeight('bold')
-      .setBackground('#1d4ed8')
-      .setFontColor('#ffffff');
+    claimSheet.getRange(1, 1, 1, CLAIMS_HEADERS.length).setFontWeight('bold').setBackground('#1d4ed8').setFontColor('#ffffff');
   }
 
-  var lastRow     = claimSheet.getLastRow();
-  var nextNo      = lastRow; // row 1 is header, so lastRow gives the count
-  var claimDate   = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  var lastRow   = claimSheet.getLastRow();
+  var nextNo    = lastRow;
+  var claimDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 
-  var newClaimRow = [
-    nextNo,
-    claimDate,
-    poNumber,
-    materialName,
-    vendorName,
-    materialType,
-    claimQty,
-    reason,
-    refNumber,
-    submittedBy,
-    originalPlannedQty,
-    newPlannedQty
-  ];
+  claimSheet.appendRow([
+    nextNo, claimDate, poNumber, materialNameActual, vendorName, materialType,
+    claimQty, reason, refNumber, submittedBy, originalPlannedQty, newPlannedQty
+  ]);
 
-  claimSheet.appendRow(newClaimRow);
+  // Invalidasi cache karena master_data berubah
+  CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
 
   return {
     success: true,
     po_number: poNumber,
+    material_name: materialNameActual,
     original_planned_qty: originalPlannedQty,
     claimed_qty: claimQty,
     new_planned_qty: newPlannedQty,
-    message: 'Klaim berhasil. Planned Qty diperbarui dari ' + originalPlannedQty + ' menjadi ' + newPlannedQty + '.'
+    message: 'Klaim berhasil untuk ' + materialNameActual + '. Planned Qty diperbarui dari ' + originalPlannedQty + ' menjadi ' + newPlannedQty + '.'
   };
 }
 
