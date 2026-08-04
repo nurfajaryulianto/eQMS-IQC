@@ -59,10 +59,7 @@ function setupInspectionHeaders() {
   Logger.log("Berhasil memperbarui Baris 1 sheet 'inspections' dengan 35 kolom header lengkap!");
 }
 
-function jsonResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data || {}))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+
 
 // ─── ENTRY POINTS ─────────────────────────────────────────────
 

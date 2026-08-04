@@ -74,6 +74,7 @@ window.loadMasterData = async function () {
             allMasterData = MOCK_MASTER_DATA;
         } else {
             const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData&status=all`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke Google Apps Script Web App`);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
 
