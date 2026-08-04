@@ -234,3 +234,15 @@ export function redirectIfLoggedIn() {
         }
     }
 }
+
+// ─── HELPER: FETCH KE GAS DENGAN TOKEN ────────────────────────
+export function gasAuthedUrl(baseAction) {
+    const session = getSession();
+    const token = session?.token || '';
+    return `${MATERIAL_GAS_URL}?action=${baseAction}&token=${encodeURIComponent(token)}`;
+}
+
+export function gasAuthedPayload(payload) {
+    const session = getSession();
+    return { ...payload, token: session?.token || '' };
+}
