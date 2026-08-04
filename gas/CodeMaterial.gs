@@ -935,6 +935,8 @@ function passAll(payload) {
       inspMapByItem[key2]    = r + 1;
     }
 
+    var baseInspLastRow = inspSheet.getLastRow();
+
     for (var i = 1; i < data.length; i++) {
       var rowIdx = i + 1; // 1-based row index in Sheet
 
@@ -1031,7 +1033,7 @@ function passAll(payload) {
         
         INSPECTION_HEADERS.forEach(function(h) {
           if (h === 'no') {
-            newRow.push(inspSheet.getLastRow() + newInspRows.length);
+            newRow.push(baseInspLastRow + newInspRows.length);
           }
           else if (h === 'inspection_id') newRow.push(uniqueId);
           else if (h === 'po_no') newRow.push(poRaw);
@@ -1060,7 +1062,7 @@ function passAll(payload) {
 
         newInspRows.push(newRow);
 
-        var newRowIndex = inspSheet.getLastRow() + newInspRows.length;
+        var newRowIndex = baseInspLastRow + newInspRows.length;
         inspMapByItem[itemFullKey] = newRowIndex;
         inspMapByItem[itemKey3]    = newRowIndex;
         inspMapByItem[itemKey2]    = newRowIndex;
