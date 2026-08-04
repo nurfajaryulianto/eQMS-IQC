@@ -96,14 +96,15 @@ function doPost(e) {
 
   var action = payload.action || '';
   try {
-    if (action === 'submitInspection')       return jsonResponse(submitInspection(payload));
-    if (action === 'bulkUpsertMasterData')   return jsonResponse(bulkUpsertMasterData(payload));
-    if (action === 'passAll')                return jsonResponse(passAll(payload));
-    if (action === 'saveUser')               return jsonResponse(saveUser(payload));
-    if (action === 'deleteUser')             return jsonResponse(deleteUser(payload));
-    if (action === 'saveMaterialAssignment')   return jsonResponse(saveMaterialAssignment(payload));
-    if (action === 'deleteMaterialAssignment') return jsonResponse(deleteMaterialAssignment(payload));
-    if (action === 'submitClaim')            return jsonResponse(submitClaim(payload));
+    if (action === 'submitInspection')        return jsonResponse(submitInspection(payload));
+    if (action === 'bulkUpsertMasterData')    return jsonResponse(bulkUpsertMasterData(payload));
+    if (action === 'passAll')                 return jsonResponse(passAll(payload));
+    if (action === 'saveUser')                return jsonResponse(saveUser(payload));
+    if (action === 'deleteUser')              return jsonResponse(deleteUser(payload));
+    if (action === 'saveMaterialAssignment')  return jsonResponse(saveMaterialAssignment(payload));
+    if (action === 'deleteMaterialAssignment')return jsonResponse(deleteMaterialAssignment(payload));
+    if (action === 'submitClaim')             return jsonResponse(submitClaim(payload));
+    if (action === 'resetOrphanedStatus')     return jsonResponse(resetOrphanedStatus());
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -276,6 +277,95 @@ function getMasterData(params) {
   }
 
   return { data: result, total: result.length };
+}
+
+// ─── RESET ORPHANED STATUS ────────────────────────────────────
+// Memaksa sinkronisasi: setiap baris di master_data yang ber-status
+// 'done' tapi TIDAK memiliki baris inspeksi yang sesuai di sheet
+// 'inspections' akan direset ke 'pending' seketika.
+function resetOrphanedStatus() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var ss        = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var mdSheet   = ss.getSheetByName(SHEET.MASTER_DATA);
+    var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+    if (!mdSheet) throw new Error('Sheet master_data tidak ditemukan.');
+
+    var mdData = mdSheet.getDataRange().getValues();
+    if (mdData.length < 2) return { status: 'ok', message: 'Tidak ada data di master_data.', reset_count: 0 };
+
+    // Build inspMap from inspections sheet (same composite key as getMasterData)
+    var inspMap = {};
+    if (inspSheet && inspSheet.getLastRow() > 1) {
+      var inspData = inspSheet.getDataRange().getValues();
+      for (var i = 1; i < inspData.length; i++) {
+        var mName = String(inspData[i][1] || '').trim().toLowerCase();
+        var pNo   = String(inspData[i][7] || '').trim().toLowerCase();
+        var rQty  = String(Number(inspData[i][8]) || 0).trim();
+        var rDate = normalizeDateStr(inspData[i][15]);
+        if (!pNo) continue;
+
+        var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
+        var key3    = pNo + '___' + mName + '___' + rQty;
+        var key2    = mName ? (pNo + '___' + mName) : pNo;
+        inspMap[fullKey] = true;
+        inspMap[key3]    = true;
+        inspMap[key2]    = true;
+      }
+    }
+
+    var resetCount = 0;
+    var updated    = false;
+    var numCols    = Math.max(mdData[0].length, 22);
+
+    for (var r = 1; r < mdData.length; r++) {
+      var row        = mdData[r];
+      var poVal      = String(row[12] || '').trim();
+      if (!poVal) continue;
+
+      var currentStatus = String(row[18] || '').trim().toLowerCase();
+      if (currentStatus !== 'done') continue; // only care about rows stuck as 'done'
+
+      var matName   = String(row[1] || '').trim().toLowerCase();
+      var poKey     = poVal.toLowerCase();
+      var planned   = Number(row[7]) || 0;
+      var rDateVal  = normalizeDateStr(row[11]);
+      var qtyStr    = String(planned).trim();
+
+      var fKey = poKey + '___' + rDateVal + '___' + matName + '___' + qtyStr;
+      var k3   = poKey + '___' + matName + '___' + qtyStr;
+      var k2   = poKey + '___' + matName;
+
+      var hasInspection = !!(inspMap[fKey] || inspMap[k3] || inspMap[k2]);
+      if (!hasInspection) {
+        // No matching inspection row -> reset status to 'pending'
+        while (row.length < numCols) row.push('');
+        row[18] = 'pending';
+        row[21] = '';        // clear checked_qty
+        resetCount++;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      // Pad all rows to same column count before bulk write
+      for (var p = 0; p < mdData.length; p++) {
+        while (mdData[p].length < numCols) mdData[p].push('');
+      }
+      mdSheet.getRange(1, 1, mdData.length, numCols).setValues(mdData);
+    }
+
+    return {
+      status: 'ok',
+      message: resetCount > 0
+        ? resetCount + ' baris direset ke "pending" karena tidak ada data inspeksi yang sesuai.'
+        : 'Semua data sudah sinkron — tidak ada baris yang perlu direset.',
+      reset_count: resetCount
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Helper to extract values from uploaded Excel row object regardless of exact header casing/spacing
@@ -826,19 +916,23 @@ function passAll(payload) {
       });
     }
 
-    // Index existing inspection rows by PO number (Col H / index 7) to avoid duplicate rows
-    var inspMapByPO = {};
+    // Index existing inspection rows by PO + Material Name + Qty + Date (composite keys matching getMasterData)
+    var inspMapByItem = {};
     var existingInspData = inspSheet.getLastRow() > 1 ? inspSheet.getDataRange().getValues() : [];
     for (var r = 1; r < existingInspData.length; r++) {
-      var poKey = String(existingInspData[r][7] || '').trim().toLowerCase();
-      if (poKey) {
-        inspMapByPO[poKey] = r + 1;
-        var pParts = poKey.split(',');
-        pParts.forEach(function(pp) {
-          var cleanSub = pp.trim().toLowerCase();
-          if (cleanSub) inspMapByPO[cleanSub] = r + 1;
-        });
-      }
+      var mName = String(existingInspData[r][1] || '').trim().toLowerCase(); // Col B (index 1) is material_name
+      var pNo   = String(existingInspData[r][7] || '').trim().toLowerCase(); // Col H (index 7) is po_no
+      var rQty  = String(Number(existingInspData[r][8]) || 0).trim();         // Col I (index 8) is qty_receive
+      var rDate = normalizeDateStr(existingInspData[r][15]);                 // Col P (index 15) is receive_date
+      if (!pNo) continue;
+
+      var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
+      var key3    = pNo + '___' + mName + '___' + rQty;
+      var key2    = mName ? (pNo + '___' + mName) : pNo;
+
+      inspMapByItem[fullKey] = r + 1;
+      inspMapByItem[key3]    = r + 1;
+      inspMapByItem[key2]    = r + 1;
     }
 
     for (var i = 1; i < data.length; i++) {
@@ -873,27 +967,21 @@ function passAll(payload) {
 
       if (!isMatched) continue; // Skip if not matched
 
-      var qty = Number(data[i][7]) || 0; // batch_size is Col H (index 7)
-      var matType = String(data[i][17] || '').trim().toLowerCase(); // material_type is Col R (index 17)
-      var matName = String(data[i][1] || '').trim().toLowerCase();  // material_name is Col B (index 1)
+      var qty        = Number(data[i][7]) || 0;                      // batch_size is Col H (index 7)
+      var matType    = String(data[i][17] || '').trim().toLowerCase(); // material_type is Col R (index 17)
+      var matName    = String(data[i][1] || '').trim().toLowerCase();  // material_name is Col B (index 1)
+      var rDateVal   = normalizeDateStr(data[i][11]);                 // receive_date is Col L (index 11)
+      var qtyKeyStr  = String(qty).trim();
+
+      var itemFullKey = poLower + '___' + rDateVal + '___' + matName + '___' + qtyKeyStr;
+      var itemKey3    = poLower + '___' + matName + '___' + qtyKeyStr;
+      var itemKey2    = poLower + '___' + matName;
 
       var foundList = assignMap[matType] || assignMap[matName] || [];
       var assignedInspectorName = (Array.isArray(foundList) && foundList.length > 0) ? foundList.join(', ') : adminName;
 
-      // Check if any sub-PO already exists in inspMapByPO
-      var existingRowIdx = -1;
-      if (inspMapByPO[poLower]) {
-        existingRowIdx = inspMapByPO[poLower];
-      } else {
-        var subParts2 = poLower.split(',');
-        for (var s2 = 0; s2 < subParts2.length; s2++) {
-          var sub2 = subParts2[s2].trim();
-          if (sub2 && inspMapByPO[sub2]) {
-            existingRowIdx = inspMapByPO[sub2];
-            break;
-          }
-        }
-      }
+      // Check if matching inspection row exists for this specific item
+      var existingRowIdx = inspMapByItem[itemFullKey] || inspMapByItem[itemKey3] || inspMapByItem[itemKey2] || -1;
 
       // Check actual dynamic status based on inspections sheet
       var actualInspStatus = '';
@@ -971,6 +1059,11 @@ function passAll(payload) {
         });
 
         newInspRows.push(newRow);
+
+        var newRowIndex = inspSheet.getLastRow() + newInspRows.length;
+        inspMapByItem[itemFullKey] = newRowIndex;
+        inspMapByItem[itemKey3]    = newRowIndex;
+        inspMapByItem[itemKey2]    = newRowIndex;
       }
 
       // Update in-memory data for master_data sheet (Col S is index 18, Col V is index 21)

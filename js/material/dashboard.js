@@ -2,10 +2,7 @@
 // js/material/dashboard.js — IQC Material: Dashboard KPI Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
-
-// ─── CONFIG ──────────────────────────────────────────────────
-const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL } from './auth.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allInspections = [];

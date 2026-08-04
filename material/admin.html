@@ -419,6 +419,11 @@
                             <option value="in-progress">In-Progress</option>
                             <option value="done">Done</option>
                         </select>
+                        <button onclick="syncOrphanedStatus()" class="btn-secondary"
+                            title="Reset semua baris 'Done' yang tidak memiliki data inspeksi kembali ke 'Pending'"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;border-color:rgba(251,191,36,0.4);color:#fbbf24;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">sync_problem</span>Sync Status
+                        </button>
                         <button onclick="loadMasterData()" class="btn-secondary"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
                             <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh

@@ -2,11 +2,8 @@
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL } from './auth.js';
 import { showAlert } from '../dialog.js';
-
-// ─── CONFIG ──────────────────────────────────────────────────
-const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbz8pi3DM_Rqu-3RVkmArhbAGjBRk3li6D6sM3v609_NTZO1SuJ4MIfTCcbGKfT8snAehw/exec';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allMasterData = [];
@@ -1550,5 +1547,38 @@ window.loadClaimsHistory = async function () {
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="9" style="padding:32px;text-align:center;color:#f87171;">Gagal memuat: ${err.message}</td></tr>`;
         if (countEl) countEl.textContent = '0 record';
+    }
+};
+
+// ─── SYNC ORPHANED STATUS ─────────────────────────────────────
+// Memanggil GAS resetOrphanedStatus untuk memaksa sinkronisasi:
+// setiap baris di master_data yang berstatus 'done' tanpa ada
+// data inspeksi yang sesuai akan direset ke 'pending' seketika.
+
+window.syncOrphanedStatus = async function () {
+    if (!confirm(
+        'Fungsi ini akan memeriksa seluruh data Master Data dan mereset baris yang berstatus "Done" ' +
+        'namun tidak memiliki data inspeksi yang sesuai di sheet Inspections kembali ke "Pending".\n\n' +
+        'Lanjutkan?'
+    )) return;
+
+    setLoading(true, 'Memeriksa sinkronisasi data...');
+    try {
+        const res  = await fetch(MATERIAL_GAS_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'resetOrphanedStatus' })
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error);
+
+        setLoading(false);
+        showToast(json.message || 'Sinkronisasi selesai.', json.reset_count > 0 ? 'warning' : 'success');
+
+        // Reload master data to reflect changes
+        await loadMasterData();
+        renderMasterTable();
+    } catch (err) {
+        setLoading(false);
+        showToast('Gagal sinkronisasi: ' + err.message, 'error');
     }
 };
