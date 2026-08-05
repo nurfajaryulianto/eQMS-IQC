@@ -2,7 +2,7 @@
 // js/material/dashboard.js — IQC Material: Dashboard KPI Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl } from './auth.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allInspections = [];
@@ -85,7 +85,8 @@ async function fetchData() {
                 qty_fail: Number(d.qty_fail),
             }));
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getInspectionData`);
+            const url = await gasAuthedUrl('getInspectionData');
+            const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
 

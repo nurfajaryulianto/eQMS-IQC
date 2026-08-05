@@ -2,7 +2,7 @@
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload } from './auth.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allPOData = [];       // semua master_data dari GAS
@@ -324,7 +324,8 @@ async function populateLeaders() {
                 { nik: 'inspector1', name: 'Inspector C', role: 'inspector' }
             ];
         } else {
-            const res = await fetch(`${MATERIAL_GAS_URL}?action=getUsers`);
+            const url = await gasAuthedUrl('getUsers');
+            const res = await fetch(url);
             const json = await res.json();
             users = json.data || [];
         }
@@ -422,7 +423,8 @@ async function fetchMasterData() {
         }
 
         setSyncStatus('Memuat data...', 'loading');
-        const res = await fetch(`${MATERIAL_GAS_URL}?action=getMasterData`);
+        const url = await gasAuthedUrl('getMasterData');
+        const res = await fetch(url);
         const json = await res.json();
 
         if (json.error) throw new Error(json.error);
@@ -1050,7 +1052,7 @@ async function submitInspection() {
 
     const checkingStatus = isBonding ? 'done' : (document.getElementById('checking-status')?.value || 'done');
 
-    const payload = {
+    const payload = await gasAuthedPayload({
         action: 'submitInspection',
         po_number: selectedPO.po_number,
         inspector_nik: inspectorName,
@@ -1075,7 +1077,7 @@ async function submitInspection() {
         file_type: fileType,
         inspection_date: new Date().toISOString(),
         status: checkingStatus,
-    };
+    });
 
     try {
         if (MATERIAL_TEST_MODE) {
