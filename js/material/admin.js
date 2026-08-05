@@ -958,27 +958,15 @@ window.handleUserSubmit = async function (e) {
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
-    const passwordInput = document.getElementById('user-password');
     const assignInput = document.getElementById('user-material-assignment');
 
     const nik = nikInput.value.trim();
     const name = nameInput.value.trim();
     const role = roleInput.value;
-    const password = passwordInput.value;
     const matAssignment = assignInput ? assignInput.value.trim() : '';
 
     if (!nik || !name || !role) {
         showToast('NIK, Nama, dan Role wajib diisi.', 'error');
-        return;
-    }
-
-    if (!editingUserNik && !password) {
-        showToast('Password wajib diisi untuk user baru.', 'error');
-        return;
-    }
-
-    if (password && password.length < 6) {
-        showToast('Password minimal 6 karakter.', 'error');
         return;
     }
 
@@ -990,8 +978,7 @@ window.handleUserSubmit = async function (e) {
             nik: nik,
             name: name,
             role: role,
-            material_assignment: matAssignment,
-            password: password || undefined
+            material_assignment: matAssignment
         });
 
         if (MATERIAL_TEST_MODE) {
@@ -1039,22 +1026,14 @@ window.editUser = function (nik) {
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
-    const passwordInput = document.getElementById('user-password');
     const assignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
-    const pwdRequiredStar = document.getElementById('pwd-required-star');
 
     if (nikInput) { nikInput.value = editingUserNik; nikInput.disabled = true; }
     if (nameInput) nameInput.value = user.name || '';
     if (roleInput) roleInput.value = String(user.role || 'inspector').trim().toLowerCase();
     if (assignInput) assignInput.value = user.material_assignment || user.material_type || '';
-    if (passwordInput) {
-        passwordInput.value = '';
-        passwordInput.placeholder = 'Kosongkan jika tidak diubah';
-        passwordInput.required = false;
-    }
-    if (pwdRequiredStar) pwdRequiredStar.style.display = 'none';
     if (formTitle) formTitle.textContent = 'Edit Pengguna: ' + user.nik;
     if (cancelBtn) cancelBtn.style.display = 'block';
 
@@ -1104,19 +1083,12 @@ window.resetUserForm = function () {
     if (form) form.reset();
 
     const nikInput = document.getElementById('user-nik');
-    const passwordInput = document.getElementById('user-password');
     const assignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
-    const pwdRequiredStar = document.getElementById('pwd-required-star');
 
     if (nikInput) nikInput.disabled = false;
     if (assignInput) assignInput.value = '';
-    if (passwordInput) {
-        passwordInput.placeholder = 'Minimal 6 karakter';
-        passwordInput.required = true;
-    }
-    if (pwdRequiredStar) pwdRequiredStar.style.display = 'inline';
     if (formTitle) formTitle.textContent = 'Tambah Pengguna Baru';
     if (cancelBtn) cancelBtn.style.display = 'none';
 };

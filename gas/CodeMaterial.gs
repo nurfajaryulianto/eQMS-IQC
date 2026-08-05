@@ -146,7 +146,6 @@ function doGet(e) {
     authorizeAction(action, token); // ← BARU: validasi sebelum apa pun dieksekusi
 
     if (action === 'getMasterData')          return jsonResponse(getMasterData(e.parameter));
-    if (action === 'syncMasterDataStatus')   return jsonResponse(syncMasterDataStatus());
     if (action === 'getInspectionData')      return jsonResponse(getInspectionData(e.parameter));
     if (action === 'getUsers')               return jsonResponse(getUsers());
     if (action === 'getMaterialAssignments') return jsonResponse(getMaterialAssignments());
@@ -189,6 +188,7 @@ function doPost(e) {
     if (action === 'deleteMaterialAssignment')return jsonResponse(deleteMaterialAssignment(payload));
     if (action === 'submitClaim')             return jsonResponse(submitClaim(payload));
     if (action === 'resetOrphanedStatus')     return jsonResponse(resetOrphanedStatus());
+    if (action === 'syncMasterDataStatus')    return jsonResponse(syncMasterDataStatus());
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -440,6 +440,9 @@ function resetOrphanedStatus() {
         while (mdData[p].length < numCols) mdData[p].push('');
       }
       mdSheet.getRange(1, 1, mdData.length, numCols).setValues(mdData);
+
+      // BARU: invalidasi cache karena master_data berubah
+      CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
     }
 
     return {
@@ -727,9 +730,9 @@ function getInspectionData(params) {
   if (!sheet) throw new Error('Sheet "inspections" tidak ditemukan.');
 
   var data    = sheet.getDataRange().getValues();
-  if (data.length < 3) return { data: [] }; // 2 header rows
+  if (data.length < 2) return { data: [] }; // 1 header row
 
-  var rows    = data.slice(2);
+  var rows    = data.slice(1);
 
   var inspections = rows.map(function(row) {
     var obj = {};
@@ -1351,27 +1354,23 @@ function setupSpreadsheetHeaders() {
     mdSheet.getRange(1, 1, 1, r1.length).setFontWeight('bold').setBackground('#f1f5f9');
   }
 
-  // inspections (Target 18-column layout from image + metadata)
+  // inspections
   var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS) || ss.insertSheet(SHEET.INSPECTIONS);
-  if (inspSheet.getLastRow() <= 2) {
+  if (inspSheet.getLastRow() <= 1) {
     if (inspSheet.getLastRow() > 0) inspSheet.clear();
-    var r1 = ['NO', 'MATERIAL NAME', 'ITEM DESCRIPTION', 'COLOR', 'UOM', 'SUPPLIERS', 'SUPPLIER PENGIRIM', 'PO NO', 'INSPECTION', '', '', 'STYLE', 'SHOE MODEL', 'BUCKET', 'CHECK COLOR', 'RECEIVE DATE', 'IN LAB', 'LOT', 'status', 'uploaded_at', 'inspection_id', 'inspector_nik', 'defect_notes', 'rolling_inspection', 'approved_by_leader', 'evidence_url', 'inspection_date'];
-    var r2 = ['', '', '', '', '', '', '', '', 'QTY RECEIVE', 'OK', 'NO', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
-    
-    inspSheet.getRange(1, 1, 1, r1.length).setValues([r1]);
-    inspSheet.getRange(2, 1, 1, r2.length).setValues([r2]);
-    inspSheet.getRange(1, 1, 2, r1.length).setFontWeight('bold').setBackground('#f1f5f9');
+    inspSheet.getRange(1, 1, 1, INSPECTION_HEADERS.length).setValues([INSPECTION_HEADERS]);
+    inspSheet.getRange(1, 1, 1, INSPECTION_HEADERS.length).setFontWeight('bold').setBackground('#10b981').setFontColor('#ffffff');
   }
 
   // users
   var uSheet = ss.getSheetByName(SHEET.USERS) || ss.insertSheet(SHEET.USERS);
   if (uSheet.getLastRow() === 0) {
-    var uHeaders = ['nik', 'password', 'name', 'role', 'material_assignment', 'created_at'];
+    var uHeaders = ['nik', 'name', 'role', 'material_assignment', 'created_at'];
     uSheet.getRange(1, 1, 1, uHeaders.length).setValues([uHeaders]);
     uSheet.getRange(1, 1, 1, uHeaders.length).setFontWeight('bold').setBackground('#e2e8f0');
     
     var now = new Date().toISOString();
-    uSheet.appendRow(['admin', 'admin123', 'Admin Material', 'admin', '', now]);
+    uSheet.appendRow(['admin', 'Admin Material', 'admin', '', now]);
   }
 
   // material_assignments
@@ -1417,7 +1416,6 @@ function saveUser(payload) {
     var nik = String(payload.nik || '').trim();
     var name = String(payload.name || '').trim();
     var role = String(payload.role || '').trim();
-    var password = String(payload.password || '').trim();
     var matAssign = String(payload.material_assignment || payload.material_type || '').trim();
 
     if (!nik || !name || !role) throw new Error('Data tidak lengkap. NIK, Nama, dan Role wajib diisi.');
@@ -1426,14 +1424,14 @@ function saveUser(payload) {
     var sheet = ss.getSheetByName(SHEET.USERS);
     if (!sheet) {
       sheet = ss.insertSheet(SHEET.USERS);
-      sheet.getRange(1, 1, 1, 6).setValues([['nik', 'password', 'name', 'role', 'material_assignment', 'created_at']]);
-      sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#e2e8f0');
+      // BARU: kolom 'password' dihapus dari header default
+      sheet.getRange(1, 1, 1, 5).setValues([['nik', 'name', 'role', 'material_assignment', 'created_at']]);
+      sheet.getRange(1, 1, 1, 5).setFontWeight('bold').setBackground('#e2e8f0');
     }
 
     var data = sheet.getDataRange().getValues();
     var headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
-    
-    // Ensure material_assignment column exists in header row if older sheet
+
     var assignCol = headers.indexOf('material_assignment');
     if (assignCol < 0) {
       assignCol = headers.length;
@@ -1442,7 +1440,6 @@ function saveUser(payload) {
     }
 
     var nikCol = headers.indexOf('nik');
-    var passCol = headers.indexOf('password');
     var nameCol = headers.indexOf('name');
     var roleCol = headers.indexOf('role');
 
@@ -1460,17 +1457,11 @@ function saveUser(payload) {
       if (nameCol >= 0) sheet.getRange(existingRowIdx, nameCol + 1).setValue(name);
       if (roleCol >= 0) sheet.getRange(existingRowIdx, roleCol + 1).setValue(role);
       if (assignCol >= 0) sheet.getRange(existingRowIdx, assignCol + 1).setValue(matAssign);
-      if (password && passCol >= 0) {
-        sheet.getRange(existingRowIdx, passCol + 1).setValue(password);
-      }
       return { status: 'ok', message: 'User berhasil diperbarui.' };
     } else {
-      if (!password) throw new Error('Password wajib diisi untuk user baru.');
-      
       var newRow = [];
       headers.forEach(function(h) {
         if (h === 'nik') newRow.push(nik);
-        else if (h === 'password') newRow.push(password);
         else if (h === 'name') newRow.push(name);
         else if (h === 'role') newRow.push(role);
         else if (h === 'material_assignment') newRow.push(matAssign);
