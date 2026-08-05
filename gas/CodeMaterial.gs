@@ -197,6 +197,47 @@ function doPost(e) {
 
 
 
+// Helper to clean PO strings (handles .0 suffix, extra spaces around commas, etc.)
+function cleanPoStr(po) {
+  if (po == null) return '';
+  var str = String(po).trim().toLowerCase();
+  if (str.indexOf('.0') === str.length - 2 && str.length > 2) {
+    str = str.substring(0, str.length - 2);
+  }
+  return str.replace(/,\s+/g, ',');
+}
+
+// Helper to build robust matching keys between master_data and inspections
+function buildMatchingKeys(po, matName, qty, receiveDate) {
+  var cleanPo = cleanPoStr(po);
+  if (!cleanPo) return [];
+
+  var cleanMat = String(matName || '').trim().toLowerCase();
+  var cleanQty = String(Number(qty) || 0).trim();
+  var cleanDate = normalizeDateStr(receiveDate);
+
+  var poTokens = [cleanPo];
+  if (cleanPo.indexOf(',') > 0) {
+    var parts = cleanPo.split(',');
+    parts.forEach(function(p) {
+      var pSub = p.trim();
+      if (pSub && poTokens.indexOf(pSub) === -1) {
+        poTokens.push(pSub);
+      }
+    });
+  }
+
+  var keys = [];
+  poTokens.forEach(function(pToken) {
+    if (cleanDate) keys.push(pToken + '___' + cleanDate + '___' + cleanMat + '___' + cleanQty);
+    keys.push(pToken + '___' + cleanMat + '___' + cleanQty);
+    if (cleanMat) keys.push(pToken + '___' + cleanMat);
+    keys.push(pToken);
+  });
+
+  return keys;
+}
+
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
 
@@ -226,17 +267,13 @@ function getMasterData(params) {
   if (inspSheet && inspSheet.getLastRow() > 1) {
     var inspData = inspSheet.getDataRange().getValues();
     for (var i = 1; i < inspData.length; i++) {
-      var mName = String(inspData[i][1] || '').trim().toLowerCase();
-      var pNo = String(inspData[i][7] || '').trim().toLowerCase();
-      var rQty = String(Number(inspData[i][8]) || 0).trim();
-      var rDate = normalizeDateStr(inspData[i][15]);
+      var mName = inspData[i][1];
+      var pNo   = inspData[i][7];
+      var rQty  = inspData[i][8];
+      var rDate = inspData[i][15];
       if (!pNo) continue;
 
-      var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
-      var key3    = pNo + '___' + mName + '___' + rQty;
-      var key2    = mName ? (pNo + '___' + mName) : pNo;
-
-      var keys = [fullKey, key3, key2];
+      var keys = buildMatchingKeys(pNo, mName, rQty, rDate);
       keys.forEach(function(k) {
         if (!inspMap[k]) {
           inspMap[k] = {
@@ -278,20 +315,22 @@ function getMasterData(params) {
     var row = data[r];
     var disp = displayData[r];
 
-    var poVal = String(row[12] || '').trim();
+    var poVal = row[12];
     if (!poVal) continue;
 
-    var matNameVal = String(row[1] || '').trim().toLowerCase();
+    var matNameVal = row[1];
     var plannedQty = Number(row[7]) || 0;
-    var poKey      = poVal.toLowerCase();
-    var rDateVal   = normalizeDateStr(row[11]);
-    var qtyKeyStr  = String(plannedQty).trim();
+    var rDateVal   = row[11];
+    var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
 
-    var fullKey = poKey + '___' + rDateVal + '___' + matNameVal + '___' + qtyKeyStr;
-    var key3    = poKey + '___' + matNameVal + '___' + qtyKeyStr;
-    var key2    = poKey + '___' + matNameVal;
-
-    var inspInfo = inspMap[fullKey] || inspMap[key3] || inspMap[key2];
+    var lookupKeys = buildMatchingKeys(poVal, matNameVal, plannedQty, rDateVal);
+    var inspInfo = null;
+    for (var kIdx = 0; kIdx < lookupKeys.length; kIdx++) {
+      if (inspMap[lookupKeys[kIdx]]) {
+        inspInfo = inspMap[lookupKeys[kIdx]];
+        break;
+      }
+    }
 
     var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
     var rawDone = inspInfo ? (inspInfo.raw_done || (checkedQty >= plannedQty && plannedQty > 0)) : false;
@@ -299,16 +338,15 @@ function getMasterData(params) {
     var bondDone = inspInfo ? inspInfo.bonding_done : false;
 
     var dynamicStatus = 'pending';
-    if (!inspInfo) {
-      dynamicStatus = 'pending';
-    } else if (rawDone || checkedQty >= plannedQty) {
-      dynamicStatus = 'done';
-    } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
-      dynamicStatus = 'in-progress';
+    if (inspInfo) {
+      if (rawDone || checkedQty >= plannedQty) {
+        dynamicStatus = 'done';
+      } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
+        dynamicStatus = 'in-progress';
+      }
+    } else {
+      dynamicStatus = (currentStoredStatus === 'done' || currentStoredStatus === 'in-progress') ? currentStoredStatus : 'pending';
     }
-
-    // NOTE: Self-healing write-back DIHAPUS dari sini.
-    // Gunakan action 'syncMasterDataStatus' terpisah untuk itu (lihat fungsi baru di bawah).
 
     if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
 
@@ -329,7 +367,7 @@ function getMasterData(params) {
 
     result.push({
       row_idx:          r + 1,
-      po_number:        poVal,
+      po_number:        String(poVal).trim(),
       material_name:    String(row[1] || '').trim(),
       item_description: String(row[2] || '').trim(),
       uom:              String(row[3] || '').trim(),
@@ -354,21 +392,17 @@ function getMasterData(params) {
   // ─── SAVE TO CACHE (60 detik) ──────────────────────────────
   try {
     var payload = JSON.stringify(finalResult);
-    // CacheService punya limit 100KB per key; kalau kelewat, skip caching daripada error
     if (payload.length < 95000) {
       cache.put(cacheKey, payload, 60);
     }
   } catch (e) {
-    // Cache put gagal (misal payload kebesaran) — tidak masalah, lanjut tanpa cache
+    // Cache put gagal
   }
 
   return finalResult;
 }
 
 // ─── RESET ORPHANED STATUS ────────────────────────────────────
-// Memaksa sinkronisasi: setiap baris di master_data yang ber-status
-// 'done' tapi TIDAK memiliki baris inspeksi yang sesuai di sheet
-// 'inspections' akan direset ke 'pending' seketika.
 function resetOrphanedStatus() {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -381,23 +415,20 @@ function resetOrphanedStatus() {
     var mdData = mdSheet.getDataRange().getValues();
     if (mdData.length < 2) return { status: 'ok', message: 'Tidak ada data di master_data.', reset_count: 0 };
 
-    // Build inspMap from inspections sheet (same composite key as getMasterData)
     var inspMap = {};
     if (inspSheet && inspSheet.getLastRow() > 1) {
       var inspData = inspSheet.getDataRange().getValues();
       for (var i = 1; i < inspData.length; i++) {
-        var mName = String(inspData[i][1] || '').trim().toLowerCase();
-        var pNo   = String(inspData[i][7] || '').trim().toLowerCase();
-        var rQty  = String(Number(inspData[i][8]) || 0).trim();
-        var rDate = normalizeDateStr(inspData[i][15]);
+        var mName = inspData[i][1];
+        var pNo   = inspData[i][7];
+        var rQty  = inspData[i][8];
+        var rDate = inspData[i][15];
         if (!pNo) continue;
 
-        var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
-        var key3    = pNo + '___' + mName + '___' + rQty;
-        var key2    = mName ? (pNo + '___' + mName) : pNo;
-        inspMap[fullKey] = true;
-        inspMap[key3]    = true;
-        inspMap[key2]    = true;
+        var keys = buildMatchingKeys(pNo, mName, rQty, rDate);
+        keys.forEach(function(k) {
+          inspMap[k] = true;
+        });
       }
     }
 
@@ -407,41 +438,40 @@ function resetOrphanedStatus() {
 
     for (var r = 1; r < mdData.length; r++) {
       var row        = mdData[r];
-      var poVal      = String(row[12] || '').trim();
+      var poVal      = row[12];
       if (!poVal) continue;
 
       var currentStatus = String(row[18] || '').trim().toLowerCase();
-      if (currentStatus !== 'done') continue; // only care about rows stuck as 'done'
+      if (currentStatus !== 'done') continue;
 
-      var matName   = String(row[1] || '').trim().toLowerCase();
-      var poKey     = poVal.toLowerCase();
+      var matName   = row[1];
       var planned   = Number(row[7]) || 0;
-      var rDateVal  = normalizeDateStr(row[11]);
-      var qtyStr    = String(planned).trim();
+      var rDateVal  = row[11];
 
-      var fKey = poKey + '___' + rDateVal + '___' + matName + '___' + qtyStr;
-      var k3   = poKey + '___' + matName + '___' + qtyStr;
-      var k2   = poKey + '___' + matName;
+      var lookupKeys = buildMatchingKeys(poVal, matName, planned, rDateVal);
+      var hasInspection = false;
+      for (var kIdx = 0; kIdx < lookupKeys.length; kIdx++) {
+        if (inspMap[lookupKeys[kIdx]]) {
+          hasInspection = true;
+          break;
+        }
+      }
 
-      var hasInspection = !!(inspMap[fKey] || inspMap[k3] || inspMap[k2]);
       if (!hasInspection) {
-        // No matching inspection row -> reset status to 'pending'
         while (row.length < numCols) row.push('');
         row[18] = 'pending';
-        row[21] = '';        // clear checked_qty
+        row[21] = '';
         resetCount++;
         updated = true;
       }
     }
 
     if (updated) {
-      // Pad all rows to same column count before bulk write
       for (var p = 0; p < mdData.length; p++) {
         while (mdData[p].length < numCols) mdData[p].push('');
       }
       mdSheet.getRange(1, 1, mdData.length, numCols).setValues(mdData);
 
-      // BARU: invalidasi cache karena master_data berubah
       CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
     }
 
@@ -458,8 +488,6 @@ function resetOrphanedStatus() {
 }
 
 // ─── SYNC MASTER DATA STATUS (Manual Trigger) ──────────────────
-// Menjalankan proses self-healing yang dulu berjalan otomatis di getMasterData.
-// Sekarang dipanggil manual lewat tombol "Sync Status" di UI.
 function syncMasterDataStatus() {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -476,17 +504,13 @@ function syncMasterDataStatus() {
     if (inspSheet && inspSheet.getLastRow() > 1) {
       var inspData = inspSheet.getDataRange().getValues();
       for (var i = 1; i < inspData.length; i++) {
-        var mName = String(inspData[i][1] || '').trim().toLowerCase();
-        var pNo = String(inspData[i][7] || '').trim().toLowerCase();
-        var rQty = String(Number(inspData[i][8]) || 0).trim();
-        var rDate = normalizeDateStr(inspData[i][15]);
+        var mName = inspData[i][1];
+        var pNo   = inspData[i][7];
+        var rQty  = inspData[i][8];
+        var rDate = inspData[i][15];
         if (!pNo) continue;
 
-        var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
-        var key3    = pNo + '___' + mName + '___' + rQty;
-        var key2    = mName ? (pNo + '___' + mName) : pNo;
-
-        var keys = [fullKey, key3, key2];
+        var keys = buildMatchingKeys(pNo, mName, rQty, rDate);
         keys.forEach(function(k) {
           if (!inspMap[k]) {
             inspMap[k] = { checked_qty: 0, raw_done: false, has_any_inspection: true };
@@ -515,26 +539,27 @@ function syncMasterDataStatus() {
       var row = data[r];
       while (row.length < numCols) row.push('');
 
-      var poVal = String(row[12] || '').trim();
+      var poVal = row[12];
       if (!poVal) continue;
 
-      var matNameVal = String(row[1] || '').trim().toLowerCase();
+      var matNameVal = row[1];
       var plannedQty = Number(row[7]) || 0;
-      var poKey      = poVal.toLowerCase();
-      var rDateVal   = normalizeDateStr(row[11]);
-      var qtyKeyStr  = String(plannedQty).trim();
 
-      var fullKey = poKey + '___' + rDateVal + '___' + matNameVal + '___' + qtyKeyStr;
-      var key3    = poKey + '___' + matNameVal + '___' + qtyKeyStr;
-      var key2    = poKey + '___' + matNameVal;
+      var lookupKeys = buildMatchingKeys(poVal, matNameVal, plannedQty, row[11]);
+      var inspInfo = null;
+      for (var kIdx = 0; kIdx < lookupKeys.length; kIdx++) {
+        if (inspMap[lookupKeys[kIdx]]) {
+          inspInfo = inspMap[lookupKeys[kIdx]];
+          break;
+        }
+      }
 
-      var inspInfo = inspMap[fullKey] || inspMap[key3] || inspMap[key2];
       var checkedQty = inspInfo ? inspInfo.checked_qty : 0;
       var rawDone = inspInfo ? (inspInfo.raw_done || (checkedQty >= plannedQty && plannedQty > 0)) : false;
 
       var dynamicStatus = 'pending';
       if (!inspInfo) {
-        dynamicStatus = 'pending';
+        dynamicStatus = String(row[18] || '').trim().toLowerCase() || 'pending';
       } else if (rawDone || checkedQty >= plannedQty) {
         dynamicStatus = 'done';
       } else if (checkedQty > 0 || inspInfo.has_any_inspection) {
@@ -555,7 +580,6 @@ function syncMasterDataStatus() {
 
     if (mdUpdated) {
       sheet.getRange(1, 1, data.length, numCols).setValues(data);
-      // Invalidate cache karena data sudah berubah
       var cache = CacheService.getScriptCache();
       cache.removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
     }
@@ -1110,35 +1134,32 @@ function passAll(payload) {
     if (!targetRowIndexes && payload.po_numbers && Array.isArray(payload.po_numbers)) {
       targetPOsMap = {};
       payload.po_numbers.forEach(function(poStr) {
-        var str = String(poStr || '').trim().toLowerCase();
+        var str = cleanPoStr(poStr);
         if (str) {
           targetPOsMap[str] = true;
           var parts = str.split(',');
           parts.forEach(function(p) {
-            var sub = p.trim().toLowerCase();
+            var sub = p.trim();
             if (sub) targetPOsMap[sub] = true;
           });
         }
       });
     }
 
-    // Index existing inspection rows by PO + Material Name + Qty + Date (composite keys matching getMasterData)
+    // Index existing inspection rows by composite keys
     var inspMapByItem = {};
     var existingInspData = inspSheet.getLastRow() > 1 ? inspSheet.getDataRange().getValues() : [];
     for (var r = 1; r < existingInspData.length; r++) {
-      var mName = String(existingInspData[r][1] || '').trim().toLowerCase(); // Col B (index 1) is material_name
-      var pNo   = String(existingInspData[r][7] || '').trim().toLowerCase(); // Col H (index 7) is po_no
-      var rQty  = String(Number(existingInspData[r][8]) || 0).trim();         // Col I (index 8) is qty_receive
-      var rDate = normalizeDateStr(existingInspData[r][15]);                 // Col P (index 15) is receive_date
+      var mName = existingInspData[r][1];
+      var pNo   = existingInspData[r][7];
+      var rQty  = existingInspData[r][8];
+      var rDate = existingInspData[r][15];
       if (!pNo) continue;
 
-      var fullKey = pNo + '___' + rDate + '___' + mName + '___' + rQty;
-      var key3    = pNo + '___' + mName + '___' + rQty;
-      var key2    = mName ? (pNo + '___' + mName) : pNo;
-
-      inspMapByItem[fullKey] = r + 1;
-      inspMapByItem[key3]    = r + 1;
-      inspMapByItem[key2]    = r + 1;
+      var keys = buildMatchingKeys(pNo, mName, rQty, rDate);
+      keys.forEach(function(k) {
+        inspMapByItem[k] = r + 1;
+      });
     }
 
     var baseInspLastRow = inspSheet.getLastRow();
@@ -1146,10 +1167,10 @@ function passAll(payload) {
     for (var i = 1; i < data.length; i++) {
       var rowIdx = i + 1; // 1-based row index in Sheet
 
-      var poRaw = String(data[i][12] || '').trim(); // po_number is Col M (index 12)
+      var poRaw = data[i][12];
       if (!poRaw) continue;
 
-      var poLower = poRaw.toLowerCase();
+      var poLower = cleanPoStr(poRaw);
 
       // Check if this row is selected (by row index first, fallback to PO string matching)
       var isMatched = false;
@@ -1177,19 +1198,17 @@ function passAll(payload) {
 
       var qty        = Number(data[i][7]) || 0;                      // batch_size is Col H (index 7)
       var matType    = String(data[i][17] || '').trim().toLowerCase(); // material_type is Col R (index 17)
-      var matName    = String(data[i][1] || '').trim().toLowerCase();  // material_name is Col B (index 1)
-      var rDateVal   = normalizeDateStr(data[i][11]);                 // receive_date is Col L (index 11)
-      var qtyKeyStr  = String(qty).trim();
+      var matName    = data[i][1];                                   // material_name is Col B (index 1)
+      var rDateVal   = data[i][11];                                  // receive_date is Col L (index 11)
 
-      var itemFullKey = poLower + '___' + rDateVal + '___' + matName + '___' + qtyKeyStr;
-      var itemKey3    = poLower + '___' + matName + '___' + qtyKeyStr;
-      var itemKey2    = poLower + '___' + matName;
-
-      var foundList = assignMap[matType] || assignMap[matName] || [];
-      var assignedInspectorName = (Array.isArray(foundList) && foundList.length > 0) ? foundList.join(', ') : adminName;
-
-      // Check if matching inspection row exists for this specific item
-      var existingRowIdx = inspMapByItem[itemFullKey] || inspMapByItem[itemKey3] || inspMapByItem[itemKey2] || -1;
+      var itemKeys = buildMatchingKeys(poRaw, matName, qty, rDateVal);
+      var existingRowIdx = -1;
+      for (var kIdx = 0; kIdx < itemKeys.length; kIdx++) {
+        if (inspMapByItem[itemKeys[kIdx]]) {
+          existingRowIdx = inspMapByItem[itemKeys[kIdx]];
+          break;
+        }
+      }
 
       // Check actual dynamic status based on inspections sheet
       var actualInspStatus = '';
@@ -1210,8 +1229,13 @@ function passAll(payload) {
 
       // Skip if dynamically done (already completed in inspections sheet)
       if (isDynamicallyDone) {
+        data[i][18] = 'done';
+        data[i][21] = '';
         continue;
       }
+
+      var foundList = assignMap[matType] || assignMap[String(matName).trim().toLowerCase()] || [];
+      var assignedInspectorName = (Array.isArray(foundList) && foundList.length > 0) ? foundList.join(', ') : adminName;
 
       // Update existing inspection row if present, otherwise create new row
       if (existingRowIdx > 1 && existingInspData[existingRowIdx - 1]) {
@@ -1269,9 +1293,9 @@ function passAll(payload) {
         newInspRows.push(newRow);
 
         var newRowIndex = baseInspLastRow + newInspRows.length;
-        inspMapByItem[itemFullKey] = newRowIndex;
-        inspMapByItem[itemKey3]    = newRowIndex;
-        inspMapByItem[itemKey2]    = newRowIndex;
+        itemKeys.forEach(function(k) {
+          inspMapByItem[k] = newRowIndex;
+        });
       }
 
       // Update in-memory data for master_data sheet (Col S is index 18, Col V is index 21)
