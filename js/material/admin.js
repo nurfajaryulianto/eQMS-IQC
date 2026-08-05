@@ -73,7 +73,8 @@ window.loadMasterData = async function () {
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
-            const res = await fetch(`${gasAuthedUrl('getMasterData')}&status=all`);
+            const url = await gasAuthedUrl('getMasterData');
+            const res = await fetch(`${url}&status=all`);
             if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke Google Apps Script Web App`);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
@@ -175,7 +176,8 @@ window.downloadTemplate = async function () {
     }
 
     try {
-        const res = await fetch(gasAuthedUrl('generateTemplate'));
+        const url = await gasAuthedUrl('generateTemplate');
+        const res = await fetch(url);
         const text = await res.text();
         downloadCSV(text, 'template_master_data_iqc_material.csv');
         showToast('Template berhasil didownload!', 'success');
@@ -342,7 +344,7 @@ window.confirmUpload = async function () {
             });
             setLoading(false);
         } else {
-            const payload = gasAuthedPayload({
+            const payload = await gasAuthedPayload({
                 action: 'bulkUpsertMasterData',
                 rows: parsedFileData,
                 uploader_nik: currentUser?.nik || 'admin',
@@ -571,7 +573,7 @@ window.confirmPassAll = async function () {
             return;
         }
 
-        const payload = gasAuthedPayload({
+        const payload = await gasAuthedPayload({
             action: 'passAll',
             admin_nik: currentUser?.nik || 'admin',
             admin_name: currentUser?.name || 'Admin Material',
@@ -662,7 +664,8 @@ window.loadMaterialAssignments = async function () {
                 { material_type: 'TEXTILE', inspector_nik: 'inspector2', inspector_name: 'Siti Rahma', updated_by: 'Admin Material', updated_at: '2026-07-21T11:30:00Z' },
             ];
         } else {
-            const res = await fetch(gasAuthedUrl('getMaterialAssignments'));
+            const url = await gasAuthedUrl('getMaterialAssignments');
+            const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allAssignments = json.data || [];
@@ -697,7 +700,8 @@ async function populateAssignmentFormOptions() {
                     { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector' }
                 ];
             } else {
-                const res = await fetch(gasAuthedUrl('getUsers'));
+                const url = await gasAuthedUrl('getUsers');
+                const res = await fetch(url);
                 const json = await res.json();
                 allUsers = json.data || [];
             }
@@ -761,7 +765,6 @@ window.handleAssignmentSubmit = async function (e) {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
-            // FIX: cari berdasarkan material_type di allAssignments, bukan row_idx di allMasterData
             const idx = allAssignments.findIndex(a => a.material_type.toLowerCase() === materialType.toLowerCase());
             const now = new Date().toISOString();
             if (idx >= 0) {
@@ -776,7 +779,7 @@ window.handleAssignmentSubmit = async function (e) {
             return;
         }
 
-        const payload = gasAuthedPayload({
+        const payload = await gasAuthedPayload({
             action: 'saveMaterialAssignment',
             material_type: materialType,
             inspector_nik: inspectorNik,
@@ -848,7 +851,7 @@ window.deleteAssignment = async function (materialType) {
             return;
         }
 
-        const payload = gasAuthedPayload({ action: 'deleteMaterialAssignment', material_type: materialType });
+        const payload = await gasAuthedPayload({ action: 'deleteMaterialAssignment', material_type: materialType });
         const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         const json = await res.json();
         if (json.error) throw new Error(json.error);
@@ -893,7 +896,8 @@ window.loadUsersList = async function () {
                 { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', material_assignment: 'TEXTILE', created_at: '2026-07-14T09:45:00Z' },
             ];
         } else {
-            const res = await fetch(gasAuthedUrl('getUsers'));
+            const url = await gasAuthedUrl('getUsers');
+            const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allUsers = json.data || [];
@@ -980,16 +984,16 @@ window.handleUserSubmit = async function (e) {
 
     setLoading(true, 'Menyimpan data user...');
 
-    const payload = gasAuthedPayload({
-        action: 'saveUser',
-        nik: nik,
-        name: name,
-        role: role,
-        material_assignment: matAssignment,
-        password: password || undefined
-    });
-
     try {
+        const payload = await gasAuthedPayload({
+            action: 'saveUser',
+            nik: nik,
+            name: name,
+            role: role,
+            material_assignment: matAssignment,
+            password: password || undefined
+        });
+
         if (MATERIAL_TEST_MODE) {
             console.log('[TEST MODE] Save User Payload:', payload);
             await delay(1000);
@@ -1076,9 +1080,10 @@ window.deleteUser = async function (nik) {
             allUsers = allUsers.filter(u => String(u.nik).trim() !== nikStr);
             showToast('User berhasil dihapus (simulasi)!', 'success');
         } else {
+            const payload = await gasAuthedPayload({ action: 'deleteUser', nik: nikStr });
             const res = await fetch(MATERIAL_GAS_URL, {
                 method: 'POST',
-                body: JSON.stringify(gasAuthedPayload({ action: 'deleteUser', nik: nikStr }))
+                body: JSON.stringify(payload)
             });
             const json = await res.json();
             if (json.error) throw new Error(json.error);
@@ -1141,7 +1146,8 @@ window.loadSpreadsheetStatus = async function () {
             return;
         }
 
-        const res = await fetch(gasAuthedUrl('getStatus'));
+        const url = await gasAuthedUrl('getStatus');
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
         const data = await res.json();
 
@@ -1273,7 +1279,8 @@ window.loadLeaderMonitorLog = async function () {
                 }
             ];
         } else {
-            const res = await fetch(gasAuthedUrl('getInspectionData'));
+            const url = await gasAuthedUrl('getInspectionData');
+            const res = await fetch(url);
             const json = await res.json();
             if (json.error) throw new Error(json.error);
             allLeaderMonitorInspections = json.data || [];
@@ -1475,8 +1482,6 @@ window.submitClaim = async function () {
     try {
         if (MATERIAL_TEST_MODE) {
             await new Promise(r => setTimeout(r, 1000));
-            // FIX: cari berdasarkan row_idx, bukan po_number, supaya tidak salah sasaran
-            // ketika satu PO punya beberapa baris material.
             const idx = allMasterData.findIndex(m => m.row_idx === claimTargetData.row_idx);
             if (idx >= 0) allMasterData[idx].planned_qty -= claimQty;
             window.closeClaimModal();
@@ -1485,7 +1490,7 @@ window.submitClaim = async function () {
             return;
         }
 
-        const payload = gasAuthedPayload({
+        const payload = await gasAuthedPayload({
             action: 'submitClaim',
             row_idx: claimTargetData.row_idx,
             po_number: claimTargetData.po_number,
@@ -1529,7 +1534,8 @@ window.loadClaimsHistory = async function () {
             return;
         }
 
-        const res = await fetch(gasAuthedUrl('getClaims'));
+        const url = await gasAuthedUrl('getClaims');
+        const res = await fetch(url);
         const json = await res.json();
         if (json.error) throw new Error(json.error);
 
@@ -1575,9 +1581,10 @@ window.syncOrphanedStatus = async function () {
 
     setLoading(true, 'Memeriksa sinkronisasi data...');
     try {
+        const payload = await gasAuthedPayload({ action: 'resetOrphanedStatus' });
         const res = await fetch(MATERIAL_GAS_URL, {
             method: 'POST',
-            body: JSON.stringify(gasAuthedPayload({ action: 'resetOrphanedStatus' }))
+            body: JSON.stringify(payload)
         });
         const json = await res.json();
         if (json.error) throw new Error(json.error);

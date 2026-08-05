@@ -27,36 +27,32 @@ export function nikToEmail(nik) {
 }
 
 // ─── CONFIG ──────────────────────────────────────────────────
-// Sama dengan URL GAS Material — akan di-overrride oleh import di setiap module
-// tapi kita export agar mudah di-update dari satu tempat
 export const MATERIAL_GAS_URL = 'https://script.google.com/macros/s/AKfycbxPpUaDT-1xipllWqR4d-hrEDCK2AcR5d5oM7euWuTVIcSXyNXohz4dE5MK85WeIL8pRQ/exec';
 
 const SESSION_KEY = 'iqc_material_session_v1';
-const LOGIN_PAGE  = '/material/login.html';
+const LOGIN_PAGE = '/material/login.html';
 
 // ─── ROLES ───────────────────────────────────────────────────
 export const MATERIAL_ROLES = {
-    ADMIN:      'admin',
+    ADMIN: 'admin',
     SUPERVISOR: 'supervisor',
-    MANAGER:    'manager',
-    INSPECTOR:  'inspector',
+    MANAGER: 'manager',
+    INSPECTOR: 'inspector',
 };
 
 // ─── UI TEST MODE ────────────────────────────────────────────
-// Set ke true untuk bypass GAS auth (development mode)
 export const MATERIAL_TEST_MODE = false;
 
-// Mock session untuk test mode
 const MOCK_SESSION = {
-    nik:      'admin',
-    name:     'Administrator (Mock)',
-    role:     MATERIAL_ROLES.ADMIN,
-    token:    'mock_token_12345',
+    nik: 'admin',
+    name: 'Administrator (Mock)',
+    role: MATERIAL_ROLES.ADMIN,
+    token: 'mock_token_12345',
     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
 
 // ─── INACTIVITY AUTO-LOGOUT MANAGER (2 Jam Idle Timeout) ─────
-const MATERIAL_INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 Jam
+const MATERIAL_INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000;
 let materialLastActivityTime = Date.now();
 let materialInactivityInterval = null;
 
@@ -81,7 +77,7 @@ export function initMaterialInactivityTimeout(maxIdleMs = MATERIAL_INACTIVITY_LI
             alert('Sesi IQC Material Anda telah berakhir karena tidak ada aktivitas selama 2 jam. Silakan login kembali.');
             await materialLogout();
         }
-    }, 60 * 1000); // Cek setiap 1 menit
+    }, 60 * 1000);
 }
 
 // ─── SESSION MANAGEMENT (sessionStorage) ─────────────────────
@@ -92,7 +88,6 @@ export function getSession() {
         const raw = sessionStorage.getItem(SESSION_KEY);
         if (!raw) return null;
         const session = JSON.parse(raw);
-        // Check expiry
         if (session.expires_at && new Date(session.expires_at) < new Date()) {
             clearSession();
             return null;
@@ -115,15 +110,11 @@ export function isLoggedIn() {
     return getSession() !== null;
 }
 
-// ─── GET CURRENT USER ─────────────────────────────────────────
-
 export function getMaterialUser() {
     return getSession();
 }
 
 // ─── REQUIRE ROLE ────────────────────────────────────────────
-// Gunakan di setiap halaman Material untuk memproteksi akses.
-// Mengembalikan session user jika authorized, null + redirect jika tidak.
 
 export async function requireMaterialRole(allowedRoles = []) {
     const session = getSession();
@@ -148,27 +139,25 @@ export async function requireMaterialRole(allowedRoles = []) {
 
 export async function materialLogin(nik, password) {
     if (MATERIAL_TEST_MODE) {
-        // In test mode, accept any credentials
         const mockUsers = {
-            'admin':     { name: 'Administrator', role: MATERIAL_ROLES.ADMIN, module: 'both' },
+            'admin': { name: 'Administrator', role: MATERIAL_ROLES.ADMIN, module: 'both' },
             'inspector': { name: 'Inspector Test', role: MATERIAL_ROLES.INSPECTOR, module: 'material' },
-            'spv':       { name: 'Supervisor Test', role: MATERIAL_ROLES.SUPERVISOR, module: 'material' },
-            'mgr':       { name: 'Manager Test', role: MATERIAL_ROLES.MANAGER, module: 'both' },
+            'spv': { name: 'Supervisor Test', role: MATERIAL_ROLES.SUPERVISOR, module: 'material' },
+            'mgr': { name: 'Manager Test', role: MATERIAL_ROLES.MANAGER, module: 'both' },
         };
         const user = mockUsers[nik.toLowerCase()] || { name: nik, role: MATERIAL_ROLES.INSPECTOR, module: 'material' };
         const session = {
-            nik:       nik,
-            name:      user.name,
-            role:      user.role,
-            module:    user.module,
-            token:     'mock_' + Date.now(),
+            nik: nik,
+            name: user.name,
+            role: user.role,
+            module: user.module,
+            token: 'mock_' + Date.now(),
             expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
         };
         setSession(session);
         return { success: true, session };
     }
 
-    // Login via Supabase Auth (Fast, 100% bypasses GAS)
     try {
         const email = nikToEmail(nik);
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -184,7 +173,6 @@ export async function materialLogin(nik, password) {
             const meta = data.user.user_metadata || {};
             const userModule = String(meta.module || meta.app_module || 'both').toLowerCase();
 
-            // Module Guard: Validate if user is authorized to access IQC Material
             if (userModule !== 'material' && userModule !== 'both') {
                 await supabase.auth.signOut();
                 return {
@@ -194,13 +182,15 @@ export async function materialLogin(nik, password) {
             }
 
             const session = {
-                nik:                 meta.nik || nik.trim(),
-                name:                meta.display_name || meta.name || nik.trim(),
-                role:                meta.role || MATERIAL_ROLES.INSPECTOR,
-                module:              userModule,
+                nik: meta.nik || nik.trim(),
+                name: meta.display_name || meta.name || nik.trim(),
+                role: meta.role || MATERIAL_ROLES.INSPECTOR,
+                module: userModule,
                 material_assignment: meta.material_assignment || '',
-                token:               data.session?.access_token || ('token_' + Date.now()),
-                expires_at:          new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+                // token statis di sini hanya fallback tampilan; pemanggilan GAS
+                // selalu ambil token TERBARU lewat getFreshToken() di bawah.
+                token: data.session?.access_token || ('token_' + Date.now()),
+                expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
             };
             setSession(session);
             return { success: true, session };
@@ -217,12 +207,11 @@ export async function materialLogin(nik, password) {
 
 export async function materialLogout() {
     clearSession();
-    try { await supabase.auth.signOut(); } catch(e) {}
+    try { await supabase.auth.signOut(); } catch (e) { }
     window.location.replace(LOGIN_PAGE);
 }
 
 // ─── REDIRECT IF LOGGED IN ───────────────────────────────────
-// Gunakan di login page agar user yang sudah login langsung di-redirect
 
 export function redirectIfLoggedIn() {
     if (isLoggedIn()) {
@@ -235,14 +224,33 @@ export function redirectIfLoggedIn() {
     }
 }
 
-// ─── HELPER: FETCH KE GAS DENGAN TOKEN ────────────────────────
-export function gasAuthedUrl(baseAction) {
-    const session = getSession();
-    const token = session?.token || '';
+// ─── HELPER: FETCH KE GAS DENGAN TOKEN (SELALU FRESH) ─────────
+// Mengambil access_token TERBARU langsung dari Supabase SDK, bukan dari
+// sessionStorage statis — supaya token yang dikirim ke GAS tidak basi
+// meski autoRefreshToken sudah memperbarui token di background.
+// PENTING: fungsi ini async — semua pemanggil WAJIB pakai `await`.
+async function getFreshToken() {
+    if (MATERIAL_TEST_MODE) {
+        return getSession()?.token || '';
+    }
+    try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data?.session?.access_token) {
+            return getSession()?.token || '';
+        }
+        return data.session.access_token;
+    } catch (e) {
+        console.error('Failed to get fresh Supabase token:', e);
+        return getSession()?.token || '';
+    }
+}
+
+export async function gasAuthedUrl(baseAction) {
+    const token = await getFreshToken();
     return `${MATERIAL_GAS_URL}?action=${baseAction}&token=${encodeURIComponent(token)}`;
 }
 
-export function gasAuthedPayload(payload) {
-    const session = getSession();
-    return { ...payload, token: session?.token || '' };
+export async function gasAuthedPayload(payload) {
+    const token = await getFreshToken();
+    return { ...payload, token };
 }
