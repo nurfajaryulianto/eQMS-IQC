@@ -2,7 +2,7 @@
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload, gasGet, gasPost, supabase, nikToEmail } from './auth.js';
 import { showAlert } from '../dialog.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -73,11 +73,7 @@ window.loadMasterData = async function () {
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
-            const url = await gasAuthedUrl('getMasterData');
-            const res = await fetch(`${url}&status=all`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke Google Apps Script Web App`);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
+            const json = await gasGet('getMasterData', 'status=all');
 
             // Normalize keys to lowercase to avoid inconsistent casing issues from backend
             allMasterData = (json.data || []).map(row => {
@@ -1002,7 +998,41 @@ window.handleUserSubmit = async function (e) {
             });
             const json = await res.json();
             if (json.error) throw new Error(json.error);
-            showToast(json.message || 'User berhasil disimpan!', 'success');
+
+            // Auto-sync / Register user account to Supabase Auth & app_users
+            const passwordInput = document.getElementById('user-password');
+            const userPassword = (passwordInput && passwordInput.value.trim()) ? passwordInput.value.trim() : '123456';
+
+            try {
+                const { error: rpcErr } = await supabase.rpc('create_supabase_user', {
+                    p_nik: nik,
+                    p_name: name,
+                    p_role: role,
+                    p_password: userPassword,
+                    p_material_assignment: matAssignment
+                });
+
+                if (rpcErr) {
+                    await supabase.auth.signUp({
+                        email: nikToEmail(nik),
+                        password: userPassword,
+                        options: {
+                            data: {
+                                nik: nik,
+                                name: name,
+                                display_name: name,
+                                role: role,
+                                module: 'material',
+                                material_assignment: matAssignment
+                            }
+                        }
+                    });
+                }
+            } catch (supErr) {
+                console.warn('Otomatisasi Supabase Auth:', supErr);
+            }
+
+            showToast(json.message || `User ${nik} berhasil disimpan & disinkronkan ke Auth!`, 'success');
         }
         resetUserForm();
         await window.loadUsersList();

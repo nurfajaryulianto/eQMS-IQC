@@ -2,7 +2,7 @@
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload, gasGet, gasPost } from './auth.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allPOData = [];       // semua master_data dari GAS
@@ -324,9 +324,7 @@ async function populateLeaders() {
                 { nik: 'inspector1', name: 'Inspector C', role: 'inspector' }
             ];
         } else {
-            const url = await gasAuthedUrl('getUsers');
-            const res = await fetch(url);
-            const json = await res.json();
+            const json = await gasGet('getUsers');
             users = json.data || [];
         }
 
@@ -357,8 +355,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupValidationDialog();
     setupLogout();
 
-    await fetchMasterData();
-    await populateLeaders();
+    // OPTIMASI: Jalankan fetchMasterData & populateLeaders secara PARALEL
+    // (sebelumnya sequential → total waktu = waktu1 + waktu2)
+    await Promise.all([
+        fetchMasterData(),
+        populateLeaders()
+    ]);
 
     const leaderSelect = document.getElementById('approved-by-leader');
     if (leaderSelect) {
@@ -423,9 +425,7 @@ async function fetchMasterData() {
         }
 
         setSyncStatus('Memuat data...', 'loading');
-        const url = await gasAuthedUrl('getMasterData');
-        const res = await fetch(url);
-        const json = await res.json();
+        const json = await gasGet('getMasterData');
 
         if (json.error) throw new Error(json.error);
 

@@ -163,9 +163,10 @@ export async function materialLogin(nik, password) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
+            const isInvalid = error.message === 'Invalid login credentials';
             return {
                 success: false,
-                message: error.message === 'Invalid login credentials' ? 'NIK atau password salah.' : error.message
+                message: isInvalid ? 'NIK atau password belum terdaftar / salah. Silakan pastikan akun NIK sudah dibuat di Supabase Auth.' : error.message
             };
         }
 
@@ -253,4 +254,50 @@ export async function gasAuthedUrl(baseAction) {
 export async function gasAuthedPayload(payload) {
     const token = await getFreshToken();
     return { ...payload, token };
+}
+
+/**
+ * Centralized GAS GET fetch — selalu no-store, safe JSON parse.
+ * Menghindari 404 browser-cache loop pada redirect GAS.
+ * @param {string} action — nama action GAS
+ * @param {string} [extraParams] — string query tambahan, misal 'status=all'
+ * @returns {Promise<any>} — parsed JSON dari GAS
+ */
+export async function gasGet(action, extraParams = '') {
+    const url = await gasAuthedUrl(action);
+    const fullUrl = extraParams ? `${url}&${extraParams}` : url;
+    const res = await fetch(fullUrl, { cache: 'no-store', redirect: 'follow' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke GAS Web App (${action})`);
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch (e) {
+        console.warn(`[gasGet:${action}] Respons bukan JSON:`, text.substring(0, 200));
+        throw new Error(`GAS mengembalikan respons tidak valid (bukan JSON). Kemungkinan timeout atau script error. Silakan coba lagi.`);
+    }
+    if (json && json.error) throw new Error(json.error);
+    return json;
+}
+
+/**
+ * Centralized GAS POST fetch — selalu no-store, safe JSON parse.
+ * @param {object} payload — body JSON (akan ditambahkan token otomatis)
+ * @returns {Promise<any>} — parsed JSON dari GAS
+ */
+export async function gasPost(payload) {
+    const authedPayload = await gasAuthedPayload(payload);
+    const res = await fetch(MATERIAL_GAS_URL, {
+        method: 'POST',
+        cache: 'no-store',
+        redirect: 'follow',
+        body: JSON.stringify(authedPayload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: Gagal terhubung ke GAS Web App (${authedPayload.action || 'POST'})`);
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch (e) {
+        console.warn(`[gasPost:${authedPayload.action}] Respons bukan JSON:`, text.substring(0, 200));
+        throw new Error(`GAS mengembalikan respons tidak valid (bukan JSON). Kemungkinan timeout atau script error. Silakan coba lagi.`);
+    }
+    if (json && json.error) throw new Error(json.error);
+    return json;
 }

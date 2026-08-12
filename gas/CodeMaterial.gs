@@ -238,13 +238,139 @@ function buildMatchingKeys(po, matName, qty, receiveDate) {
   return keys;
 }
 
+// ─── HELPER: Format date value tanpa perlu getDisplayValues() ──────
+function formatDateValue(val) {
+  if (val == null || val === '') return '';
+  try {
+    if (val instanceof Date || (typeof val === 'object' && val.getTime)) {
+      return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+  } catch(e) { /* fallthrough */ }
+  var str = String(val).trim();
+  if (str.indexOf('T') > 0) return str.split('T')[0];
+  return str;
+}
+
+// ─── HELPER: Chunked cache put/get (max 90KB per chunk) ────────────
+var CACHE_CHUNK_SIZE = 90000;
+var CACHE_TTL = 300; // 5 menit
+
+function cachePutChunked(cache, key, jsonStr) {
+  try {
+    if (jsonStr.length <= CACHE_CHUNK_SIZE) {
+      cache.put(key, jsonStr, CACHE_TTL);
+      cache.put(key + '_chunks', '1', CACHE_TTL);
+    } else {
+      var numChunks = Math.ceil(jsonStr.length / CACHE_CHUNK_SIZE);
+      var pairs = {};
+      for (var c = 0; c < numChunks; c++) {
+        pairs[key + '_' + c] = jsonStr.substring(c * CACHE_CHUNK_SIZE, (c + 1) * CACHE_CHUNK_SIZE);
+      }
+      pairs[key + '_chunks'] = String(numChunks);
+      cache.putAll(pairs, CACHE_TTL);
+    }
+  } catch(e) { /* cache put gagal, lanjut tanpa cache */ }
+}
+
+function cacheGetChunked(cache, key) {
+  var numStr = cache.get(key + '_chunks');
+  if (!numStr) return null;
+  var num = Number(numStr);
+  if (num === 1) {
+    return cache.get(key);
+  }
+  var parts = [];
+  for (var c = 0; c < num; c++) {
+    var chunk = cache.get(key + '_' + c);
+    if (chunk === null) return null; // partial cache miss → stale
+    parts.push(chunk);
+  }
+  return parts.join('');
+}
+
+// ─── HELPER: Invalidate all master data cache keys ─────────────────
+function invalidateMasterDataCache() {
+  var cache = CacheService.getScriptCache();
+  var filters = ['all', 'pending', 'in-progress', 'done'];
+  var keysToRemove = [];
+  filters.forEach(function(f) {
+    var key = 'master_data_v2_' + f;
+    keysToRemove.push(key);
+    keysToRemove.push(key + '_chunks');
+    // Remove up to 10 chunks (enough for ~900KB payload)
+    for (var c = 0; c < 10; c++) {
+      keysToRemove.push(key + '_' + c);
+    }
+  });
+  try { cache.removeAll(keysToRemove); } catch(e) { /* ignore */ }
+}
+
+// ─── HELPER: Build inspection lookup map (shared across functions) ──
+function buildInspectionMap(ss) {
+  var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+  var inspMap = {};
+  if (!inspSheet || inspSheet.getLastRow() <= 1) return inspMap;
+
+  var inspData = inspSheet.getDataRange().getValues();
+  for (var i = 1; i < inspData.length; i++) {
+    var pNo = inspData[i][7];
+    if (!pNo) continue;
+
+    var mName = inspData[i][1];
+    var rQty  = inspData[i][8];
+    var rDate = inspData[i][15];
+    var iType = String(inspData[i][27] || '').trim();
+    var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
+    var okQty = Number(inspData[i][9]) || 0;
+    var noQty = Number(inspData[i][10]) || 0;
+    var bondingUrl = String(inspData[i][34] || '').trim();
+
+    // Primary key (most specific) — try this first for O(1) lookup
+    var primaryKey = cleanPoStr(pNo) + '___' + String(mName || '').trim().toLowerCase() + '___' + String(Number(rQty) || 0).trim();
+
+    if (!inspMap[primaryKey]) {
+      inspMap[primaryKey] = {
+        checked_qty: 0,
+        raw_done: false,
+        laminating_done: false,
+        bonding_done: false,
+        has_any_inspection: true,
+        last_status: ''
+      };
+    }
+
+    inspMap[primaryKey].checked_qty += (okQty + noQty);
+    if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
+      if (iStatus === 'done') inspMap[primaryKey].raw_done = true;
+    }
+    if (iType.indexOf('Laminating Material') >= 0) {
+      inspMap[primaryKey].laminating_done = true;
+    }
+    if (iType.indexOf('Bonding Test') >= 0 || bondingUrl !== '') {
+      inspMap[primaryKey].bonding_done = true;
+    }
+    inspMap[primaryKey].last_status = iStatus;
+
+    // Secondary keys (less specific) — only add if different from primary
+    var fallbackKeys = buildMatchingKeys(pNo, mName, rQty, rDate);
+    for (var fk = 0; fk < fallbackKeys.length; fk++) {
+      var fbk = fallbackKeys[fk];
+      if (fbk === primaryKey) continue;
+      if (!inspMap[fbk]) {
+        inspMap[fbk] = inspMap[primaryKey]; // point to same object (shared reference)
+      }
+    }
+  }
+  return inspMap;
+}
+
 function getMasterData(params) {
   var statusFilter = (params && params.status) ? params.status.toLowerCase() : 'all';
 
-  // ─── CACHE CHECK ─────────────────────────────────────────
+  // ─── CHUNKED CACHE CHECK ──────────────────────────────────
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'master_data_v1_' + statusFilter;
-  var cached = cache.get(cacheKey);
+  var cacheKey = 'master_data_v2_' + statusFilter;
+  var cached = cacheGetChunked(cache, cacheKey);
   if (cached) {
     return JSON.parse(cached);
   }
@@ -253,67 +379,25 @@ function getMasterData(params) {
   var sheet = ss.getSheetByName(SHEET.MASTER_DATA);
   if (!sheet) throw new Error('Sheet "master_data" tidak ditemukan.');
 
-  var data        = sheet.getDataRange().getValues();
-  var displayData = sheet.getDataRange().getDisplayValues();
+  var data = sheet.getDataRange().getValues();
+  // OPTIMASI #1: Tidak lagi memanggil getDisplayValues() — hemat ~1-3 detik
   if (data.length < 2) {
     var emptyResult = { data: [] };
-    cache.put(cacheKey, JSON.stringify(emptyResult), 60);
+    cachePutChunked(cache, cacheKey, JSON.stringify(emptyResult));
     return emptyResult;
   }
 
-  // DYNAMIC LIVE LOOKUP from "inspections" sheet for single source of truth & per-inspection status
-  var inspSheet = ss.getSheetByName(SHEET.INSPECTIONS);
+  // OPTIMASI #6: Skip inspections lookup jika filter = 'pending'
+  // Pending = belum ada inspeksi, jadi tidak perlu baca sheet inspections
   var inspMap = {};
-  if (inspSheet && inspSheet.getLastRow() > 1) {
-    var inspData = inspSheet.getDataRange().getValues();
-    for (var i = 1; i < inspData.length; i++) {
-      var mName = inspData[i][1];
-      var pNo   = inspData[i][7];
-      var rQty  = inspData[i][8];
-      var rDate = inspData[i][15];
-      if (!pNo) continue;
-
-      var keys = buildMatchingKeys(pNo, mName, rQty, rDate);
-      keys.forEach(function(k) {
-        if (!inspMap[k]) {
-          inspMap[k] = {
-            checked_qty: 0,
-            raw_done: false,
-            laminating_done: false,
-            bonding_done: false,
-            has_any_inspection: true,
-            last_status: ''
-          };
-        }
-      });
-
-      var iType = String(inspData[i][27] || '').trim();
-      var iStatus = String(inspData[i][18] || '').trim().toLowerCase();
-      var okQty = Number(inspData[i][9]) || 0;
-      var noQty = Number(inspData[i][10]) || 0;
-      var bondingUrl = String(inspData[i][34] || '').trim();
-
-      keys.forEach(function(k) {
-        inspMap[k].checked_qty += (okQty + noQty);
-        if (iType.indexOf('Raw Material') >= 0 && (iStatus === 'done' || (okQty + noQty) > 0)) {
-          if (iStatus === 'done') inspMap[k].raw_done = true;
-        }
-        if (iType.indexOf('Laminating Material') >= 0) {
-          inspMap[k].laminating_done = true;
-        }
-        if (iType.indexOf('Bonding Test') >= 0 || bondingUrl !== '') {
-          inspMap[k].bonding_done = true;
-        }
-        inspMap[k].last_status = iStatus;
-      });
-    }
+  if (statusFilter !== 'pending') {
+    inspMap = buildInspectionMap(ss);
   }
 
   var result = [];
 
   for (var r = 1; r < data.length; r++) {
     var row = data[r];
-    var disp = displayData[r];
 
     var poVal = row[12];
     if (!poVal) continue;
@@ -323,12 +407,21 @@ function getMasterData(params) {
     var rDateVal   = row[11];
     var currentStoredStatus = String(row[18] || '').trim().toLowerCase();
 
-    var lookupKeys = buildMatchingKeys(poVal, matNameVal, plannedQty, rDateVal);
+    // OPTIMASI #3: Primary key lookup dulu (O(1)), fallback hanya jika miss
     var inspInfo = null;
-    for (var kIdx = 0; kIdx < lookupKeys.length; kIdx++) {
-      if (inspMap[lookupKeys[kIdx]]) {
-        inspInfo = inspMap[lookupKeys[kIdx]];
-        break;
+    if (statusFilter !== 'pending') {
+      var primaryKey = cleanPoStr(poVal) + '___' + String(matNameVal || '').trim().toLowerCase() + '___' + String(plannedQty).trim();
+      inspInfo = inspMap[primaryKey] || null;
+
+      // Fallback: coba key lain hanya jika primary miss
+      if (!inspInfo) {
+        var lookupKeys = buildMatchingKeys(poVal, matNameVal, plannedQty, rDateVal);
+        for (var kIdx = 0; kIdx < lookupKeys.length; kIdx++) {
+          if (inspMap[lookupKeys[kIdx]]) {
+            inspInfo = inspMap[lookupKeys[kIdx]];
+            break;
+          }
+        }
       }
     }
 
@@ -350,18 +443,8 @@ function getMasterData(params) {
 
     if (statusFilter !== 'all' && dynamicStatus !== statusFilter) continue;
 
-    var rdVal = disp[11] || '';
-    if (!rdVal && row[11] != null && row[11] !== '') {
-      try {
-        if (row[11] instanceof Date || (typeof row[11] === 'object' && row[11].getTime)) {
-          rdVal = Utilities.formatDate(row[11], Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        } else {
-          rdVal = String(row[11]).trim();
-        }
-      } catch(e) {
-        rdVal = String(row[11]).trim();
-      }
-    }
+    // OPTIMASI #1: Format date tanpa getDisplayValues()
+    var rdVal = formatDateValue(row[11]);
 
     var balanceQty = Math.max(0, plannedQty - checkedQty);
 
@@ -389,15 +472,8 @@ function getMasterData(params) {
 
   var finalResult = { data: result, total: result.length };
 
-  // ─── SAVE TO CACHE (60 detik) ──────────────────────────────
-  try {
-    var payload = JSON.stringify(finalResult);
-    if (payload.length < 95000) {
-      cache.put(cacheKey, payload, 60);
-    }
-  } catch (e) {
-    // Cache put gagal
-  }
+  // ─── SAVE TO CHUNKED CACHE (300 detik / 5 menit) ──────────
+  cachePutChunked(cache, cacheKey, JSON.stringify(finalResult));
 
   return finalResult;
 }
@@ -472,7 +548,7 @@ function resetOrphanedStatus() {
       }
       mdSheet.getRange(1, 1, mdData.length, numCols).setValues(mdData);
 
-      CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+      invalidateMasterDataCache();
     }
 
     return {
@@ -581,7 +657,7 @@ function syncMasterDataStatus() {
     if (mdUpdated) {
       sheet.getRange(1, 1, data.length, numCols).setValues(data);
       var cache = CacheService.getScriptCache();
-      cache.removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+      invalidateMasterDataCache();
     }
 
     return {
@@ -732,7 +808,7 @@ function bulkUpsertMasterData(payload) {
       sheet.getRange(currentLastRow + 1, 1, insertRows.length, insertRows[0].length).setValues(insertRows);
     }
 
-    CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+    invalidateMasterDataCache();
 
     return {
       status:  'ok',
@@ -1320,7 +1396,7 @@ function passAll(payload) {
         .setValues(newInspRows);
     }
 
-    CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+    invalidateMasterDataCache();
 
     return {
       status:  'ok',
@@ -1761,7 +1837,7 @@ function submitClaim(payload) {
   ]);
 
   // Invalidasi cache karena master_data berubah
-  CacheService.getScriptCache().removeAll(['master_data_v1_all', 'master_data_v1_pending', 'master_data_v1_in-progress', 'master_data_v1_done']);
+  invalidateMasterDataCache();
 
   return {
     success: true,
