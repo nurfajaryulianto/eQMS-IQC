@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
@@ -511,70 +511,43 @@ window.confirmPassAll = async function () {
         .filter(cb => cb.checked)
         .map(cb => ({
             po:           cb.dataset.po,
-            id:           cb.dataset.id ? Number(cb.dataset.id) : null,
-            rowIdx:       cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null,
+            id:           cb.dataset.id ? Number(cb.dataset.id) : (cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null),
             materialType: (cb.dataset.materialtype || '').trim(),
         }));
 
-    if (!selectedItems.length) {
+    const targetIds = selectedItems.map(item => item.id).filter(id => id != null);
+
+    if (!targetIds.length) {
         showToast('Tidak ada item yang dipilih untuk di-pass.', 'info');
         return;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menandai ${selectedItems.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menandai ${targetIds.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
 
-    setLoading(true, `Memproses ${selectedItems.length} item...`);
+    setLoading(true, `Memproses ${targetIds.length} item...`);
 
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(2000);
             allMasterData.forEach(d => {
-                const isSelected = selectedItems.some(item => item.id === d.id || item.po === d.po_number);
+                const isSelected = targetIds.includes(d.id || d.row_idx);
                 if (d.status === 'pending' && isSelected) d.status = 'done';
             });
             setLoading(false);
-            showToast(`Pass berhasil: ${selectedItems.length} item ditandai sebagai Pass. (simulasi)`, 'success');
+            showToast(`Pass berhasil: ${targetIds.length} item ditandai sebagai Pass. (simulasi)`, 'success');
             await loadPassAllPreview();
             renderMasterTable();
             return;
         }
 
-        // Ambil assignments: material_type -> inspector
-        const assignResult = await apiGetAssignments();
-        const assignments = assignResult.data || [];
-        const assignMap = {};
-        assignments.forEach(a => {
-            assignMap[(a.material_type || '').toUpperCase()] = {
-                nik:  a.inspector_nik  || currentUser?.nik  || 'admin',
-                name: a.inspector_name || currentUser?.name || 'Admin Material',
-            };
-        });
-
-        // Group items by material_type
-        const groups = {};
-        selectedItems.forEach(item => {
-            const mt = (item.materialType || 'UNKNOWN').toUpperCase();
-            if (!groups[mt]) groups[mt] = [];
-            const id = item.id || item.rowIdx;
-            if (id != null) groups[mt].push(id);
-        });
-
-        let totalPassed = 0;
-        const groupEntries = Object.entries(groups);
-
-        for (const [mt, ids] of groupEntries) {
-            if (!ids.length) continue;
-            const inspector = assignMap[mt] || assignMap['ALL'] || {
-                nik:  currentUser?.nik  || 'admin',
-                name: currentUser?.name || 'Admin Material',
-            };
-            setLoading(true, `Pass ${mt}: ${ids.length} item (Inspector: ${inspector.nik})...`);
-            const result = await apiPassAll(ids, inspector.nik, inspector.name);
-            totalPassed += result?.passed_count || 0;
-        }
+        const result = await apiPassAll(
+            targetIds,
+            currentUser?.nik || 'admin',
+            currentUser?.name || 'Admin Material'
+        );
 
         setLoading(false);
-        showToast(`Pass berhasil: ${totalPassed} item ditandai DONE dengan inspector sesuai assignment.`, 'success');
+        showToast(result?.message || `Pass berhasil: ${targetIds.length} item diproses.`, 'success');
         await loadMasterData();
         if (typeof renderMasterTable === 'function') renderMasterTable();
         await loadPassAllPreview();

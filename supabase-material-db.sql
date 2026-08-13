@@ -130,7 +130,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   v_batch_size     NUMERIC;
   v_total_checked  NUMERIC;
-  v_has_raw_done   BOOLEAN;
+  v_has_done       BOOLEAN;
   v_new_status     VARCHAR(20);
 BEGIN
   IF NEW.master_data_id IS NULL THEN
@@ -143,12 +143,12 @@ BEGIN
 
   SELECT
     COALESCE(SUM(ok + no_qty), 0),
-    BOOL_OR(inspection_type ILIKE '%Raw Material%' AND status = 'done')
-  INTO v_total_checked, v_has_raw_done
+    BOOL_OR(status IN ('done', 'pass'))
+  INTO v_total_checked, v_has_done
   FROM public.material_inspections
   WHERE master_data_id = NEW.master_data_id;
 
-  IF v_has_raw_done OR (v_batch_size > 0 AND v_total_checked >= v_batch_size) THEN
+  IF v_has_done OR (v_batch_size > 0 AND v_total_checked >= v_batch_size) THEN
     v_new_status := 'done';
   ELSIF v_total_checked > 0 THEN
     v_new_status := 'in-progress';
@@ -178,17 +178,57 @@ CREATE OR REPLACE FUNCTION fn_pass_all_materials(
 )
 RETURNS JSONB AS $$
 DECLARE
-  v_id        BIGINT;
-  v_row       public.material_master_data%ROWTYPE;
-  v_insp_id   TEXT;
-  v_count     INT := 0;
+  v_id         BIGINT;
+  v_row        public.material_master_data%ROWTYPE;
+  v_insp_id    TEXT;
+  v_count      INT := 0;
+  v_insp_nik   TEXT;
+  v_insp_name  TEXT;
+  v_mat_type   TEXT;
 BEGIN
   FOREACH v_id IN ARRAY target_ids LOOP
     SELECT * INTO v_row FROM public.material_master_data WHERE id = v_id;
     IF NOT FOUND THEN CONTINUE; END IF;
     IF v_row.status = 'done' THEN CONTINUE; END IF;
 
-    v_insp_id := 'PASS-' || v_id::TEXT || '-' || EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT;
+    -- Reset inspector variables
+    v_insp_nik := NULL;
+    v_insp_name := NULL;
+    v_mat_type := UPPER(TRIM(COALESCE(v_row.material_type, '')));
+
+    -- 1. Look up material_assignments by exact material_type match
+    IF v_mat_type <> '' THEN
+      SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
+      FROM public.material_assignments
+      WHERE UPPER(TRIM(material_type)) = v_mat_type
+      LIMIT 1;
+    END IF;
+
+    -- 2. Fallback: match material_type keywords in material_name
+    IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_row.material_name IS NOT NULL THEN
+      SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
+      FROM public.material_assignments
+      WHERE (UPPER(TRIM(material_type)) IN ('LEATHER', 'LTH') AND UPPER(v_row.material_name) LIKE '%LTH%')
+         OR (UPPER(TRIM(material_type)) IN ('TEXTILE', 'TXT') AND UPPER(v_row.material_name) LIKE '%TXT%')
+         OR (UPPER(TRIM(material_type)) IN ('SYNTHETIC', 'SYN') AND (UPPER(v_row.material_name) LIKE '%SYN%' OR UPPER(v_row.material_name) LIKE '%PU%'))
+      LIMIT 1;
+    END IF;
+
+    -- 3. Fallback: check wildcard 'ALL' in material_assignments
+    IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
+      SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
+      FROM public.material_assignments
+      WHERE UPPER(TRIM(material_type)) = 'ALL'
+      LIMIT 1;
+    END IF;
+
+    -- 4. Final Fallback: use admin / current user
+    IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
+      v_insp_nik := admin_nik;
+      v_insp_name := admin_name;
+    END IF;
+
+    v_insp_id := 'PASS-' || v_id::TEXT || '-' || EXTRACT(EPOCH FROM NOW())::BIGINT::TEXT || '-' || (FLOOR(RANDOM()*1000)::INT)::TEXT;
 
     INSERT INTO public.material_inspections (
       inspection_id, master_data_id, po_no, material_name,
@@ -199,8 +239,13 @@ BEGIN
       v_insp_id, v_id, v_row.po_number, v_row.material_name,
       v_row.batch_size, v_row.batch_size, 0,
       v_row.receive_date, 'done', NOW(),
-      admin_nik, 'Raw Material', 'batch_pass_all', NOW()
+      v_insp_nik, COALESCE(NULLIF(v_row.material_type, ''), 'Raw Material'), 'batch_pass_all', NOW()
     );
+
+    -- Update master data status directly to done
+    UPDATE public.material_master_data
+    SET status = 'done'
+    WHERE id = v_id;
 
     v_count := v_count + 1;
   END LOOP;

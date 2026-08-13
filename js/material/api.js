@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // js/material/api.js — IQC Material: Supabase API Layer
 // Menggantikan seluruh gasGet / gasPost / GAS Web App calls.
 // Semua fungsi menggunakan Supabase JS SDK dari auth.js.
@@ -116,28 +116,44 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
         return '';
     };
 
-    const insertRows = rows.map(r => ({
-        po_number:            g(r, 'PO Number','po_number','PONumber','PO_NUMBER'),
-        material_name:        g(r, 'Material Name','material_name','MaterialName','MATERIAL_NAME'),
-        material_description: g(r, 'Material Description','material_description','ItemDescription','MATERIAL_DESCRIPTION'),
-        uom:                  g(r, 'UOM','uom','Uom'),
-        supplier:             g(r, 'Supplier','supplier','SUPPLIER'),
-        supplier_name:        g(r, 'Supplier Name','supplier_name','SupplierName','vendor_name','SUPPLIER_NAME'),
-        po_area:              g(r, 'PO Area','po_area','POArea','PO_AREA'),
-        batch_size:           Number(g(r, 'Batch Size','batch_size','BatchSize','BATCH_SIZE','planned_qty') || 0) || 0,
-        product_code:         g(r, 'Product Code','product_code','ProductCode','style','PRODUCT_CODE'),
-        model_name:           g(r, 'Model Name','model_name','ModelName','model_shoe','MODEL_NAME'),
-        bucket:               g(r, 'Bucket','bucket','BUCKET'),
-        receive_date:         parseDateSafe(g(r, 'Receive Date','receive_date','ReceiveDate','RECEIVE_DATE')),
-        shipment_number:      g(r, 'Shipment Number','shipment_number','ShipmentNumber','SHIPMENT_NUMBER'),
-        no_bc:                g(r, 'No BC','no_bc','NoBc','NO_BC'),
-        bc_type:              g(r, 'BC Type','bc_type','BcType','BC_TYPE'),
-        receive_number:       g(r, 'Receive Number','receive_number','ReceiveNumber','RECEIVE_NUMBER'),
-        material_type:        g(r, 'Material Type','material_type','MaterialType','MATERIAL_TYPE'),
-        status:               'pending',
-        uploaded_by:          uploaderNik,
-        created_at:           now,
-    })).filter(r => r.po_number && r.material_name);
+    const insertRows = rows.map(r => {
+        const matName = g(r, 'Material Name','material_name','MaterialName','MATERIAL_NAME');
+        const matDesc = g(r, 'Material Description','material_description','ItemDescription','MATERIAL_DESCRIPTION');
+        let matType = g(r, 'Material Type','material_type','MaterialType','MATERIAL_TYPE');
+
+        if (!matType) {
+            const textUpper = (matName + ' ' + matDesc).toUpperCase();
+            if (textUpper.includes('LTH') || textUpper.includes('LEATHER')) matType = 'LEATHER';
+            else if (textUpper.includes('TXT') || textUpper.includes('TEXTILE')) matType = 'TEXTILE';
+            else if (textUpper.includes('SYN') || textUpper.includes('PU') || textUpper.includes('SUEDE') || textUpper.includes('NUBUCK')) matType = 'SYNTHETIC';
+            else if (textUpper.includes('RUB') || textUpper.includes('RUBBER') || textUpper.includes('SOLE')) matType = 'RUBBER';
+            else if (textUpper.includes('PKG') || textUpper.includes('BOX')) matType = 'PACKAGING';
+            else matType = 'Raw Material';
+        }
+
+        return {
+            po_number:            g(r, 'PO Number','po_number','PONumber','PO_NUMBER'),
+            material_name:        matName,
+            material_description: matDesc,
+            uom:                  g(r, 'UOM','uom','Uom'),
+            supplier:             g(r, 'Supplier','supplier','SUPPLIER'),
+            supplier_name:        g(r, 'Supplier Name','supplier_name','SupplierName','vendor_name','SUPPLIER_NAME'),
+            po_area:              g(r, 'PO Area','po_area','POArea','PO_AREA'),
+            batch_size:           Number(g(r, 'Batch Size','batch_size','BatchSize','BATCH_SIZE','planned_qty') || 0) || 0,
+            product_code:         g(r, 'Product Code','product_code','ProductCode','style','PRODUCT_CODE'),
+            model_name:           g(r, 'Model Name','model_name','ModelName','model_shoe','MODEL_NAME'),
+            bucket:               g(r, 'Bucket','bucket','BUCKET'),
+            receive_date:         parseDateSafe(g(r, 'Receive Date','receive_date','ReceiveDate','RECEIVE_DATE')),
+            shipment_number:      g(r, 'Shipment Number','shipment_number','ShipmentNumber','SHIPMENT_NUMBER'),
+            no_bc:                g(r, 'No BC','no_bc','NoBc','NO_BC'),
+            bc_type:              g(r, 'BC Type','bc_type','BcType','BC_TYPE'),
+            receive_number:       g(r, 'Receive Number','receive_number','ReceiveNumber','RECEIVE_NUMBER'),
+            material_type:        matType,
+            status:               'pending',
+            uploaded_by:          uploaderNik,
+            created_at:           now,
+        };
+    }).filter(r => r.po_number && r.material_name);
 
     console.log('[upload] parsed rows sample:', insertRows[0]);
     console.log('[upload] total valid rows:', insertRows.length, 'of', rows.length);
