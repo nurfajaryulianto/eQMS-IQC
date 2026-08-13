@@ -1104,8 +1104,6 @@ async function submitInspection() {
         } else {
             throw new Error(result.message || 'Gagal menyimpan data.');
         }
-            throw new Error(json.message || 'Gagal menyimpan data.');
-        }
 
     } catch (err) {
         console.error('submitInspection error:', err);
