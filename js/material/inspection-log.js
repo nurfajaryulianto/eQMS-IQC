@@ -86,35 +86,42 @@ function renderInspectionLog(data) {
 
     tbody.innerHTML = data.map((d, i) => {
         const dateStr = d.inspection_date
-            ? (d.inspection_date instanceof Date
-                ? d.inspection_date.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
-                : String(d.inspection_date).substring(0, 10))
+            ? String(d.inspection_date).substring(0, 10)
+            : '—';
+
+        // Format date as "13 Agu 2026"
+        const dateFmt = dateStr !== '—'
+            ? new Date(dateStr).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
             : '—';
 
         const ok    = Number(d.ok)     || 0;
         const noQty = Number(d.no_qty) || 0;
         const total = ok + noQty;
-        const passRate = total > 0 ? ((ok / total) * 100).toFixed(0) : '—';
+        const passRate = total > 0 ? ((ok / total) * 100).toFixed(0) + '%' : '—';
 
         const statusColor = d.status === 'done' ? '#34d399' : d.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
 
         const typeBadge = (type) => {
             const colors = { 'Raw Material': '#60a5fa', 'Laminating Material': '#a78bfa', 'Bonding Test': '#f97316' };
             const c = colors[type] || '#94a3b8';
-            return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;white-space:nowrap;">${esc(type || '—')}</span>`;
+            return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${esc(type || '—')}</span>`;
         };
 
+        // Shared td truncate style
+        const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        const TD = `padding:10px 12px;${T}`;
+
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="padding:10px 12px;color:rgba(255,255,255,0.5);font-size:12px;white-space:nowrap;">${dateStr}</td>
-            <td style="padding:10px 12px;font-weight:700;color:#fff;font-size:12px;">${esc(d.po_no || d.po_number || '—')}</td>
-            <td style="padding:10px 12px;color:#34d399;font-weight:600;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
-            <td style="padding:10px 12px;">${typeBadge(d.inspection_type)}</td>
-            <td style="padding:10px 12px;color:rgba(255,255,255,0.7);font-size:12px;">${esc(d.inspector_nik || '—')}</td>
-            <td style="padding:10px 12px;text-align:right;font-weight:700;color:#fff;font-size:13px;">${ok.toLocaleString('id-ID')}</td>
-            <td style="padding:10px 12px;text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
-            <td style="padding:10px 12px;text-align:right;color:#94a3b8;font-size:12px;">${typeof passRate === 'string' && passRate !== '—' ? passRate + '%' : passRate}</td>
-            <td style="padding:10px 12px;"><span style="font-size:11px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
-            <td style="padding:10px 12px;font-size:11px;color:rgba(255,255,255,0.4);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(d.defect_notes||'')}">${esc(d.defect_notes || '—')}</td>
+            <td style="${TD}color:rgba(255,255,255,0.5);font-size:12px;" title="${dateFmt}">${dateFmt}</td>
+            <td style="${TD}font-weight:700;color:#fff;font-size:12px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
+            <td style="${TD}color:#34d399;font-weight:600;font-size:12px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
+            <td style="padding:10px 12px;overflow:hidden;">${typeBadge(d.inspection_type)}</td>
+            <td style="${TD}color:rgba(255,255,255,0.7);font-size:12px;" title="${esc(d.inspector_nik||'')}">${esc(d.inspector_nik || '—')}</td>
+            <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:13px;">${ok.toLocaleString('id-ID')}</td>
+            <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
+            <td style="${TD}text-align:right;color:#94a3b8;font-size:12px;">${passRate}</td>
+            <td style="${TD}"><span style="font-size:11px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
+            <td style="${TD}font-size:11px;color:rgba(255,255,255,0.4);" title="${esc(d.defect_notes||'')}">${esc(d.defect_notes || '—')}</td>
         </tr>`;
     }).join('');
 }

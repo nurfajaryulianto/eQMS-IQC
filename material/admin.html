@@ -991,7 +991,19 @@
                 </div>
                 <!-- Table -->
                 <div class="thin-scroll" style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;min-width:900px;">
+                        <colgroup>
+                            <col style="width:95px;">  <!-- Tgl -->
+                            <col style="width:120px;"> <!-- PO Number -->
+                            <col style="width:160px;"> <!-- Material Name -->
+                            <col style="width:120px;"> <!-- Jenis -->
+                            <col style="width:90px;">  <!-- Inspector -->
+                            <col style="width:70px;">  <!-- Qty OK -->
+                            <col style="width:70px;">  <!-- Qty Fail -->
+                            <col style="width:75px;">  <!-- Pass Rate -->
+                            <col style="width:70px;">  <!-- Status -->
+                            <col style="width:auto;">  <!-- Catatan -->
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;white-space:nowrap;">Tgl Inspeksi</th>

@@ -448,7 +448,7 @@ window.applyPassAllDateFilter = function () {
 
     listEl.innerHTML = filteredPending.map((d, i) => `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" data-id="${d.id}" data-materialtype="${esc(d.material_type||')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ffffff;">
@@ -510,8 +510,10 @@ window.confirmPassAll = async function () {
     const selectedItems = Array.from(checkboxes)
         .filter(cb => cb.checked)
         .map(cb => ({
-            po: cb.dataset.po,
-            rowIdx: cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null
+            po:           cb.dataset.po,
+            id:           cb.dataset.id ? Number(cb.dataset.id) : null,
+            rowIdx:       cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null,
+            materialType: (cb.dataset.materialtype || '').trim(),
         }));
 
     if (!selectedItems.length) {
@@ -527,10 +529,8 @@ window.confirmPassAll = async function () {
         if (MATERIAL_TEST_MODE) {
             await delay(2000);
             allMasterData.forEach(d => {
-                const isSelected = selectedItems.some(item => (item.rowIdx && d.row_idx === item.rowIdx) || (!item.rowIdx && d.po_number === item.po));
-                if (d.status === 'pending' && isSelected) {
-                    d.status = 'done';
-                }
+                const isSelected = selectedItems.some(item => item.id === d.id || item.po === d.po_number);
+                if (d.status === 'pending' && isSelected) d.status = 'done';
             });
             setLoading(false);
             showToast(`Pass berhasil: ${selectedItems.length} item ditandai sebagai Pass. (simulasi)`, 'success');
@@ -539,20 +539,42 @@ window.confirmPassAll = async function () {
             return;
         }
 
-        const rowIds = selectedItems
-            .map(item => item.rowIdx)
-            .filter(id => id != null);
+        // Ambil assignments: material_type -> inspector
+        const assignResult = await apiGetAssignments();
+        const assignments = assignResult.data || [];
+        const assignMap = {};
+        assignments.forEach(a => {
+            assignMap[(a.material_type || '').toUpperCase()] = {
+                nik:  a.inspector_nik  || currentUser?.nik  || 'admin',
+                name: a.inspector_name || currentUser?.name || 'Admin Material',
+            };
+        });
 
-        if (!rowIds.length) throw new Error('Tidak ada ID item yang valid untuk di-pass.');
+        // Group items by material_type
+        const groups = {};
+        selectedItems.forEach(item => {
+            const mt = (item.materialType || 'UNKNOWN').toUpperCase();
+            if (!groups[mt]) groups[mt] = [];
+            const id = item.id || item.rowIdx;
+            if (id != null) groups[mt].push(id);
+        });
 
-        const result = await apiPassAll(
-            rowIds,
-            currentUser?.nik || 'admin',
-            currentUser?.name || 'Admin Material'
-        );
+        let totalPassed = 0;
+        const groupEntries = Object.entries(groups);
+
+        for (const [mt, ids] of groupEntries) {
+            if (!ids.length) continue;
+            const inspector = assignMap[mt] || assignMap['ALL'] || {
+                nik:  currentUser?.nik  || 'admin',
+                name: currentUser?.name || 'Admin Material',
+            };
+            setLoading(true, `Pass ${mt}: ${ids.length} item (Inspector: ${inspector.nik})...`);
+            const result = await apiPassAll(ids, inspector.nik, inspector.name);
+            totalPassed += result?.passed_count || 0;
+        }
 
         setLoading(false);
-        showToast(result?.message || 'Pass berhasil!', 'success');
+        showToast(`Pass berhasil: ${totalPassed} item ditandai DONE dengan inspector sesuai assignment.`, 'success');
         await loadMasterData();
         if (typeof renderMasterTable === 'function') renderMasterTable();
         await loadPassAllPreview();
