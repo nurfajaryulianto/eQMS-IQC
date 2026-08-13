@@ -201,16 +201,18 @@ BEGIN
       SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
       FROM public.material_assignments
       WHERE UPPER(TRIM(material_type)) = v_mat_type
+        AND inspector_nik IS NOT NULL AND TRIM(inspector_nik) <> ''
       LIMIT 1;
     END IF;
 
-    -- 2. Fallback: match material_type keywords in material_name
+    -- 2. Fallback: match material_assignments by keyword in material_name
     IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_row.material_name IS NOT NULL THEN
       SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
       FROM public.material_assignments
-      WHERE (UPPER(TRIM(material_type)) IN ('LEATHER', 'LTH') AND UPPER(v_row.material_name) LIKE '%LTH%')
+      WHERE ((UPPER(TRIM(material_type)) IN ('LEATHER', 'LTH') AND UPPER(v_row.material_name) LIKE '%LTH%')
          OR (UPPER(TRIM(material_type)) IN ('TEXTILE', 'TXT') AND UPPER(v_row.material_name) LIKE '%TXT%')
-         OR (UPPER(TRIM(material_type)) IN ('SYNTHETIC', 'SYN') AND (UPPER(v_row.material_name) LIKE '%SYN%' OR UPPER(v_row.material_name) LIKE '%PU%'))
+         OR (UPPER(TRIM(material_type)) IN ('SYNTHETIC', 'SYN') AND (UPPER(v_row.material_name) LIKE '%SYN%' OR UPPER(v_row.material_name) LIKE '%PU%')))
+        AND inspector_nik IS NOT NULL AND TRIM(inspector_nik) <> ''
       LIMIT 1;
     END IF;
 
@@ -219,10 +221,30 @@ BEGIN
       SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
       FROM public.material_assignments
       WHERE UPPER(TRIM(material_type)) = 'ALL'
+        AND inspector_nik IS NOT NULL AND TRIM(inspector_nik) <> ''
       LIMIT 1;
     END IF;
 
-    -- 4. Final Fallback: use admin / current user
+    -- 4. Fallback: lookup from public.app_users where role = 'inspector' and material_assignment matches
+    IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_mat_type <> '' THEN
+      SELECT nik, display_name INTO v_insp_nik, v_insp_name
+      FROM public.app_users
+      WHERE LOWER(role) = 'inspector'
+        AND (UPPER(material_assignment) LIKE '%' || v_mat_type || '%' OR UPPER(material_assignment) = 'ALL')
+      ORDER BY id ASC
+      LIMIT 1;
+    END IF;
+
+    -- 5. Fallback: pick ANY first available inspector from public.app_users
+    IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
+      SELECT nik, display_name INTO v_insp_nik, v_insp_name
+      FROM public.app_users
+      WHERE LOWER(role) = 'inspector'
+      ORDER BY id ASC
+      LIMIT 1;
+    END IF;
+
+    -- 6. Final Fallback: use admin if no inspectors exist at all
     IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
       v_insp_nik := admin_nik;
       v_insp_name := admin_name;

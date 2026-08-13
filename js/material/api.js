@@ -545,22 +545,71 @@ function normalizeRow(row) {
  */
 function parseDateSafe(val) {
     if (!val) return null;
+
+    // SheetJS Date object
     if (val instanceof Date) {
+        if (isNaN(val.getTime())) return null;
         const y = val.getFullYear();
         const m = String(val.getMonth() + 1).padStart(2, '0');
         const d = String(val.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-    const s = String(val).trim();
+
+    // Excel serial number (e.g., 45516)
+    if (typeof val === 'number') {
+        const dateObj = new Date(Math.round((val - 25569) * 86400 * 1000));
+        if (!isNaN(dateObj.getTime())) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+    }
+
+    let s = String(val).trim();
     if (!s) return null;
+
     // ISO format YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
-    // DD-MM-YYYY atau DD/MM/YYYY
-    const sep = s.includes('/') ? '/' : '-';
-    const parts = s.split(sep);
-    if (parts.length === 3 && parts[0].length <= 2) {
-        return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+
+    // Check for DD/MM/YYYY, MM/DD/YYYY, DD-MM-YYYY, etc.
+    const sep = s.includes('/') ? '/' : (s.includes('-') ? '-' : (s.includes('.') ? '.' : ''));
+    if (sep) {
+        const parts = s.split(sep);
+        if (parts.length === 3) {
+            let y, m, d;
+            if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                y = parts[0]; m = parts[1]; d = parts[2];
+            } else if (parts[2].length === 4 || parts[2].length === 2) {
+                // DD-MM-YYYY or MM-DD-YYYY
+                y = parts[2].length === 2 ? '20' + parts[2].padStart(2, '0') : parts[2];
+                if (Number(parts[0]) > 12) {
+                    d = parts[0]; m = parts[1];
+                } else {
+                    d = parts[0]; m = parts[1];
+                }
+            }
+            if (y && m && d) {
+                const yr = Number(y);
+                const mo = String(Number(m)).padStart(2, '0');
+                const dy = String(Number(d)).padStart(2, '0');
+                if (yr > 1900 && yr < 2100 && Number(mo) >= 1 && Number(mo) <= 12 && Number(dy) >= 1 && Number(dy) <= 31) {
+                    return `${yr}-${mo}-${dy}`;
+                }
+            }
+        }
     }
+
+    // Standard JS Date fallback
+    const dt = new Date(s);
+    if (!isNaN(dt.getTime()) && dt.getFullYear() > 1900) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     return s;
 }
 

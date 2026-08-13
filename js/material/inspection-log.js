@@ -85,14 +85,28 @@ function renderInspectionLog(data) {
     }
 
     tbody.innerHTML = data.map((d, i) => {
-        const dateStr = d.inspection_date
-            ? String(d.inspection_date).substring(0, 10)
-            : '—';
-
-        // Format date as "13 Agu 2026"
-        const dateFmt = dateStr !== '—'
-            ? new Date(dateStr).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
-            : '—';
+        // Robust date parsing (inspection_date, created_at, or receive_date)
+        const rawDate = d.inspection_date || d.created_at || d.receive_date;
+        let dateFmt = '—';
+        if (rawDate) {
+            const str = String(rawDate).trim();
+            const isoPart = str.split('T')[0];
+            const parts = isoPart.split(/[-/.]/);
+            if (parts.length === 3) {
+                let y = Number(parts[0]);
+                let m = Number(parts[1]);
+                let dy = Number(parts[2]);
+                if (parts[0].length <= 2 && parts[2].length === 4) {
+                    // Handle DD-MM-YYYY format
+                    dy = Number(parts[0]); m = Number(parts[1]); y = Number(parts[2]);
+                }
+                if (y < 100) y += 2000;
+                if (y > 1900 && m >= 1 && m <= 12 && dy >= 1 && dy <= 31) {
+                    const dt = new Date(y, m - 1, dy);
+                    dateFmt = dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+                }
+            }
+        }
 
         const ok    = Number(d.ok)     || 0;
         const noQty = Number(d.no_qty) || 0;
