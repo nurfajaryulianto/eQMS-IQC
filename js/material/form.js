@@ -2,7 +2,8 @@
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload, gasGet, gasPost } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
+import { apiGetMasterData, apiGetUsers, apiSubmitInspection } from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allPOData = [];       // semua master_data dari GAS
@@ -425,34 +426,27 @@ async function fetchMasterData() {
         }
 
         setSyncStatus('Memuat data...', 'loading');
-        const json = await gasGet('getMasterData');
+        const result = await apiGetMasterData({ status: 'all' });
 
-        if (json.error) throw new Error(json.error);
-
-        allPOData = (json.data || []).map(row => {
-            const plannedQty = Number(row.planned_qty || row.PlannedQty) || 0;
-            const checkedQty = Number(row.checked_qty) || 0;
-            const balanceQty = Math.max(0, plannedQty - checkedQty);
-            const statusVal = (row.status || row.Status || 'pending').toLowerCase();
-            return {
-                po_number: row.po_number || row.PONumber || '',
-                material_name: row.material_name || row.MaterialName || '',
-                item_description: row.item_description || row.ItemDescription || '',
-                uom: row.uom || row.UOM || '',
-                vendor_name: row.vendor_name || row.VendorName || '',
-                style: row.style || row.Style || '',
-                model_shoe: row.model_shoe || row.ModelShoe || '',
-                planned_qty: plannedQty,
-                checked_qty: checkedQty,
-                in_progress_qty: checkedQty,
-                balance_qty: balanceQty,
-                receive_date: row.receive_date || row.ReceiveDate || '',
-                status: statusVal,
-                raw_done: Boolean(row.raw_done),
-                laminating_done: Boolean(row.laminating_done),
-                bonding_done: Boolean(row.bonding_done)
-            };
-        });
+        allPOData = (result.data || []).map(row => ({
+            id:             row.id,
+            po_number:      row.po_number || '',
+            material_name:  row.material_name || '',
+            item_description: row.item_description || '',
+            uom:            row.uom || '',
+            vendor_name:    row.vendor_name || '',
+            style:          row.style || '',
+            model_shoe:     row.model_shoe || '',
+            planned_qty:    Number(row.planned_qty) || 0,
+            checked_qty:    Number(row.checked_qty) || 0,
+            balance_qty:    Math.max(0, (Number(row.planned_qty) || 0) - (Number(row.checked_qty) || 0)),
+            receive_date:   row.receive_date || '',
+            status:         (row.status || 'pending').toLowerCase(),
+            raw_done:       row.status === 'done',
+            laminating_done: false,
+            bonding_done:   false,
+            material_type:  row.material_type || '',
+        }));
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
         renderPOList(allPOData);
@@ -1052,52 +1046,17 @@ async function submitInspection() {
 
     const checkingStatus = isBonding ? 'done' : (document.getElementById('checking-status')?.value || 'done');
 
-    const payload = await gasAuthedPayload({
-        action: 'submitInspection',
-        po_number: selectedPO.po_number,
-        inspector_nik: inspectorName,
-        inspector_name: inspectorName,
-        inspection_type: inspectTypeStr,
-        qty_inspect: inspect,
-        qty_fail: fail,
-        defect_notes: isBonding ? bondingNotes : notes,
-        result_status: isBonding ? 'Pass' : (isRaw ? (fail === 0 ? 'Pass' : 'Fail') : (lamColorChoice === 'YES' && lamPackagingChoice === 'YES' ? 'Pass' : 'Fail')),
-        input_type: 'manual',
-        rolling_inspection: isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
-        check_color: isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
-        color_check_status: isRaw ? 'N/A' : (isBonding ? 'N/A' : lamColorChoice),
-        color_check_result: isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
-        packaging_status: isRaw ? 'N/A' : (isBonding ? 'N/A' : lamPackagingChoice),
-        packaging_reject_reason: isBonding ? '' : lamPkgReason,
-        roll_inspection_flag: isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
-        roll_inspection_percentage: isRaw ? '' : (isBonding ? '' : lamRollPct),
-        approved_by_leader: isBonding ? '' : (leaderSelect ? leaderSelect.value : ''),
-        file_data: fileData,
-        file_name: fileName,
-        file_type: fileType,
-        inspection_date: new Date().toISOString(),
-        status: checkingStatus,
-    });
-
     try {
         if (MATERIAL_TEST_MODE) {
-            console.log('[TEST MODE] Payload:', JSON.stringify(payload, null, 2));
             await delay(1000);
-            // Update PO status and checked qty in local mock
             const idx = allPOData.findIndex(p => p.po_number === selectedPO.po_number);
             if (idx !== -1) {
                 allPOData[idx].status = checkingStatus;
                 if (checkingStatus === 'in-progress') {
                     allPOData[idx].checked_qty = (allPOData[idx].checked_qty || 0) + inspect;
-                    allPOData[idx].in_progress_qty = allPOData[idx].checked_qty;
                     allPOData[idx].balance_qty = Math.max(0, allPOData[idx].planned_qty - allPOData[idx].checked_qty);
-                } else {
-                    allPOData[idx].checked_qty = 0;
-                    allPOData[idx].in_progress_qty = 0;
-                    allPOData[idx].balance_qty = allPOData[idx].planned_qty;
                 }
             }
-
             loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan! (simulasi)`, 'success');
             resetForm();
@@ -1105,19 +1064,43 @@ async function submitInspection() {
             return;
         }
 
-        const res = await fetch(MATERIAL_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload),
+        const result = await apiSubmitInspection({
+            master_data_id:           selectedPO.id || null,
+            po_number:                selectedPO.po_number,
+            material_name:            selectedPO.material_name,
+            item_description:         selectedPO.item_description || '',
+            qty_receive:              selectedPO.planned_qty,
+            receive_date:             selectedPO.receive_date,
+            inspector_nik:            inspectorName,
+            inspector_name:           inspectorName,
+            inspection_type:          inspectTypeStr,
+            qty_inspect:              inspect,
+            qty_fail:                 fail,
+            defect_notes:             isBonding ? bondingNotes : notes,
+            rolling_inspection:       isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
+            check_color:              isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
+            color_check_status:       isRaw ? '' : (isBonding ? '' : lamColorChoice),
+            color_check_result:       isRaw ? checkColor : (isBonding ? '' : lamColorRes),
+            packaging_status:         isRaw ? '' : (isBonding ? '' : lamPackagingChoice),
+            packaging_reject_reason:  isBonding ? '' : lamPkgReason,
+            roll_inspection_flag:     isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
+            roll_inspection_percentage: isRaw ? '' : (isBonding ? '' : lamRollPct),
+            approved_by_leader:       isBonding ? '' : (leaderSelect ? leaderSelect.value : ''),
+            file_data:                fileData,
+            file_name:                fileName,
+            file_type:                fileType,
+            inspection_date:          new Date().toISOString(),
+            status:                   checkingStatus,
         });
-        const json = await res.json();
 
-        if (json.status === 'ok' || res.ok) {
+        if (result.status === 'ok') {
             loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan!`, 'success');
-            // Refresh data
             await fetchMasterData();
             resetForm();
         } else {
+            throw new Error(result.message || 'Gagal menyimpan data.');
+        }
             throw new Error(json.message || 'Gagal menyimpan data.');
         }
 

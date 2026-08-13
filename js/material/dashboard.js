@@ -2,7 +2,8 @@
 // js/material/dashboard.js — IQC Material: Dashboard KPI Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
+import { apiGetInspectionData } from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allInspections = [];
@@ -85,17 +86,15 @@ async function fetchData() {
                 qty_fail: Number(d.qty_fail),
             }));
         } else {
-            const url = await gasAuthedUrl('getInspectionData');
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-
-            allInspections = (json.data || []).map(d => ({
-                ...d,
-                inspection_date: new Date(d.inspection_date || d.created_at),
-                qty_inspect: Number(d.qty_inspect) || 0,
-                qty_fail: Number(d.qty_fail) || 0,
-            }));
+            const result = await apiGetInspectionData({});
+            if (result.data) {
+                allInspections = (result.data || []).map(d => ({
+                    ...d,
+                    inspection_date: d.inspection_date ? new Date(d.inspection_date) : new Date(),
+                    qty_inspect:     Number(d.qty_inspect) || 0,
+                    qty_fail:        Number(d.qty_fail)    || 0,
+                }));
+            }
         }
 
         populateFilters();

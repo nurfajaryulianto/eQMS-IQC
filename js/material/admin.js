@@ -2,8 +2,16 @@
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
-import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, MATERIAL_GAS_URL, gasAuthedUrl, gasAuthedPayload, gasGet, gasPost, supabase, nikToEmail } from './auth.js';
+import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, supabase, nikToEmail } from './auth.js';
 import { showAlert } from '../dialog.js';
+import {
+    apiGetMasterData, apiUpdateMasterData, apiDeleteMasterData, apiBulkUpsertMasterData,
+    apiPassAll, apiGetInspectionData,
+    apiGetAssignments, apiSaveAssignment, apiDeleteAssignment,
+    apiGetUsers, apiSaveUser, apiDeleteUser,
+    apiSubmitClaim, apiGetClaims,
+    getCurrentUserMeta
+} from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allMasterData = [];
@@ -73,39 +81,16 @@ window.loadMasterData = async function () {
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
-            const json = await gasGet('getMasterData', 'status=all');
-
-            // Normalize keys to lowercase to avoid inconsistent casing issues from backend
-            allMasterData = (json.data || []).map(row => {
-                const plannedQty = Number(row.planned_qty || row.PlannedQty || row.plannedQty) || 0;
-                const checkedQty = Number(row.checked_qty || row.CheckedQty || row.checkedQty) || 0;
-                return {
-                    row_idx: row.row_idx || row.rowIdx || null,
-                    po_number: row.po_number || row.PONumber || row.poNumber || '',
-                    material_name: row.material_name || row.MaterialName || row.materialName || '',
-                    item_description: row.item_description || row.ItemDescription || row.itemDescription || '',
-                    uom: row.uom || row.UOM || '',
-                    vendor_name: row.vendor_name || row.VendorName || row.vendorName || '',
-                    style: row.style || row.Style || '',
-                    model_shoe: row.model_shoe || row.ModelShoe || row.modelShoe || '',
-                    planned_qty: plannedQty,
-                    checked_qty: checkedQty,
-                    receive_date: row.receive_date || row.ReceiveDate || row.receiveDate || '',
-                    status: (row.status || row.Status || 'pending').toLowerCase(),
-                    raw_done: Boolean(row.raw_done || row.RawDone),
-                    laminating_done: Boolean(row.laminating_done || row.LaminatingDone),
-                    bonding_done: Boolean(row.bonding_done || row.BondingDone),
-                    material_type: (row.material_type || row.MaterialType || '').trim()
-                };
-            });
+            const result = await apiGetMasterData({ status: 'all' });
+            allMasterData = result.data || [];
         }
+        window.__allMasterData = allMasterData;  // expose untuk Export Excel
         renderMasterTable();
-        // Populate material type filter after data is loaded
         populatePassAllMaterialTypeFilter();
     } catch (err) {
         console.error(err);
         showToast('Gagal memuat data: ' + err.message, 'error');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
     }
 };
 
@@ -139,8 +124,12 @@ window.renderMasterTable = function () {
         }
         const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0;
         const claimBtn = hasInspection
-            ? `<button onclick="window.openClaimModal(${d.row_idx})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
+            ? `<button onclick="window.openClaimModal(${d.row_idx || d.id})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
             : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
+        const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
+        const deleteBtn = d.status === 'pending'
+            ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
+            : '';
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
             <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
@@ -149,37 +138,26 @@ window.renderMasterTable = function () {
             <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
             <td style="padding:10px 14px;text-align:center;">${claimBtn}</td>
+            <td style="padding:10px 14px;text-align:center;">
+                <div style="display:flex;gap:6px;justify-content:center;">${editBtn}${deleteBtn}</div>
+            </td>
         </tr>`;
     }).join('');
 };
 
 // ─── UPLOAD TAB: GENERATE TEMPLATE ───────────────────────────
 
-window.downloadTemplate = async function () {
-    if (MATERIAL_TEST_MODE) {
-        // Generate CSV in browser
-        const headers = [
-            'Material Name', 'Material Description', 'UOM', 'Supplier',
-            'Supplier Name', 'PO Area', 'Batch Size', 'Product Code',
-            'Model Name', 'Bucket', 'Receive Date', 'PO Number',
-            'Shipment Number', 'No BC', 'BC Type', 'Receive Number', 'Material Type'
-        ];
-        const example = '"RM.LTH.1070000003.00A","FP JUNIOR BUCK - 1.4-1.6MM - DYE THROUGH - N/A - N/A - BLACK(00A)","Square Feet","YOUNGIL LEATHER INDONESIA PT.","","RM-LKL",9605.5,"CU6620-001","NIKE COURT VISION MID - BLACK/BLACK","260525,260810","01-07-2026","1263026745,1263035401","YLI/DO/26/11490,YLI/DO/26/11491","105743","BC 2.7","111260042835,111260042840","LEATHER"';
-        const csv = headers.join(',') + '\n' + example + '\n';
-        downloadCSV(csv, 'template_master_data_iqc_material.csv');
-        showToast('Template berhasil didownload!', 'success');
-        return;
-    }
-
-    try {
-        const url = await gasAuthedUrl('generateTemplate');
-        const res = await fetch(url);
-        const text = await res.text();
-        downloadCSV(text, 'template_master_data_iqc_material.csv');
-        showToast('Template berhasil didownload!', 'success');
-    } catch (err) {
-        showToast('Gagal download template: ' + err.message, 'error');
-    }
+window.downloadTemplate = function () {
+    const headers = [
+        'Material Name', 'Material Description', 'UOM', 'Supplier',
+        'Supplier Name', 'PO Area', 'Batch Size', 'Product Code',
+        'Model Name', 'Bucket', 'Receive Date', 'PO Number',
+        'Shipment Number', 'No BC', 'BC Type', 'Receive Number', 'Material Type'
+    ];
+    const example = '"RM.LTH.1070000003.00A","FP JUNIOR BUCK - 1.4-1.6MM","Square Feet","YOUNGIL LEATHER INDONESIA PT.","","RM-LKL",9605.5,"CU6620-001","NIKE COURT VISION MID - BLACK/BLACK","260525,260810","01-07-2026","1263026745,1263035401","YLI/DO/26/11490","105743","BC 2.7","111260042835","LEATHER"';
+    const csv = headers.join(',') + '\n' + example + '\n';
+    downloadCSV(csv, 'template_master_data_iqc_material.csv');
+    showToast('Template berhasil didownload!', 'success');
 };
 
 function downloadCSV(content, filename) {
@@ -340,17 +318,9 @@ window.confirmUpload = async function () {
             });
             setLoading(false);
         } else {
-            const payload = await gasAuthedPayload({
-                action: 'bulkUpsertMasterData',
-                rows: parsedFileData,
-                uploader_nik: currentUser?.nik || 'admin',
-            });
-            const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-
-            inserted = json.inserted || 0;
-            rejected = json.rejected || [];
+            const result = await apiBulkUpsertMasterData(parsedFileData, currentUser?.nik || 'admin');
+            inserted = result.inserted || 0;
+            rejected = result.rejectedList || [];
             setLoading(false);
         }
 
@@ -569,19 +539,20 @@ window.confirmPassAll = async function () {
             return;
         }
 
-        const payload = await gasAuthedPayload({
-            action: 'passAll',
-            admin_nik: currentUser?.nik || 'admin',
-            admin_name: currentUser?.name || 'Admin Material',
-            po_numbers: selectedItems.map(item => item.po),
-            row_indexes: selectedItems.filter(item => item.rowIdx).map(item => item.rowIdx)
-        });
-        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        const rowIds = selectedItems
+            .map(item => item.rowIdx)
+            .filter(id => id != null);
+
+        if (!rowIds.length) throw new Error('Tidak ada ID item yang valid untuk di-pass.');
+
+        const result = await apiPassAll(
+            rowIds,
+            currentUser?.nik || 'admin',
+            currentUser?.name || 'Admin Material'
+        );
 
         setLoading(false);
-        showToast(json.message || 'Pass berhasil!', 'success');
+        showToast(result?.message || 'Pass berhasil!', 'success');
         await loadMasterData();
         if (typeof renderMasterTable === 'function') renderMasterTable();
         await loadPassAllPreview();
@@ -660,11 +631,8 @@ window.loadMaterialAssignments = async function () {
                 { material_type: 'TEXTILE', inspector_nik: 'inspector2', inspector_name: 'Siti Rahma', updated_by: 'Admin Material', updated_at: '2026-07-21T11:30:00Z' },
             ];
         } else {
-            const url = await gasAuthedUrl('getMaterialAssignments');
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-            allAssignments = json.data || [];
+            const result = await apiGetAssignments();
+            allAssignments = result.data || [];
         }
         renderAssignmentsTable();
     } catch (err) {
@@ -696,10 +664,8 @@ async function populateAssignmentFormOptions() {
                     { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector' }
                 ];
             } else {
-                const url = await gasAuthedUrl('getUsers');
-                const res = await fetch(url);
-                const json = await res.json();
-                allUsers = json.data || [];
+                const result = await apiGetUsers();
+                allUsers = result.data || [];
             }
         }
 
@@ -775,20 +741,15 @@ window.handleAssignmentSubmit = async function (e) {
             return;
         }
 
-        const payload = await gasAuthedPayload({
-            action: 'saveMaterialAssignment',
-            material_type: materialType,
-            inspector_nik: inspectorNik,
-            inspector_name: inspectorName,
-            updated_by: currentUser?.name || currentUser?.nik || 'Admin'
+        await apiSaveAssignment({
+            materialType: materialType,
+            inspectorNik: inspectorNik,
+            inspectorName: inspectorName,
+            updatedBy: currentUser?.name || currentUser?.nik || 'Admin'
         });
 
-        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-
         setLoading(false);
-        showToast(json.message || 'Assignment berhasil disimpan.', 'success');
+        showToast('Assignment berhasil disimpan.', 'success');
         resetAssignmentForm();
         await loadMaterialAssignments();
 
@@ -847,13 +808,10 @@ window.deleteAssignment = async function (materialType) {
             return;
         }
 
-        const payload = await gasAuthedPayload({ action: 'deleteMaterialAssignment', material_type: materialType });
-        const res = await fetch(MATERIAL_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
+        await apiDeleteAssignment(materialType);
 
         setLoading(false);
-        showToast(json.message || 'Assignment berhasil dihapus.', 'success');
+        showToast('Assignment berhasil dihapus.', 'success');
         await loadMaterialAssignments();
 
     } catch (err) {
@@ -892,11 +850,8 @@ window.loadUsersList = async function () {
                 { nik: 'inspector2', name: 'Siti Rahma', role: 'inspector', material_assignment: 'TEXTILE', created_at: '2026-07-14T09:45:00Z' },
             ];
         } else {
-            const url = await gasAuthedUrl('getUsers');
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-            allUsers = json.data || [];
+            const result = await apiGetUsers();
+            allUsers = result.data || [];
         }
         renderUsersTable();
     } catch (err) {
@@ -978,7 +933,7 @@ window.handleUserSubmit = async function (e) {
         });
 
         if (MATERIAL_TEST_MODE) {
-            console.log('[TEST MODE] Save User Payload:', payload);
+            console.log('[TEST MODE] Save User Payload:', { nik, name, role, matAssignment });
             await delay(1000);
             if (editingUserNik) {
                 const idx = allUsers.findIndex(u => u.nik === editingUserNik);
@@ -992,47 +947,8 @@ window.handleUserSubmit = async function (e) {
             }
             showToast('User berhasil disimpan (simulasi)!', 'success');
         } else {
-            const res = await fetch(MATERIAL_GAS_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-
-            // Auto-sync / Register user account to Supabase Auth & app_users
-            const passwordInput = document.getElementById('user-password');
-            const userPassword = (passwordInput && passwordInput.value.trim()) ? passwordInput.value.trim() : '123456';
-
-            try {
-                const { error: rpcErr } = await supabase.rpc('create_supabase_user', {
-                    p_nik: nik,
-                    p_name: name,
-                    p_role: role,
-                    p_password: userPassword,
-                    p_material_assignment: matAssignment
-                });
-
-                if (rpcErr) {
-                    await supabase.auth.signUp({
-                        email: nikToEmail(nik),
-                        password: userPassword,
-                        options: {
-                            data: {
-                                nik: nik,
-                                name: name,
-                                display_name: name,
-                                role: role,
-                                module: 'material',
-                                material_assignment: matAssignment
-                            }
-                        }
-                    });
-                }
-            } catch (supErr) {
-                console.warn('Otomatisasi Supabase Auth:', supErr);
-            }
-
-            showToast(json.message || `User ${nik} berhasil disimpan & disinkronkan ke Auth!`, 'success');
+            await apiSaveUser({ nik, name, role, password: document.getElementById('user-password')?.value?.trim() || '123456', isNew: !editingUserNik });
+            showToast(`User ${nik} berhasil disimpan!`, 'success');
         }
         resetUserForm();
         await window.loadUsersList();
@@ -1089,14 +1005,8 @@ window.deleteUser = async function (nik) {
             allUsers = allUsers.filter(u => String(u.nik).trim() !== nikStr);
             showToast('User berhasil dihapus (simulasi)!', 'success');
         } else {
-            const payload = await gasAuthedPayload({ action: 'deleteUser', nik: nikStr });
-            const res = await fetch(MATERIAL_GAS_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-            showToast(json.message || 'User berhasil dihapus!', 'success');
+            await apiDeleteUser(nikStr);
+            showToast('User berhasil dihapus!', 'success');
         }
         await window.loadUsersList();
     } catch (err) {
@@ -1123,53 +1033,24 @@ window.resetUserForm = function () {
     if (cancelBtn) cancelBtn.style.display = 'none';
 };
 
-// ─── SPREADSHEET STATUS ───────────────────────────────────────
-
+// ─── SPREADSHEET STATUS (deprecated — replaced by Supabase) ──
+// Tab Spreadsheet sekarang menunjukkan info koneksi Supabase
 window.loadSpreadsheetStatus = async function () {
     const infoContainer = document.getElementById('admin-spreadsheet-info');
     const openBtn = document.getElementById('admin-open-spreadsheet-btn');
     if (!infoContainer) return;
 
-    infoContainer.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,0.45);font-size:13px;">⏳ <span>Loading spreadsheet status...</span></div>';
-    if (openBtn) openBtn.style.display = 'none';
-
-    try {
-        if (MATERIAL_TEST_MODE) {
-            infoContainer.innerHTML = `
-                <div style="display:flex;flex-direction:column;gap:4px;">
-                    <span style="color:white;font-weight:600;">[TEST MODE] eQMS-IQC-Material-Database</span>
-                    <span style="font-size:11px;color:rgba(255,255,255,0.4);font-family:monospace;">ID: mock_spreadsheet_id_123</span>
-                </div>
-            `;
-            if (openBtn) {
-                openBtn.href = '#';
-                openBtn.style.display = 'flex';
-            }
-            return;
-        }
-
-        const url = await gasAuthedUrl('getStatus');
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-        const data = await res.json();
-
-        if (data.spreadsheetId) {
-            infoContainer.innerHTML = `
-                <div style="display:flex;flex-direction:column;gap:4px;">
-                    <span style="color:white;font-weight:600;">${data.spreadsheetName || 'eQMS IQC Material Database'}</span>
-                    <span style="font-size:11px;color:rgba(255,255,255,0.4);font-family:monospace;word-break:break-all;">ID: ${data.spreadsheetId}</span>
-                </div>
-            `;
-            if (openBtn && data.spreadsheetUrl) {
-                openBtn.href = data.spreadsheetUrl;
-                openBtn.style.display = 'flex';
-            }
-        } else {
-            throw new Error(data.message || 'Gagal memuat status spreadsheet');
-        }
-    } catch (err) {
-        console.error(err);
-        infoContainer.innerHTML = `<span style="color:#f87171;font-weight:600;font-size:12px;">Gagal memuat status: ${err.message}. Pastikan Web App sudah di-deploy dengan benar.</span>`;
+    infoContainer.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:6px;">
+            <span style="color:#34d399;font-weight:700;">✅ Supabase PostgreSQL — Aktif</span>
+            <span style="font-size:12px;color:rgba(255,255,255,0.5);">Database telah berhasil dimigrasikan dari Google Sheets ke Supabase.</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:monospace;">Project: mymzszufrwmpkpmmlnnc.supabase.co</span>
+        </div>
+    `;
+    if (openBtn) {
+        openBtn.href = 'https://supabase.com/dashboard/project/mymzszufrwmpkpmmlnnc';
+        openBtn.textContent = 'Buka Supabase Dashboard';
+        openBtn.style.display = 'flex';
     }
 };
 
@@ -1492,26 +1373,16 @@ window.submitClaim = async function () {
             return;
         }
 
-        const payload = await gasAuthedPayload({
-            action: 'submitClaim',
-            row_idx: claimTargetData.row_idx,
-            po_number: claimTargetData.po_number,
-            material_name: claimTargetData.material_name,
-            claim_qty: claimQty,
+        const result = await apiSubmitClaim({
+            masterDataId: claimTargetData.id || claimTargetData.row_idx,
+            claimQty,
             reason,
-            ref_number: refNumber,
-            submitted_by: currentUser?.name || currentUser?.nik || 'admin'
+            refNumber,
+            submittedBy: currentUser?.name || currentUser?.nik || 'admin'
         });
-
-        const res = await fetch(MATERIAL_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
 
         window.closeClaimModal();
-        showToast(json.message || 'Klaim berhasil.', 'success');
+        showToast(result?.message || 'Klaim berhasil.', 'success');
         await loadMasterData();
         renderMasterTable();
     } catch (err) {
@@ -1536,12 +1407,8 @@ window.loadClaimsHistory = async function () {
             return;
         }
 
-        const url = await gasAuthedUrl('getClaims');
-        const res = await fetch(url);
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-
-        const data = json.data || [];
+        const result = await apiGetClaims();
+        const data = result.data || [];
         if (countEl) countEl.textContent = `${data.length} record`;
 
         if (!data.length) {
@@ -1550,7 +1417,7 @@ window.loadClaimsHistory = async function () {
         }
 
         tbody.innerHTML = data.map((c, i) => {
-            const dateStr = c.claim_date ? String(c.claim_date).substring(0, 16).replace('T', ' ') : '—';
+            const dateStr = c.created_at ? String(c.created_at).substring(0, 16).replace('T', ' ') : '—';
             return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
                 <td style="padding:10px 14px;color:rgba(255,255,255,0.5);font-size:12px;">${dateStr}</td>
                 <td style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(String(c.po_number || '—'))}</td>

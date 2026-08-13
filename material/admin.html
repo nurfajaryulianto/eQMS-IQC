@@ -391,8 +391,12 @@
                 Leader Monitor
             </button>
             <button class="tab-btn" id="tab-spreadsheet" onclick="switchTab('spreadsheet')">
-                <span class="material-symbols-outlined" style="font-size:16px;">grid_on</span>
-                Spreadsheet
+                <span class="material-symbols-outlined" style="font-size:16px;">database</span>
+                DB Status
+            </button>
+            <button class="tab-btn" id="tab-inspectionlog" onclick="switchTab('inspectionlog')">
+                <span class="material-symbols-outlined" style="font-size:16px;">fact_check</span>
+                Inspection Log
             </button>
             <button class="tab-btn" id="tab-claims" onclick="switchTab('claims')">
                 <span class="material-symbols-outlined" style="font-size:16px;">flag</span>
@@ -419,6 +423,10 @@
                             <option value="in-progress">In-Progress</option>
                             <option value="done">Done</option>
                         </select>
+                        <button onclick="window.exportMasterDataBtn()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#34d399;border-color:rgba(52,211,153,0.3);">
+                            <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export Excel
+                        </button>
                         <button onclick="syncOrphanedStatus()" class="btn-secondary"
                             title="Reset semua baris 'Done' yang tidak memiliki data inspeksi kembali ke 'Pending'"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;border-color:rgba(251,191,36,0.4);color:#fbbf24;">
@@ -434,12 +442,13 @@
                     <table class="data-table" style="width:100%;table-layout:fixed;">
                         <colgroup>
                             <col style="width: 17%;"> <!-- PO Number -->
-                            <col style="width: 25%;"> <!-- Material -->
-                            <col style="width: 20%;"> <!-- Vendor -->
-                            <col style="width: 8%;">  <!-- UOM -->
-                            <col style="width: 10%;"> <!-- Planned Qty -->
-                            <col style="width: 10%;"> <!-- Status -->
-                            <col style="width: 10%;"> <!-- Klaim -->
+                            <col style="width: 22%;"> <!-- Material -->
+                            <col style="width: 18%;"> <!-- Vendor -->
+                            <col style="width: 7%;">  <!-- UOM -->
+                            <col style="width: 9%;">  <!-- Planned Qty -->
+                            <col style="width: 9%;">  <!-- Status -->
+                            <col style="width: 9%;">  <!-- Klaim -->
+                            <col style="width: 9%;">  <!-- Actions -->
                         </colgroup>
                         <thead>
                             <tr>
@@ -450,6 +459,7 @@
                                 <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:right;">Planned Qty</th>
                                 <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">Status</th>
                                 <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">Klaim</th>
+                                <th style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="master-tbody">
@@ -908,40 +918,103 @@
             </div>
         </div>
 
-        <!-- ── TAB: SPREADSHEET ── -->
+        <!-- ── TAB: SPREADSHEET (DB Status) ── -->
         <div id="panel-spreadsheet" style="display:none;">
             <div class="card" style="max-width: 600px;">
                 <div class="card-header">
                     <span class="material-symbols-outlined"
-                        style="font-size:18px;color:rgba(255,255,255,0.45);">grid_on</span>
-                    <span style="font-size:14px;font-weight:700;color:white;">Google Spreadsheet Integration</span>
+                        style="font-size:18px;color:rgba(255,255,255,0.45);">database</span>
+                    <span style="font-size:14px;font-weight:700;color:white;">Supabase Database Status</span>
                 </div>
                 <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
-                    <p style="font-size:13px;color:rgba(255,255,255,0.45);margin:0;line-height:1.6;">
-                        Aplikasi IQC Material menggunakan Google Spreadsheet sebagai database utama untuk menyimpan data
-                        transaksi hasil inspeksi, master data PO, vendor, dan user.
-                    </p>
-
-                    <div
-                        style="background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
-                        <span
-                            style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:6px;">Status
-                            Spreadsheet Aktif</span>
-                        <div id="admin-spreadsheet-info" style="font-size:13px;font-weight:600;color:white;">
-                            Menghubungkan ke Google Apps Script...
-                        </div>
+                    <div id="admin-spreadsheet-info" style="font-size:13px;font-weight:600;color:white;">
+                        Menghubungkan ke Supabase...
                     </div>
-
                     <div style="display:flex;gap:12px;">
                         <a id="admin-open-spreadsheet-btn" target="_blank" href="#" class="btn-gradient"
                             style="padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;display:none;align-items:center;gap:8px;justify-content:center;">
                             <span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span>
-                            Buka Spreadsheet Aktif
+                            Buka Supabase Dashboard
                         </a>
                     </div>
                 </div>
             </div>
-        <!-- ── TAB: CLAIMS ── -->
+        </div>
+
+        <!-- ── TAB: INSPECTION LOG ── -->
+        <div id="panel-inspectionlog" style="display:none;">
+            <div class="card">
+                <div class="card-header" style="justify-content:space-between;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:rgba(255,255,255,0.45);">fact_check</span>
+                        <span style="font-size:14px;font-weight:700;color:white;">Inspection Log</span>
+                        <span id="ilog-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button id="ilog-export-btn" onclick="exportInspectionLog()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#34d399;border-color:rgba(52,211,153,0.3);">
+                            <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export Excel
+                        </button>
+                        <button onclick="window.loadInspectionLogTab()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
+                        </button>
+                    </div>
+                </div>
+                <!-- Filter bar -->
+                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Dari Tanggal</label>
+                        <input type="date" id="ilog-start" class="styled-input" style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Sampai Tanggal</label>
+                        <input type="date" id="ilog-end" class="styled-input" style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Jenis Inspeksi</label>
+                        <select id="ilog-type" class="styled-input" style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                            <option value="">Semua Jenis</option>
+                            <option value="Raw Material">Raw Material</option>
+                            <option value="Laminating Material">Laminating Material</option>
+                            <option value="Bonding Test">Bonding Test</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Inspector NIK</label>
+                        <input type="text" id="ilog-inspector" class="styled-input" placeholder="NIK..." style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <button onclick="window.loadInspectionLogTab()" class="btn-gradient"
+                        style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
+                        <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
+                    </button>
+                </div>
+                <!-- Table -->
+                <div class="thin-scroll" style="overflow-x:auto;">
+                    <table class="data-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;white-space:nowrap;">Tgl Inspeksi</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">PO Number</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Material Name</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Jenis</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Inspector</th>
+                                <th style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Qty OK</th>
+                                <th style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Qty Fail</th>
+                                <th style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Pass Rate</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Status</th>
+                                <th style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ilog-tbody">
+                            <tr><td colspan="10" style="padding:40px;text-align:center;color:rgba(255,255,255,0.35);">Pilih tab Inspection Log untuk memuat data.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="ilog-pagination" style="padding:16px;border-top:1px solid rgba(255,255,255,0.06);"></div>
+            </div>
+        </div>
+
         <div id="panel-claims" style="display:none;">
             <div class="card">
                 <div class="card-header" style="justify-content:space-between;">
@@ -950,10 +1023,16 @@
                         <span style="font-size:14px;font-weight:700;color:white;">Riwayat Klaim Material</span>
                         <span id="claims-count" style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
                     </div>
-                    <button onclick="window.loadClaimsHistory()" class="btn-secondary"
-                        style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
-                        <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
-                    </button>
+                    <div style="display:flex;gap:8px;">
+                        <button id="claims-export-btn" onclick="window.exportClaimsBtn()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#34d399;border-color:rgba(52,211,153,0.3);">
+                            <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export Excel
+                        </button>
+                        <button onclick="window.loadClaimsHistory()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>Refresh
+                        </button>
+                    </div>
                 </div>
                 <div style="background:rgba(239,68,68,0.06);border-bottom:1px solid rgba(239,68,68,0.15);padding:12px 20px;display:flex;gap:10px;align-items:center;">
                     <span class="material-symbols-outlined" style="color:#f87171;font-size:18px;flex-shrink:0;">info</span>
@@ -1063,9 +1142,36 @@
         </div>
     </div>
 
-    <!-- SheetJS CDN for Excel parsing -->
+    <!-- SheetJS CDN for Excel parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="../js/material/admin.js?v=20260804"></script>
+    <script type="module" src="../js/material/admin.js?v=20260813"></script>
+    <script type="module">
+        import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
+        import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
+        window.__inspLogInit = false;
+        window.loadInspectionLogTab = async function() {
+            if (!window.__inspLogInit) {
+                await initInspectionLog();
+                window.__inspLogInit = true;
+            } else {
+                await loadInspectionLog();
+            }
+        };
+        window.exportMasterDataBtn = function() {
+            const data = window.__allMasterData || [];
+            exportMasterDataToExcel(data);
+        };
+        window.exportClaimsBtn = async function() {
+            const btn = document.getElementById('claims-export-btn');
+            if (btn) { btn.disabled = true; }
+            try {
+                const { apiGetClaims } = await import('../js/material/api.js');
+                const result = await apiGetClaims({ limit: 9999 });
+                exportClaimsToExcel(result.data || []);
+            } catch(e) { alert('Gagal export: ' + e.message); }
+            finally { if (btn) btn.disabled = false; }
+        };
+    </script>
 
     <script>
         // Tab switching (needs to be non-module for onclick)
@@ -1087,7 +1193,7 @@
                 tab = 'leadermonitor';
             }
 
-            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet', 'claims'].forEach(t => {
+            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet', 'inspectionlog', 'claims', 'assignment'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -1101,6 +1207,9 @@
             }
             if (tab === 'spreadsheet' && typeof window.loadSpreadsheetStatus === 'function') {
                 window.loadSpreadsheetStatus();
+            }
+            if (tab === 'inspectionlog' && typeof window.loadInspectionLogTab === 'function') {
+                window.loadInspectionLogTab();
             }
             if (tab === 'claims' && typeof window.loadClaimsHistory === 'function') {
                 window.loadClaimsHistory();
