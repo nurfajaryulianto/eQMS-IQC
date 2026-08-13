@@ -130,25 +130,44 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
         created_at:           now,
     })).filter(r => r.po_number && r.material_name);
 
-    // Supabase upsert — ON CONFLICT DO NOTHING (berdasarkan unique constraint)
-    const { data, error } = await supabase
+    // Cek duplikat di sisi client sebelum insert
+    const { data: existing } = await supabase
         .from('material_master_data')
-        .upsert(insertRows, {
-            onConflict: 'lower(po_number),receive_date,lower(material_name),lower(COALESCE(receive_number,\'\')),batch_size',
-            ignoreDuplicates: true,
-        })
-        .select();
+        .select('po_number, receive_date, material_name, receive_number, batch_size')
+        .in('po_number', insertRows.map(r => r.po_number));
 
-    if (error) throw new Error(error.message);
+    const existingKeys = new Set(
+        (existing || []).map(e =>
+            `${e.po_number.toLowerCase()}|${e.receive_date || ''}|${e.material_name.toLowerCase()}|${(e.receive_number || '').toLowerCase()}|${e.batch_size}`
+        )
+    );
 
-    const inserted = data?.length || 0;
-    const rejected = insertRows.length - inserted;
+    const newRows = insertRows.filter(r => {
+        const key = `${r.po_number.toLowerCase()}|${r.receive_date || ''}|${r.material_name.toLowerCase()}|${(r.receive_number || '').toLowerCase()}|${r.batch_size}`;
+        return !existingKeys.has(key);
+    });
+
+    const rejected = insertRows.length - newRows.length;
+    let inserted = 0;
+
+    if (newRows.length > 0) {
+        const BATCH = 200;
+        for (let i = 0; i < newRows.length; i += BATCH) {
+            const batch = newRows.slice(i, i + BATCH);
+            const { data, error } = await supabase
+                .from('material_master_data')
+                .insert(batch)
+                .select();
+            if (error) throw new Error(error.message);
+            inserted += data?.length || 0;
+        }
+    }
 
     return {
         inserted,
         rejected,
         rejectedList: [],
-        message: `Upload selesai: ${inserted} baru disimpan, ${rejected} duplikat ditolak.`,
+        message: `Upload selesai: ${inserted} baru disimpan, ${rejected} duplikat dilewati.`,
     };
 }
 
