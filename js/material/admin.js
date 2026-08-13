@@ -448,7 +448,7 @@ window.applyPassAllDateFilter = function () {
 
     listEl.innerHTML = filteredPending.map((d, i) => `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" data-id="${d.id}" data-materialtype="${esc(d.material_type||')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" data-id="${d.id}" data-materialtype="${esc(d.material_type||'')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ffffff;">
