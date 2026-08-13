@@ -252,7 +252,6 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            table-layout: fixed;
         }
 
         .data-table td.truncate,
@@ -603,7 +602,7 @@
                             </div>
                             <div class="thin-scroll"
                                 style="overflow-x:auto;max-height:200px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow-y:auto;background:rgba(0,0,0,0.2);">
-                                <table id="preview-table" class="data-table" style="font-size:12px;"></table>
+                                <table id="preview-table" class="data-table" style="font-size:12px;table-layout:auto;width:max-content;min-width:100%;"></table>
                             </div>
                             <div style="display:flex;gap:8px;margin-top:12px;">
                                 <button onclick="clearFile()" class="btn-secondary"
