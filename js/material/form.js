@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
@@ -325,8 +325,11 @@ async function populateLeaders() {
                 { nik: 'inspector1', name: 'Inspector C', role: 'inspector' }
             ];
         } else {
-            const json = await gasGet('getUsers');
-            users = json.data || [];
+            const result = await apiGetUsers();
+            users = (result.data || []).map(u => ({
+                ...u,
+                name: u.display_name || u.nik || u.name || u.email || '',
+            }));
         }
 
         // Filter for supervisor and manager roles

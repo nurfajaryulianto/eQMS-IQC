@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // js/material/admin.js — IQC Material: Admin Panel Logic
 // ============================================================
 
@@ -851,7 +851,10 @@ window.loadUsersList = async function () {
             ];
         } else {
             const result = await apiGetUsers();
-            allUsers = result.data || [];
+            allUsers = (result.data || []).map(u => ({
+                ...u,
+                name: u.display_name || u.name || u.nik || '',
+            }));
         }
         renderUsersTable();
     } catch (err) {
@@ -924,26 +927,17 @@ window.handleUserSubmit = async function (e) {
     setLoading(true, 'Menyimpan data user...');
 
     try {
-        const payload = await gasAuthedPayload({
-            action: 'saveUser',
-            nik: nik,
-            name: name,
-            role: role,
-            material_assignment: matAssignment
-        });
-
         if (MATERIAL_TEST_MODE) {
-            console.log('[TEST MODE] Save User Payload:', { nik, name, role, matAssignment });
             await delay(1000);
             if (editingUserNik) {
                 const idx = allUsers.findIndex(u => u.nik === editingUserNik);
                 if (idx !== -1) {
-                    allUsers[idx].name = name;
+                    allUsers[idx].display_name = name;
                     allUsers[idx].role = role;
                     allUsers[idx].material_assignment = matAssignment;
                 }
             } else {
-                allUsers.push({ nik, name, role, material_assignment: matAssignment, created_at: new Date().toISOString() });
+                allUsers.push({ nik, display_name: name, role, material_assignment: matAssignment, created_at: new Date().toISOString() });
             }
             showToast('User berhasil disimpan (simulasi)!', 'success');
         } else {
@@ -1162,11 +1156,11 @@ window.loadLeaderMonitorLog = async function () {
                 }
             ];
         } else {
-            const url = await gasAuthedUrl('getInspectionData');
-            const res = await fetch(url);
-            const json = await res.json();
-            if (json.error) throw new Error(json.error);
-            allLeaderMonitorInspections = json.data || [];
+            const result = await apiGetInspectionData({
+                approvedOnly: true,
+                limit: 500,
+            });
+            allLeaderMonitorInspections = result.data || [];
         }
 
         window.renderLeaderMonitorLog();
@@ -1437,35 +1431,9 @@ window.loadClaimsHistory = async function () {
 };
 
 // ─── SYNC ORPHANED STATUS ─────────────────────────────────────
-// Memanggil GAS resetOrphanedStatus untuk memaksa sinkronisasi:
-// setiap baris di master_data yang berstatus 'done' tanpa ada
-// data inspeksi yang sesuai akan direset ke 'pending' seketika.
+// Status di-sync otomatis oleh trigger trg_sync_md_status di PostgreSQL.
 
 window.syncOrphanedStatus = async function () {
-    if (!confirm(
-        'Fungsi ini akan memeriksa seluruh data Master Data dan mereset baris yang berstatus "Done" ' +
-        'namun tidak memiliki data inspeksi yang sesuai di sheet Inspections kembali ke "Pending".\n\n' +
-        'Lanjutkan?'
-    )) return;
-
-    setLoading(true, 'Memeriksa sinkronisasi data...');
-    try {
-        const payload = await gasAuthedPayload({ action: 'resetOrphanedStatus' });
-        const res = await fetch(MATERIAL_GAS_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (json.error) throw new Error(json.error);
-
-        setLoading(false);
-        showToast(json.message || 'Sinkronisasi selesai.', json.reset_count > 0 ? 'warning' : 'success');
-
-        // Reload master data to reflect changes
-        await loadMasterData();
-        renderMasterTable();
-    } catch (err) {
-        setLoading(false);
-        showToast('Gagal sinkronisasi: ' + err.message, 'error');
-    }
+    showToast('Status dikelola otomatis oleh database trigger. Tidak perlu sync manual.', 'info');
+    await loadMasterData();
 };

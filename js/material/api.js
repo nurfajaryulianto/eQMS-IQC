@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // js/material/api.js — IQC Material: Supabase API Layer
 // Menggantikan seluruh gasGet / gasPost / GAS Web App calls.
 // Semua fungsi menggunakan Supabase JS SDK dari auth.js.
@@ -356,7 +356,7 @@ export async function apiGetUsers() {
     const { data, error } = await supabase
         .from('app_users')
         .select('*')
-        .order('name', { ascending: true });
+        .order('display_name', { ascending: true });
     if (error) throw new Error(error.message);
     return { data: data || [] };
 }
@@ -386,7 +386,7 @@ export async function apiSaveUser(userData) {
     // Update user yang sudah ada di app_users
     const { data, error } = await supabase
         .from('app_users')
-        .update({ name, role })
+        .update({ display_name: name, role })
         .eq('nik', nik)
         .select()
         .single();
