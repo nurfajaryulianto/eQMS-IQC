@@ -814,13 +814,14 @@ export async function apiSubmitSubcontInspection(payload) {
             if (Array.isArray(item.defects) && item.defects.length > 0) {
                 item.defects.forEach(d => {
                     const count = Number(d.count || d.qty || 1);
-                    if (count > 0 && d.defectType) {
+                    const defectName = d.type || d.defectType || d.issue_finding || d.name || '';
+                    if (count > 0 && defectName) {
                         defectRows.push({
                             session_id:    sessionId,
                             date:          dateInsp,
                             vendor:        payload.vendor || '',
                             component:     item.component || '',
-                            issue_finding: d.defectType,
+                            issue_finding: defectName,
                             count:         count,
                         });
                     }

@@ -925,28 +925,69 @@ async function saveData() {
         if (insErr) throw new Error(insErr.message);
 
         // Simpan defect details
-        if (Array.isArray(dataToSend.items)) {
+        if (Array.isArray(dataToSend.items) && dataToSend.items.length > 0) {
             await supabase.from('subcont_defect_logs').delete().eq('session_id', sessId);
             const dRows = [];
             dataToSend.items.forEach(it => {
-                if (Array.isArray(it.defects)) {
+                if (Array.isArray(it.defects) && it.defects.length > 0) {
                     it.defects.forEach(d => {
                         const cnt = Number(d.count || d.qty || 1);
-                        if (cnt > 0 && d.defectType) {
+                        const defectName = d.type || d.defectType || d.issue_finding || d.name || '';
+                        if (cnt > 0 && defectName) {
                             dRows.push({
                                 session_id: sessId,
                                 date: headerRow.tanggal_insp,
                                 vendor: dataToSend.vendor || '',
                                 component: it.component || '',
-                                issue_finding: d.defectType,
+                                issue_finding: defectName,
                                 count: cnt
                             });
                         }
                     });
+                } else if (Number(it.defect) > 0) {
+                    // Fallback jika tidak ada breakdown detail tapi ada defect
+                    dRows.push({
+                        session_id: sessId,
+                        date: headerRow.tanggal_insp,
+                        vendor: dataToSend.vendor || '',
+                        component: it.component || '',
+                        issue_finding: 'DEFECT GENERAL',
+                        count: Number(it.defect)
+                    });
                 }
             });
+
+            // Fallback jika items ada defect tapi belum terformat di it.defects
+            if (dRows.length === 0 && Number(dataToSend.defect) > 0) {
+                for (const [type, posObj] of Object.entries(defectCounts || {})) {
+                    let cnt = 0;
+                    if (typeof posObj === 'object' && posObj !== null) {
+                        for (const grp of Object.values(posObj)) {
+                            if (typeof grp === 'object' && grp !== null) {
+                                cnt += Number(grp.defect || 0);
+                            } else {
+                                cnt += Number(grp || 0);
+                            }
+                        }
+                    } else {
+                        cnt = Number(posObj || 0);
+                    }
+                    if (cnt > 0) {
+                        dRows.push({
+                            session_id: sessId,
+                            date: headerRow.tanggal_insp,
+                            vendor: dataToSend.vendor || '',
+                            component: dataToSend.component || '',
+                            issue_finding: type,
+                            count: cnt
+                        });
+                    }
+                }
+            }
+
             if (dRows.length > 0) {
-                await supabase.from('subcont_defect_logs').insert(dRows);
+                const { error: defErr } = await supabase.from('subcont_defect_logs').insert(dRows);
+                if (defErr) console.error('Insert defect logs error:', defErr);
             }
         }
 
