@@ -478,27 +478,46 @@ export async function apiGetAssignments() {
     return { data: data || [] };
 }
 
-export async function apiSaveAssignment({ materialType, inspectorNik, inspectorName, updatedBy }) {
-    const { data, error } = await supabase
-        .from('material_assignments')
-        .upsert({
-            material_type:  materialType,
-            inspector_nik:  inspectorNik,
-            inspector_name: inspectorName,
-            updated_by:     updatedBy,
-            updated_at:     new Date().toISOString(),
-        }, { onConflict: 'material_type' })
-        .select()
-        .single();
-    if (error) throw new Error(error.message);
-    return data;
+export async function apiSaveAssignment({ materialType, inspectorNik, inspectorName, updatedBy, id }) {
+    if (id) {
+        // Update existing row
+        const { data, error } = await supabase
+            .from('material_assignments')
+            .update({
+                material_type:  materialType,
+                inspector_nik:  inspectorNik,
+                inspector_name: inspectorName,
+                updated_by:     updatedBy,
+                updated_at:     new Date().toISOString(),
+            })
+            .eq('id', id)
+            .select()
+            .single();
+        if (error) throw new Error(error.message);
+        return data;
+    } else {
+        // Insert new row (allows multiple inspectors per material_type)
+        const { data, error } = await supabase
+            .from('material_assignments')
+            .insert({
+                material_type:  materialType,
+                inspector_nik:  inspectorNik,
+                inspector_name: inspectorName,
+                updated_by:     updatedBy,
+                updated_at:     new Date().toISOString(),
+            })
+            .select()
+            .single();
+        if (error) throw new Error(error.message);
+        return data;
+    }
 }
 
-export async function apiDeleteAssignment(materialType) {
+export async function apiDeleteAssignment(id) {
     const { error } = await supabase
         .from('material_assignments')
         .delete()
-        .eq('material_type', materialType);
+        .eq('id', id);
     if (error) throw new Error(error.message);
     return { success: true };
 }

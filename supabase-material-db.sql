@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_claims_po_number      ON public.material_claims(l
 
 CREATE TABLE IF NOT EXISTS public.material_assignments (
   id              BIGSERIAL PRIMARY KEY,
-  material_type   VARCHAR(100) NOT NULL UNIQUE,
+  material_type   VARCHAR(100) NOT NULL,
   inspector_nik   VARCHAR(100),
   inspector_name  TEXT,
   updated_by      VARCHAR(100),

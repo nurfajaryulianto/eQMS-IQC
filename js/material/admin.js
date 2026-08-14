@@ -694,8 +694,8 @@ function renderAssignmentsTable() {
             <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(a.updated_by || 'Admin')} (${esc(dateStr)})</td>
             <td style="padding:12px 14px;text-align:center;">
                 <div style="display:flex;gap:12px;justify-content:center;">
-                    <button onclick="window.editAssignment('${esc(a.material_type)}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#60a5fa;border-color:rgba(96,165,250,0.3);">Edit</button>
-                    <button onclick="window.deleteAssignment('${esc(a.material_type)}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#f87171;border-color:rgba(248,113,113,0.3);">Delete</button>
+                    <button onclick="window.editAssignment(${a.id})" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#60a5fa;border-color:rgba(96,165,250,0.3);">Edit</button>
+                    <button onclick="window.deleteAssignment(${a.id})" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#f87171;border-color:rgba(248,113,113,0.3);">Hapus</button>
                 </div>
             </td>
         </tr>`;
@@ -707,7 +707,7 @@ window.handleAssignmentSubmit = async function (e) {
     const mtInput = document.getElementById('assign-material-type');
     const inspSelect = document.getElementById('assign-inspector');
 
-    const materialType = mtInput.value.trim();
+    const materialType = mtInput.value.trim().toUpperCase();
     const inspectorName = inspSelect.value;
     const selectedOpt = inspSelect.options[inspSelect.selectedIndex];
     const inspectorNik = selectedOpt ? (selectedOpt.dataset.nik || inspectorName) : inspectorName;
@@ -722,12 +722,13 @@ window.handleAssignmentSubmit = async function (e) {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
-            const idx = allAssignments.findIndex(a => a.material_type.toLowerCase() === materialType.toLowerCase());
             const now = new Date().toISOString();
-            if (idx >= 0) {
-                allAssignments[idx] = { material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now };
+            const editId = editingAssignmentId;
+            if (editId != null) {
+                const idx = allAssignments.findIndex(a => a.id === editId);
+                if (idx >= 0) allAssignments[idx] = { ...allAssignments[idx], material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now };
             } else {
-                allAssignments.push({ material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now });
+                allAssignments.push({ id: Date.now(), material_type: materialType, inspector_nik: inspectorNik, inspector_name: inspectorName, updated_by: currentUser?.name || 'Admin', updated_at: now });
             }
             setLoading(false);
             showToast('Assignment berhasil disimpan (simulasi)', 'success');
@@ -737,10 +738,11 @@ window.handleAssignmentSubmit = async function (e) {
         }
 
         await apiSaveAssignment({
-            materialType: materialType,
-            inspectorNik: inspectorNik,
+            id:            editingAssignmentId || null,
+            materialType:  materialType,
+            inspectorNik:  inspectorNik,
             inspectorName: inspectorName,
-            updatedBy: currentUser?.name || currentUser?.nik || 'Admin'
+            updatedBy:     currentUser?.name || currentUser?.nik || 'Admin',
         });
 
         setLoading(false);
@@ -754,28 +756,29 @@ window.handleAssignmentSubmit = async function (e) {
     }
 };
 
-window.editAssignment = function (materialType) {
-    const item = allAssignments.find(a => a.material_type.toLowerCase() === materialType.toLowerCase());
+let editingAssignmentId = null;
+
+window.editAssignment = function (id) {
+    const item = allAssignments.find(a => a.id === id);
     if (!item) return;
 
-    editingAssignmentMaterialType = item.material_type;
+    editingAssignmentId = item.id;
     document.getElementById('assign-material-type').value = item.material_type;
 
     const inspSelect = document.getElementById('assign-inspector');
-    if (inspSelect) {
-        inspSelect.value = item.inspector_name || item.inspector_nik || '';
-    }
+    if (inspSelect) inspSelect.value = item.inspector_name || item.inspector_nik || '';
 
     const titleEl = document.getElementById('assignment-form-title');
     const submitBtn = document.getElementById('assign-submit-btn');
     const cancelBtn = document.getElementById('assign-cancel-btn');
 
-    if (titleEl) titleEl.textContent = `Edit Assignment: ${item.material_type}`;
+    if (titleEl) titleEl.textContent = `Edit Assignment: ${item.material_type} — ${item.inspector_name || item.inspector_nik}`;
     if (submitBtn) submitBtn.textContent = 'Update Assignment';
     if (cancelBtn) cancelBtn.style.display = 'block';
 };
 
 window.resetAssignmentForm = function () {
+    editingAssignmentId = null;
     editingAssignmentMaterialType = null;
     document.getElementById('assignment-form')?.reset();
 
@@ -784,26 +787,28 @@ window.resetAssignmentForm = function () {
     const cancelBtn = document.getElementById('assign-cancel-btn');
 
     if (titleEl) titleEl.textContent = 'Assign Inspector per Material';
-    if (submitBtn) submitBtn.textContent = 'Simpan Assignment';
+    if (submitBtn) submitBtn.textContent = 'Tambah Assignment';
     if (cancelBtn) cancelBtn.style.display = 'none';
 };
 
-window.deleteAssignment = async function (materialType) {
-    if (!confirm(`Hapus assignment untuk material type "${materialType}"?`)) return;
+window.deleteAssignment = async function (id) {
+    const item = allAssignments.find(a => a.id === id);
+    const label = item ? `"${item.material_type} — ${item.inspector_name || item.inspector_nik}"` : `id ${id}`;
+    if (!confirm(`Hapus assignment ${label}?`)) return;
 
     setLoading(true, 'Menghapus assignment...');
 
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(800);
-            allAssignments = allAssignments.filter(a => a.material_type.toLowerCase() !== materialType.toLowerCase());
+            allAssignments = allAssignments.filter(a => a.id !== id);
             setLoading(false);
             showToast('Assignment dihapus (simulasi)', 'success');
             renderAssignmentsTable();
             return;
         }
 
-        await apiDeleteAssignment(materialType);
+        await apiDeleteAssignment(id);
 
         setLoading(false);
         showToast('Assignment berhasil dihapus.', 'success');

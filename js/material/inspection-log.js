@@ -4,7 +4,7 @@
 // Data diambil langsung dari Supabase melalui api.js.
 // ============================================================
 
-import { apiGetInspectionData } from './api.js';
+import { apiGetInspectionData, apiGetAssignments } from './api.js';
 import { exportInspectionLogToExcel } from './export.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -12,6 +12,8 @@ let allInspectionLog = [];
 let currentPage      = 1;
 const PAGE_LIMIT     = 50;
 let currentFilters   = {};
+// map: material_type (uppercase) -> array of inspector names
+let assignmentNameMap = {};
 
 // ─── INIT ─────────────────────────────────────────────────────
 export async function initInspectionLog() {
@@ -53,6 +55,18 @@ export async function loadInspectionLog(resetPage = true) {
     };
 
     try {
+        // Load assignments untuk lookup inspector names
+        try {
+            const asgn = await apiGetAssignments();
+            assignmentNameMap = {};
+            (asgn.data || []).forEach(a => {
+                const key = (a.material_type || '').toUpperCase();
+                if (!assignmentNameMap[key]) assignmentNameMap[key] = [];
+                const nm = (a.inspector_name || a.inspector_nik || '').trim();
+                if (nm && !assignmentNameMap[key].includes(nm)) assignmentNameMap[key].push(nm);
+            });
+        } catch (_) { /* assignment load failed — non-fatal */ }
+
         const result = await apiGetInspectionData(currentFilters);
         allInspectionLog = result.data || [];
         const total = result.total || 0;
@@ -85,28 +99,33 @@ function renderInspectionLog(data) {
     }
 
     tbody.innerHTML = data.map((d, i) => {
-        // Robust date parsing (inspection_date, created_at, or receive_date)
-        const rawDate = d.inspection_date || d.created_at || d.receive_date;
+        // --- Date: d.inspection_date is a JS Date object (converted in api.js)
         let dateFmt = '—';
-        if (rawDate) {
-            const str = String(rawDate).trim();
-            const isoPart = str.split('T')[0];
-            const parts = isoPart.split(/[-/.]/);
-            if (parts.length === 3) {
-                let y = Number(parts[0]);
-                let m = Number(parts[1]);
-                let dy = Number(parts[2]);
-                if (parts[0].length <= 2 && parts[2].length === 4) {
-                    // Handle DD-MM-YYYY format
-                    dy = Number(parts[0]); m = Number(parts[1]); y = Number(parts[2]);
-                }
+        const rawDate = d.inspection_date || d.created_at;
+        if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+            dateFmt = rawDate.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+        } else if (rawDate) {
+            // Fallback: rawDate is a string
+            const s = String(rawDate);
+            const iso = s.length >= 10 ? s.substring(0,10) : s;
+            const pts = iso.split(/[-/]/);
+            if (pts.length === 3) {
+                let y = Number(pts[0]), m = Number(pts[1]), dy = Number(pts[2]);
+                if (pts[0].length <= 2 && pts[2].length === 4) { y = Number(pts[2]); m = Number(pts[1]); dy = Number(pts[0]); }
                 if (y < 100) y += 2000;
                 if (y > 1900 && m >= 1 && m <= 12 && dy >= 1 && dy <= 31) {
-                    const dt = new Date(y, m - 1, dy);
-                    dateFmt = dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+                    dateFmt = new Date(y, m-1, dy).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
                 }
             }
         }
+
+        // --- Inspector names: lookup all assigned inspectors for this material_type
+        const matTypeKey = (d.inspection_type || '').toUpperCase();
+        const assignedNames = assignmentNameMap[matTypeKey] || [];
+        // fallback: use inspector_nik or inspector_name from row itself
+        const rowInspName = d.inspector_name || d.inspector_nik || '—';
+        const inspDisplay = assignedNames.length > 0 ? assignedNames.join(', ') : rowInspName;
+        const inspTitle   = assignedNames.length > 0 ? assignedNames.join(' / ') : rowInspName;
 
         const ok    = Number(d.ok)     || 0;
         const noQty = Number(d.no_qty) || 0;
@@ -116,12 +135,15 @@ function renderInspectionLog(data) {
         const statusColor = d.status === 'done' ? '#34d399' : d.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
 
         const typeBadge = (type) => {
-            const colors = { 'Raw Material': '#60a5fa', 'Laminating Material': '#a78bfa', 'Bonding Test': '#f97316' };
-            const c = colors[type] || '#94a3b8';
-            return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${esc(type || '—')}</span>`;
+            const typeColors = {
+                'Raw Material': '#60a5fa', 'Laminating Material': '#a78bfa',
+                'Bonding Test': '#f97316', 'LEATHER': '#10b981', 'TEXTILE': '#a78bfa',
+                'SYNTHETIC': '#f59e0b', 'RUBBER': '#f87171', 'PACKAGING': '#34d399',
+            };
+            const c = typeColors[type] || '#94a3b8';
+            return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">` + esc(type || '—') + `</span>`;
         };
 
-        // Shared td truncate style
         const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         const TD = `padding:10px 12px;${T}`;
 
@@ -130,7 +152,7 @@ function renderInspectionLog(data) {
             <td style="${TD}font-weight:700;color:#fff;font-size:12px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
             <td style="${TD}color:#34d399;font-weight:600;font-size:12px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
             <td style="padding:10px 12px;overflow:hidden;">${typeBadge(d.inspection_type)}</td>
-            <td style="${TD}color:rgba(255,255,255,0.7);font-size:12px;" title="${esc(d.inspector_nik||'')}">${esc(d.inspector_nik || '—')}</td>
+            <td style="${TD}color:rgba(255,255,255,0.85);font-size:12px;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:13px;">${ok.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;color:#94a3b8;font-size:12px;">${passRate}</td>
