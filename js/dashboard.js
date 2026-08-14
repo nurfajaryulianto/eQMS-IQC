@@ -1,7 +1,4 @@
 import { supabase } from './db.js';
-// PENTING: Ganti dengan URL Web App Google Apps Script Anda
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
-
 // --- IMPOR AUTH MODULE ---
 import { requireRole, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
 import { showAlert, showConfirm } from './dialog.js';
@@ -237,8 +234,7 @@ async function fetchData() {
 
     } catch (error) {
         console.error('Error fetching data:', error);
-        // Changed alert message
-        await showAlert('Gagal memuat data. Pastikan URL Web App sudah benar, sudah di-deploy ulang, dan akses diset ke "Anyone".\nError: ' + error.message, 'error', 'Gagal Memuat Data');
+        await showAlert('Gagal memuat data analitik: ' + error.message, 'error', 'Gagal Memuat Data');
     } finally {
         loadingOverlay.style.display = 'none';
     }

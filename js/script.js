@@ -991,7 +991,7 @@ async function saveData() {
             }
         }
 
-        await showAlert('Data inspeksi berhasil disimpan ke Supabase Database!', 'success', 'Tersimpan!');
+        await showAlert('Data inspeksi berhasil disimpan!', 'success', 'Tersimpan!');
         resetAllFields();
         if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
         if (typeof window.loadSubcontInspectionLog === 'function') window.loadSubcontInspectionLog();
@@ -1873,13 +1873,11 @@ document.addEventListener('DOMContentLoaded', initApp);
 // INSPECTION RESULT FEATURE (DONE & IN-PROGRESS)
 // ===========================================
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec";
-
 let allInspectionSessions = [];
 let filterOptionsInitialized = false;
 let editingSessionId = null;
 
-/** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
+/** Load all Inspection Results (Done & In-Progress) from Supabase */
 window.loadInspectionResults = async function () {
     const gallery = document.getElementById('inspection-result-gallery');
     const badge = document.getElementById('inspection-result-count-badge');
@@ -1927,11 +1925,45 @@ window.loadInspectionResults = async function () {
                 }
             ];
         } else {
-            const url = `${GAS_URL}?action=getInspectionResults`;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('Gagal mengambil data dari server');
-            const data = await res.json();
-            allInspectionSessions = data.sessions || [];
+            // Query langsung dari Supabase subcont_inspections
+            const { data: sessData, error: sessErr } = await supabase
+                .from('subcont_inspections')
+                .select('*')
+                .order('timestamp', { ascending: false });
+
+            if (sessErr) throw sessErr;
+
+            allInspectionSessions = (sessData || []).map(row => ({
+                sessionId: row.session_id,
+                timestamp: row.timestamp || row.created_at,
+                tanggalIncoming: row.date || '',
+                tanggalInspection: row.tanggal_insp || row.date || '',
+                tanggalBucket: row.bucket || '',
+                materialType: row.material_type || '',
+                auditor: row.user_login || '',
+                vendor: row.vendor || '',
+                component: row.component || '',
+                process: row.process || '',
+                styleNumber: row.style_number || '',
+                modelName: row.model || '',
+                qtyIncoming: Number(row.qty_incoming) || 0,
+                qtyInspect: Number(row.qty_inspect) || 0,
+                pass: Number(row.qty_pass) || 0,
+                defect: Number(row.qty_defect) || 0,
+                ftt: Number(row.ftt) || 0,
+                redoRate: Number(row.redo_rate) || 0,
+                approvedByLeader: row.approved_by || '',
+                evidenceUrl: row.evidence_url || '',
+                status: row.status || 'Done',
+                items: row.component ? [{
+                    component: row.component,
+                    process: row.process || '',
+                    qtyIncoming: Number(row.qty_incoming) || 0,
+                    qtyInspect: Number(row.qty_inspect) || 0,
+                    pass: Number(row.qty_pass) || 0,
+                    defect: Number(row.qty_defect) || 0
+                }] : []
+            }));
         }
 
         populateFilterOptions();
