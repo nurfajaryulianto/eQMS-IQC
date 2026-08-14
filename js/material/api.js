@@ -701,3 +701,303 @@ async function uploadEvidenceFile(fileDataBase64, fileName, mimeType) {
         return '';
     }
 }
+
+// ============================================================
+// ─── SUBCONT SUPABASE API SERVICE (100% IDENTIK SPREADSHEET) ─
+// ============================================================
+
+/**
+ * Upload evidence photo ke Supabase Storage (bucket: subcont-evidence)
+ */
+export async function uploadSubcontEvidenceFile(base64Data, fileName, contentType = 'image/png') {
+    try {
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: contentType });
+
+        const ext = fileName.split('.').pop() || 'png';
+        const cleanName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+        const filePath = `evidence_${Date.now()}_${cleanName}.${ext}`;
+
+        const { error } = await supabase.storage
+            .from('subcont-evidence')
+            .upload(filePath, blob, {
+                contentType,
+                upsert: true,
+            });
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabase.storage
+            .from('subcont-evidence')
+            .getPublicUrl(filePath);
+
+        return publicUrlData?.publicUrl || '';
+    } catch (err) {
+        console.warn('Gagal upload evidence ke Supabase Storage:', err);
+        return '';
+    }
+}
+
+/**
+ * Submit Sesi Inspeksi Subcont secara atomik ke 2 tabel:
+ * 1. subcont_inspections (Sheet 1)
+ * 2. subcont_defect_logs (Sheet 2)
+ */
+export async function apiSubmitSubcontInspection(payload) {
+    let evidenceUrl = payload.evidence_url || '';
+
+    // Upload evidence ke storage jika ada file base64
+    if (payload.file_data && payload.file_name) {
+        evidenceUrl = await uploadSubcontEvidenceFile(
+            payload.file_data,
+            payload.file_name,
+            payload.file_type || 'image/png'
+        );
+    }
+
+    const sessionId = payload.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+    const dateIncoming = payload.tanggalIncoming ? payload.tanggalIncoming.substring(0, 10) : null;
+    const dateInsp = payload.tanggalInspection ? payload.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10);
+    const dateBucket = payload.tanggalBucket ? payload.tanggalBucket.substring(0, 10) : null;
+
+    const qtyIncoming = Number(payload.qtyIncoming) || 0;
+    const qtyInspect = Number(payload.qtyInspect) || 0;
+    const qtyPass = Number(payload.pass) || 0;
+    const qtyDefect = Number(payload.defect) || 0;
+    const ftt = qtyInspect > 0 ? Number((qtyPass / qtyInspect).toFixed(4)) : (payload.ftt || 0);
+    const redoRate = qtyInspect > 0 ? Number((qtyDefect / qtyInspect).toFixed(4)) : (payload.redoRate || 0);
+
+    // 1. Simpan Header ke subcont_inspections
+    const headerRow = {
+        session_id:     sessionId,
+        timestamp:      payload.timestamp || new Date().toISOString(),
+        date:           dateIncoming,
+        material_type:  payload.materialType || '',
+        user_login:     payload.auditor || '',
+        vendor:         payload.vendor || '',
+        component:      payload.component || '',
+        process:        payload.process || '',
+        style_number:   payload.styleNumber || '',
+        model:          payload.modelName || '',
+        qty_incoming:   qtyIncoming,
+        qty_inspect:    qtyInspect,
+        qty_pass:       qtyPass,
+        qty_defect:     qtyDefect,
+        ftt:            ftt,
+        redo_rate:      redoRate,
+        tanggal_insp:   dateInsp,
+        bucket:         dateBucket,
+        approved_by:    payload.approvedByLeader || '',
+        evidence_url:   evidenceUrl,
+        status:         payload.status || 'Done',
+        updated_at:     new Date().toISOString(),
+    };
+
+    const { error: headerErr } = await supabase
+        .from('subcont_inspections')
+        .upsert(headerRow, { onConflict: 'session_id' });
+
+    if (headerErr) throw new Error(`Gagal menyimpan header inspeksi: ${headerErr.message}`);
+
+    // 2. Simpan Detail Cacat ke subcont_defect_logs
+    if (Array.isArray(payload.items) && payload.items.length > 0) {
+        // Hapus defect lama jika ini update session
+        await supabase.from('subcont_defect_logs').delete().eq('session_id', sessionId);
+
+        const defectRows = [];
+        payload.items.forEach(item => {
+            if (Array.isArray(item.defects) && item.defects.length > 0) {
+                item.defects.forEach(d => {
+                    const count = Number(d.count || d.qty || 1);
+                    if (count > 0 && d.defectType) {
+                        defectRows.push({
+                            session_id:    sessionId,
+                            date:          dateInsp,
+                            vendor:        payload.vendor || '',
+                            component:     item.component || '',
+                            issue_finding: d.defectType,
+                            count:         count,
+                        });
+                    }
+                });
+            } else if (Number(item.defect) > 0) {
+                // Fallback jika tidak ada breakdown detail
+                defectRows.push({
+                    session_id:    sessionId,
+                    date:          dateInsp,
+                    vendor:        payload.vendor || '',
+                    component:     item.component || '',
+                    issue_finding: 'DEFECT GENERAL',
+                    count:         Number(item.defect),
+                });
+            }
+        });
+
+        if (defectRows.length > 0) {
+            const { error: defErr } = await supabase
+                .from('subcont_defect_logs')
+                .insert(defectRows);
+
+            if (defErr) console.warn('Warning: Gagal menyimpan beberapa baris defect_logs:', defErr);
+        }
+    }
+
+    return {
+        success: true,
+        sessionId: sessionId,
+        message: 'Data inspeksi berhasil disimpan ke Supabase!',
+    };
+}
+
+/**
+ * Ambil daftar sesi inspeksi untuk galeri / Inspection Log
+ */
+export async function apiGetSubcontInspectionSessions({
+    startDate = '',
+    endDate = '',
+    vendor = '',
+    auditor = '',
+    status = '',
+    page = 1,
+    limit = 100,
+} = {}) {
+    let query = supabase
+        .from('subcont_inspections')
+        .select('*', { count: 'exact' })
+        .order('timestamp', { ascending: false });
+
+    if (startDate) query = query.gte('tanggal_insp', startDate);
+    if (endDate)   query = query.lte('tanggal_insp', endDate);
+    if (vendor && vendor !== 'all')   query = query.ilike('vendor', `%${vendor}%`);
+    if (auditor && auditor !== 'all') query = query.ilike('user_login', `%${auditor}%`);
+    if (status && status !== 'all')   query = query.eq('status', status);
+
+    const from = (page - 1) * limit;
+    query = query.range(from, from + limit - 1);
+
+    const { data, error, count } = await query;
+    if (error) throw new Error(error.message);
+
+    return {
+        data: data || [],
+        total: count || 0,
+        page,
+        limit,
+    };
+}
+
+/**
+ * Ambil daftar defect logs (Sheet 2)
+ */
+export async function apiGetSubcontDefectLogs({
+    startDate = '',
+    endDate = '',
+    vendor = '',
+    component = '',
+    issueFinding = '',
+    limit = 500,
+} = {}) {
+    let query = supabase
+        .from('subcont_defect_logs')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(limit);
+
+    if (startDate) query = query.gte('date', startDate);
+    if (endDate)   query = query.lte('date', endDate);
+    if (vendor && vendor !== 'all')       query = query.ilike('vendor', `%${vendor}%`);
+    if (component && component !== 'all') query = query.ilike('component', `%${component}%`);
+    if (issueFinding) query = query.ilike('issue_finding', `%${issueFinding}%`);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    return { data: data || [] };
+}
+
+/**
+ * Ambil data lengkap untuk Analytics Dashboard Subcont
+ */
+export async function apiGetSubcontDashboardData({ startDate = '', endDate = '' } = {}) {
+    let qSessions = supabase.from('subcont_inspections').select('*').order('date', { ascending: true });
+    let qDefects = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: true });
+
+    if (startDate) {
+        qSessions = qSessions.gte('date', startDate);
+        qDefects = qDefects.gte('date', startDate);
+    }
+    if (endDate) {
+        qSessions = qSessions.lte('date', endDate);
+        qDefects = qDefects.lte('date', endDate);
+    }
+
+    const [resSessions, resDefects] = await Promise.all([qSessions, qDefects]);
+
+    if (resSessions.error) throw new Error(resSessions.error.message);
+    if (resDefects.error) throw new Error(resDefects.error.message);
+
+    return {
+        sessions: resSessions.data || [],
+        defects: resDefects.data || [],
+    };
+}
+
+/**
+ * Export Multi-Sheet Excel (Sheet 1: Sesi Inspeksi, Sheet 2: Defect Breakdown)
+ */
+export function exportSubcontLogToMultiSheetExcel(sessions, defects, filenamePrefix = 'IQC_Subcont_Log') {
+    if (typeof XLSX === 'undefined') {
+        alert('Library SheetJS (xlsx) belum dimuat.');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Inspection Sessions ──
+    const sessionRows = (sessions || []).map(s => ({
+        'SessionID':     s.session_id || '',
+        'timeStamp':     s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
+        'Date':          s.date || '',
+        'Material Type': s.material_type || '',
+        'User Login':    s.user_login || '',
+        'Vendor':        s.vendor || '',
+        'Component':     s.component || '',
+        'Process':       s.process || '',
+        'Style Number':  s.style_number || '',
+        'Model':         s.model || '',
+        'Qty Incoming':  Number(s.qty_incoming) || 0,
+        'Qty Inspect':   Number(s.qty_inspect) || 0,
+        'Qty Pass':      Number(s.qty_pass) || 0,
+        'Qty Defect':    Number(s.qty_defect) || 0,
+        'FTT (%)':       s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
+        'TanggalInsp':   s.tanggal_insp || '',
+        'Bucket':        s.bucket || '',
+        'ApprovedBy':    s.approved_by || '',
+        'EvidenceUrl':   s.evidence_url || '',
+        'Status':        s.status || 'Done',
+    }));
+
+    const ws1 = XLSX.utils.json_to_sheet(sessionRows);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Inspection_Sessions');
+
+    // ── Sheet 2: Defect Breakdown ──
+    const defectRows = (defects || []).map(d => ({
+        'SessionId':     d.session_id || '',
+        'Date':          d.date || '',
+        'Vendor':        d.vendor || '',
+        'Component':     d.component || '',
+        'Issue Finding': d.issue_finding || '',
+        'Count':         Number(d.count) || 0,
+    }));
+
+    const ws2 = XLSX.utils.json_to_sheet(defectRows);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Defect_Breakdown');
+
+    const nowStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, `${filenamePrefix}_${nowStr}.xlsx`);
+}

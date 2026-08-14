@@ -437,3 +437,128 @@ CREATE POLICY "mat_users_write_admin" ON public.material_users
 -- SELECT table_name FROM information_schema.tables
 -- WHERE table_schema = 'public' AND table_name LIKE 'material_%'
 -- ORDER BY table_name;
+
+-- ============================================================
+-- ─── BAGIAN 2: SKEMA MODUL IQC SUBCONT (100% IDENTIK SHEET) ──
+-- ============================================================
+
+-- ─── 1. TABEL UTAMA: subcont_inspections (Sheet 1 Header) ────
+
+CREATE TABLE IF NOT EXISTS public.subcont_inspections (
+  session_id          VARCHAR(100)  PRIMARY KEY,
+  timestamp           TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  date                DATE,                      -- Tanggal incoming material (Date)
+  material_type       VARCHAR(100),              -- upper, bottom, dll.
+  user_login          TEXT,                      -- Nama auditor yang login
+  auditor_nik         VARCHAR(50),               -- NIK auditor (opsional)
+  vendor              TEXT,                      -- Nama vendor (M3M, dll)
+  component           TEXT,                      -- Daftar komponen (Foxing, Vamp, dll)
+  process             TEXT,                      -- Proses (Screen Printing, Stitching, dll)
+  style_number        VARCHAR(100),              -- Style Number
+  model               TEXT,                      -- Model Sepatu
+  qty_incoming        NUMERIC(12,2) DEFAULT 0,   -- Qty Incoming
+  qty_inspect         NUMERIC(12,2) DEFAULT 0,   -- Qty Inspect
+  qty_pass            NUMERIC(12,2) DEFAULT 0,   -- Qty Pass
+  qty_defect          NUMERIC(12,2) DEFAULT 0,   -- Qty Defect
+  ftt                 NUMERIC(6,4)  DEFAULT 0,   -- First Time Through rate (0.0000 - 1.0000)
+  redo_rate           NUMERIC(6,4)  DEFAULT 0,   -- Redo / Rework rate
+  tanggal_insp        DATE,                      -- Tanggal inspeksi aktual (TanggalInsp)
+  bucket              DATE,                      -- Tanggal bucket produksi
+  approved_by         VARCHAR(255),              -- Leader approval
+  evidence_url        TEXT,                      -- URL foto evidence di Supabase Storage
+  status              VARCHAR(50)   NOT NULL DEFAULT 'Done'
+                        CHECK (status IN ('Done', 'In-Progress', 'done', 'in-progress', 'Pass', 'Fail')),
+  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+-- Indexing untuk query cepat (<5ms)
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_date        ON public.subcont_inspections(date DESC);
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_tgl_insp    ON public.subcont_inspections(tanggal_insp DESC);
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_vendor      ON public.subcont_inspections(lower(vendor));
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_model       ON public.subcont_inspections(lower(model));
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_style       ON public.subcont_inspections(lower(style_number));
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_status      ON public.subcont_inspections(status);
+CREATE INDEX IF NOT EXISTS idx_subcont_insp_created_at  ON public.subcont_inspections(created_at DESC);
+
+-- ─── 2. TABEL RINCIAN: subcont_defect_logs (Sheet 2 Detail) ───
+
+CREATE TABLE IF NOT EXISTS public.subcont_defect_logs (
+  id                  BIGSERIAL     PRIMARY KEY,
+  session_id          VARCHAR(100)  NOT NULL
+                        REFERENCES public.subcont_inspections(session_id)
+                        ON DELETE CASCADE,
+  date                DATE,                      -- Tanggal inspeksi
+  vendor              TEXT,                      -- Vendor
+  component           TEXT,                      -- Komponen (Foxing, Vamp, dll)
+  issue_finding       TEXT          NOT NULL,    -- Jenis defect (STAIN, DAMAGE, WRINKLE, dll)
+  count               INT           NOT NULL DEFAULT 0,
+  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+-- Indexing detail defect
+CREATE INDEX IF NOT EXISTS idx_subcont_def_sess_id     ON public.subcont_defect_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_subcont_def_date        ON public.subcont_defect_logs(date DESC);
+CREATE INDEX IF NOT EXISTS idx_subcont_def_vendor      ON public.subcont_defect_logs(lower(vendor));
+CREATE INDEX IF NOT EXISTS idx_subcont_def_component   ON public.subcont_defect_logs(lower(component));
+CREATE INDEX IF NOT EXISTS idx_subcont_def_issue       ON public.subcont_defect_logs(lower(issue_finding));
+
+-- ─── 3. SUPABASE STORAGE BUCKET: subcont-evidence ────────────
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('subcont-evidence', 'subcont-evidence', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- ─── 4. ROW LEVEL SECURITY (RLS) POLICIES ────────────────────
+
+ALTER TABLE public.subcont_inspections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subcont_defect_logs ENABLE ROW LEVEL SECURITY;
+
+-- Policy: subcont_inspections
+DROP POLICY IF EXISTS "subcont_insp_select_all" ON public.subcont_inspections;
+DROP POLICY IF EXISTS "subcont_insp_insert_all" ON public.subcont_inspections;
+DROP POLICY IF EXISTS "subcont_insp_update_all" ON public.subcont_inspections;
+DROP POLICY IF EXISTS "subcont_insp_delete_all" ON public.subcont_inspections;
+
+CREATE POLICY "subcont_insp_select_all" ON public.subcont_inspections
+  FOR SELECT TO authenticated, anon USING (TRUE);
+
+CREATE POLICY "subcont_insp_insert_all" ON public.subcont_inspections
+  FOR INSERT TO authenticated, anon WITH CHECK (TRUE);
+
+CREATE POLICY "subcont_insp_update_all" ON public.subcont_inspections
+  FOR UPDATE TO authenticated, anon USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "subcont_insp_delete_all" ON public.subcont_inspections
+  FOR DELETE TO authenticated, anon USING (TRUE);
+
+-- Policy: subcont_defect_logs
+DROP POLICY IF EXISTS "subcont_def_select_all" ON public.subcont_defect_logs;
+DROP POLICY IF EXISTS "subcont_def_insert_all" ON public.subcont_defect_logs;
+DROP POLICY IF EXISTS "subcont_def_update_all" ON public.subcont_defect_logs;
+DROP POLICY IF EXISTS "subcont_def_delete_all" ON public.subcont_defect_logs;
+
+CREATE POLICY "subcont_def_select_all" ON public.subcont_defect_logs
+  FOR SELECT TO authenticated, anon USING (TRUE);
+
+CREATE POLICY "subcont_def_insert_all" ON public.subcont_defect_logs
+  FOR INSERT TO authenticated, anon WITH CHECK (TRUE);
+
+CREATE POLICY "subcont_def_update_all" ON public.subcont_defect_logs
+  FOR UPDATE TO authenticated, anon USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "subcont_def_delete_all" ON public.subcont_defect_logs
+  FOR DELETE TO authenticated, anon USING (TRUE);
+
+-- Policy: storage.objects untuk bucket subcont-evidence
+DROP POLICY IF EXISTS "subcont_storage_select" ON storage.objects;
+DROP POLICY IF EXISTS "subcont_storage_insert" ON storage.objects;
+
+CREATE POLICY "subcont_storage_select" ON storage.objects
+  FOR SELECT TO authenticated, anon
+  USING (bucket_id = 'subcont-evidence');
+
+CREATE POLICY "subcont_storage_insert" ON storage.objects
+  FOR INSERT TO authenticated, anon
+  WITH CHECK (bucket_id = 'subcont-evidence');
+
