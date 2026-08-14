@@ -1157,6 +1157,110 @@ async function handleModelsBatchConfirm() {
 let currentSubcontLogSessions = [];
 let currentSubcontLogDefects = [];
 
+let sessionsCurrentPage = 1;
+let sessionsPageSize = 25;
+
+let defectsCurrentPage = 1;
+let defectsPageSize = 25;
+
+window.setSessionsPage = function(page) {
+    sessionsCurrentPage = page;
+    renderSubcontLogSessions(currentSubcontLogSessions);
+};
+
+window.setSessionsPageSize = function(size) {
+    sessionsPageSize = parseInt(size, 10) || 25;
+    sessionsCurrentPage = 1;
+    renderSubcontLogSessions(currentSubcontLogSessions);
+};
+
+window.setDefectsPage = function(page) {
+    defectsCurrentPage = page;
+    renderSubcontLogDefects(currentSubcontLogDefects);
+};
+
+window.setDefectsPageSize = function(size) {
+    defectsPageSize = parseInt(size, 10) || 25;
+    defectsCurrentPage = 1;
+    renderSubcontLogDefects(currentSubcontLogDefects);
+};
+
+function renderPaginationControls(containerId, currentPage, pageSize, totalItems, onPageChangeName, onPageSizeChangeName) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!totalItems || totalItems <= 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startItem = (safePage - 1) * pageSize + 1;
+    const endItem = Math.min(safePage * pageSize, totalItems);
+
+    let pageNumbers = [];
+    if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+    } else {
+        if (safePage <= 4) {
+            pageNumbers = [1, 2, 3, 4, 5, '...', totalPages];
+        } else if (safePage >= totalPages - 3) {
+            pageNumbers = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        } else {
+            pageNumbers = [1, '...', safePage - 1, safePage, safePage + 1, '...', totalPages];
+        }
+    }
+
+    const buttonsHtml = pageNumbers.map(p => {
+        if (p === '...') {
+            return `<span class="px-2 py-1 text-slate-400">...</span>`;
+        }
+        const isActive = p === safePage;
+        return `
+            <button onclick="${onPageChangeName}(${p})" 
+                class="min-w-[28px] h-7 px-2 flex items-center justify-center rounded text-xs font-semibold transition-colors cursor-pointer ${
+                    isActive 
+                        ? 'bg-emerald-600 text-white shadow-xs' 
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                }">
+                ${p}
+            </button>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="flex items-center gap-3 text-slate-500 text-xs">
+            <span>Menampilkan <strong class="text-slate-800 font-semibold">${startItem} - ${endItem}</strong> dari <strong class="text-slate-800 font-semibold">${totalItems}</strong> data</span>
+            <div class="flex items-center gap-1.5 ml-2">
+                <span>Per halaman:</span>
+                <select onchange="${onPageSizeChangeName}(this.value)" class="py-1 px-2 border border-slate-200 rounded bg-white text-slate-700 font-medium text-xs focus:outline-emerald-500 cursor-pointer">
+                    <option value="15" ${pageSize === 15 ? 'selected' : ''}>15</option>
+                    <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
+                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+            <button onclick="${onPageChangeName}(${safePage - 1})" ${safePage <= 1 ? 'disabled' : ''} 
+                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
+                Prev
+            </button>
+            
+            <div class="flex items-center gap-1">
+                ${buttonsHtml}
+            </div>
+
+            <button onclick="${onPageChangeName}(${safePage + 1})" ${safePage >= totalPages ? 'disabled' : ''} 
+                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
+                Next
+            </button>
+        </div>
+    `;
+}
+
 window.switchSubcontLogSubtab = function(tab) {
     const btnSessions = document.getElementById('subcont-log-tab-sessions');
     const btnDefects = document.getElementById('subcont-log-tab-defects');
@@ -1192,14 +1296,14 @@ window.loadSubcontInspectionLog = async function() {
         const statusVal = document.getElementById('subcont-log-status-filter')?.value || 'all';
 
         // Query Supabase subcont_inspections (Sheet 1)
-        let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false }).limit(200);
+        let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false });
         if (dateStart) qSess = qSess.gte('tanggal_insp', dateStart);
         if (dateEnd) qSess = qSess.lte('tanggal_insp', dateEnd);
         if (vendorVal !== 'all') qSess = qSess.ilike('vendor', `%${vendorVal}%`);
         if (statusVal !== 'all') qSess = qSess.eq('status', statusVal);
 
         // Query Supabase subcont_defect_logs (Sheet 2)
-        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).limit(500);
+        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false });
         if (dateStart) qDef = qDef.gte('date', dateStart);
         if (dateEnd) qDef = qDef.lte('date', dateEnd);
         if (vendorVal !== 'all') qDef = qDef.ilike('vendor', `%${vendorVal}%`);
@@ -1211,6 +1315,9 @@ window.loadSubcontInspectionLog = async function() {
 
         currentSubcontLogSessions = resSess.data || [];
         currentSubcontLogDefects = resDef.data || [];
+
+        sessionsCurrentPage = 1;
+        defectsCurrentPage = 1;
 
         // Populate Vendor Filter dropdown jika belum
         const vendorFilterSelect = document.getElementById('subcont-log-vendor-filter');
@@ -1243,10 +1350,18 @@ function renderSubcontLogSessions(sessions) {
 
     if (!sessions || sessions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400 italic">Tidak ada data sesi inspeksi ditemukan.</td></tr>';
+        renderPaginationControls('subcont-sessions-pagination', 1, sessionsPageSize, 0, 'window.setSessionsPage', 'window.setSessionsPageSize');
         return;
     }
 
-    tbody.innerHTML = sessions.map(s => {
+    const totalPages = Math.ceil(sessions.length / sessionsPageSize) || 1;
+    if (sessionsCurrentPage > totalPages) sessionsCurrentPage = totalPages;
+    if (sessionsCurrentPage < 1) sessionsCurrentPage = 1;
+
+    const startIdx = (sessionsCurrentPage - 1) * sessionsPageSize;
+    const pageItems = sessions.slice(startIdx, startIdx + sessionsPageSize);
+
+    tbody.innerHTML = pageItems.map(s => {
         const tgl = s.tanggal_insp || s.date || (s.timestamp ? String(s.timestamp).substring(0, 10) : '-');
         const stClass = (s.status || 'Done').toLowerCase() === 'done'
             ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -1285,6 +1400,8 @@ function renderSubcontLogSessions(sessions) {
             </tr>
         `;
     }).join('');
+
+    renderPaginationControls('subcont-sessions-pagination', sessionsCurrentPage, sessionsPageSize, sessions.length, 'window.setSessionsPage', 'window.setSessionsPageSize');
 }
 
 function renderSubcontLogDefects(defects) {
@@ -1293,13 +1410,22 @@ function renderSubcontLogDefects(defects) {
 
     if (!defects || defects.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400 italic">Tidak ada temuan defect ditemukan.</td></tr>';
+        renderPaginationControls('subcont-defects-pagination', 1, defectsPageSize, 0, 'window.setDefectsPage', 'window.setDefectsPageSize');
         return;
     }
 
-    tbody.innerHTML = defects.map((d, idx) => {
+    const totalPages = Math.ceil(defects.length / defectsPageSize) || 1;
+    if (defectsCurrentPage > totalPages) defectsCurrentPage = totalPages;
+    if (defectsCurrentPage < 1) defectsCurrentPage = 1;
+
+    const startIdx = (defectsCurrentPage - 1) * defectsPageSize;
+    const pageItems = defects.slice(startIdx, startIdx + defectsPageSize);
+
+    tbody.innerHTML = pageItems.map((d, idx) => {
+        const itemNumber = startIdx + idx + 1;
         return `
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="py-2.5 px-3 text-slate-400 font-mono">${idx + 1}</td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">${itemNumber}</td>
                 <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${d.date || '-'}</td>
                 <td class="py-2.5 px-3 font-semibold text-slate-800">${d.vendor || '-'}</td>
                 <td class="py-2.5 px-3 font-medium text-slate-700">${d.component || '-'}</td>
@@ -1309,6 +1435,8 @@ function renderSubcontLogDefects(defects) {
             </tr>
         `;
     }).join('');
+
+    renderPaginationControls('subcont-defects-pagination', defectsCurrentPage, defectsPageSize, defects.length, 'window.setDefectsPage', 'window.setDefectsPageSize');
 }
 
 window.showSubcontSessionDetail = function(rawSessionId) {
