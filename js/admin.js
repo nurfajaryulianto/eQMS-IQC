@@ -377,7 +377,7 @@ function switchAdminTab(tab) {
     });
 
     if (tab === 'spreadsheet') {
-        loadSpreadsheetStatus();
+        window.loadSubcontInspectionLog();
     }
 }
 
@@ -1052,7 +1052,7 @@ async function handleCreateSpreadsheet() {
     } catch (err) {
         console.error(err);
         await showAlert(`Failed to create spreadsheet: ${err.message}`, 'error', 'Error');
-        await loadSpreadsheetStatus(); // Restore original status
+        await window.loadSubcontInspectionLog(); // Restore original status
     } finally {
         if (createBtn) createBtn.disabled = false;
     }
@@ -1240,3 +1240,270 @@ async function handleModelsBatchConfirm() {
         if (btn) { btn.disabled = false; btn.textContent = 'Konfirmasi Upload'; }
     }
 }
+
+
+// ============================================================
+// SUBCONT INSPECTION LOG (SUPABASE 2-TABEL & EXPORT 2-SHEET)
+// ============================================================
+
+let currentSubcontLogSessions = [];
+let currentSubcontLogDefects = [];
+
+window.switchSubcontLogSubtab = function(tab) {
+    const btnSessions = document.getElementById('subcont-log-tab-sessions');
+    const btnDefects = document.getElementById('subcont-log-tab-defects');
+    const viewSessions = document.getElementById('subcont-view-sessions');
+    const viewDefects = document.getElementById('subcont-view-defects');
+
+    if (tab === 'sessions') {
+        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer';
+        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer';
+        if (viewSessions) viewSessions.classList.remove('hidden');
+        if (viewDefects) viewDefects.classList.add('hidden');
+    } else {
+        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer';
+        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer';
+        if (viewDefects) viewDefects.classList.remove('hidden');
+        if (viewSessions) viewSessions.classList.add('hidden');
+    }
+};
+
+window.loadSubcontInspectionLog = async function() {
+    const tbodySessions = document.getElementById('subcont-sessions-tbody');
+    const tbodyDefects = document.getElementById('subcont-defects-tbody');
+    const badgeSessions = document.getElementById('subcont-sessions-count-badge');
+    const badgeDefects = document.getElementById('subcont-defects-count-badge');
+
+    if (tbodySessions) tbodySessions.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">?</span>Memuat data sesi inspeksi...</td></tr>';
+    if (tbodyDefects) tbodyDefects.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">?</span>Memuat rincian defect...</td></tr>';
+
+    try {
+        const dateStart = document.getElementById('subcont-log-start')?.value || '';
+        const dateEnd = document.getElementById('subcont-log-end')?.value || '';
+        const vendorVal = document.getElementById('subcont-log-vendor-filter')?.value || 'all';
+        const statusVal = document.getElementById('subcont-log-status-filter')?.value || 'all';
+
+        // Query Supabase subcont_inspections (Sheet 1)
+        let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false }).limit(200);
+        if (dateStart) qSess = qSess.gte('tanggal_insp', dateStart);
+        if (dateEnd) qSess = qSess.lte('tanggal_insp', dateEnd);
+        if (vendorVal !== 'all') qSess = qSess.ilike('vendor', %%);
+        if (statusVal !== 'all') qSess = qSess.eq('status', statusVal);
+
+        // Query Supabase subcont_defect_logs (Sheet 2)
+        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).limit(500);
+        if (dateStart) qDef = qDef.gte('date', dateStart);
+        if (dateEnd) qDef = qDef.lte('date', dateEnd);
+        if (vendorVal !== 'all') qDef = qDef.ilike('vendor', %%);
+
+        const [resSess, resDef] = await Promise.all([qSess, qDef]);
+
+        if (resSess.error) throw resSess.error;
+        if (resDef.error) throw resDef.error;
+
+        currentSubcontLogSessions = resSess.data || [];
+        currentSubcontLogDefects = resDef.data || [];
+
+        // Populate Vendor Filter dropdown jika belum
+        const vendorFilterSelect = document.getElementById('subcont-log-vendor-filter');
+        if (vendorFilterSelect && vendorFilterSelect.options.length <= 1) {
+            const vendors = [...new Set(currentSubcontLogSessions.map(s => s.vendor).filter(Boolean))].sort();
+            vendors.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                vendorFilterSelect.appendChild(opt);
+            });
+        }
+
+        if (badgeSessions) badgeSessions.textContent = currentSubcontLogSessions.length;
+        if (badgeDefects) badgeDefects.textContent = currentSubcontLogDefects.length;
+
+        renderSubcontLogSessions(currentSubcontLogSessions);
+        renderSubcontLogDefects(currentSubcontLogDefects);
+
+    } catch (err) {
+        console.error('loadSubcontInspectionLog error:', err);
+        if (tbodySessions) tbodySessions.innerHTML = <tr><td colspan="11" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: </td></tr>;
+        if (tbodyDefects) tbodyDefects.innerHTML = <tr><td colspan="7" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: </td></tr>;
+    }
+};
+
+function renderSubcontLogSessions(sessions) {
+    const tbody = document.getElementById('subcont-sessions-tbody');
+    if (!tbody) return;
+
+    if (!sessions || sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400 italic">Tidak ada data sesi inspeksi ditemukan.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = sessions.map(s => {
+        const tgl = s.tanggal_insp || s.date || (s.timestamp ? String(s.timestamp).substring(0, 10) : '-');
+        const stClass = (s.status || 'Done').toLowerCase() === 'done'
+            ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+            : 'bg-amber-100 text-amber-700 border-amber-200';
+
+        const safeSessionId = encodeURIComponent(s.session_id);
+
+        return 
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900"></td>
+                <td class="py-2.5 px-3 font-semibold text-slate-800"></td>
+                <td class="py-2.5 px-3">
+                    <div class="font-bold text-slate-900"></div>
+                    <div class="text-[10px] text-slate-500 font-mono"></div>
+                </td>
+                <td class="py-2.5 px-3">
+                    <div class="font-medium text-slate-800"></div>
+                    <div class="text-[10px] text-slate-500"></div>
+                </td>
+                <td class="py-2.5 px-3 text-slate-600"></td>
+                <td class="py-2.5 px-3 text-right font-mono"></td>
+                <td class="py-2.5 px-3 text-right font-mono font-medium"></td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-600"></td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-600"></td>
+                <td class="py-2.5 px-3 text-center">
+                    <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ">
+                        
+                    </span>
+                </td>
+                <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                    <button onclick="window.showSubcontSessionDetail('')" 
+                        class="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[13px]">visibility</span> Detail
+                    </button>
+                </td>
+            </tr>
+        ;
+    }).join('');
+}
+
+function renderSubcontLogDefects(defects) {
+    const tbody = document.getElementById('subcont-defects-tbody');
+    if (!tbody) return;
+
+    if (!defects || defects.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400 italic">Tidak ada temuan defect ditemukan.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = defects.map((d, idx) => {
+        return 
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="py-2.5 px-3 text-slate-400 font-mono"></td>
+                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900"></td>
+                <td class="py-2.5 px-3 font-semibold text-slate-800"></td>
+                <td class="py-2.5 px-3 font-medium text-slate-700"></td>
+                <td class="py-2.5 px-3 font-bold text-rose-600"></td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900"></td>
+                <td class="py-2.5 px-3 text-[10px] text-slate-400 font-mono max-w-[150px] truncate"></td>
+            </tr>
+        ;
+    }).join('');
+}
+
+window.showSubcontSessionDetail = function(rawSessionId) {
+    const sessionId = decodeURIComponent(rawSessionId);
+    const session = currentSubcontLogSessions.find(s => s.session_id === sessionId);
+    if (!session) return;
+
+    const modal = document.getElementById('subcont-session-detail-modal');
+    const title = document.getElementById('subcont-modal-title');
+    const subtitle = document.getElementById('subcont-modal-subtitle');
+    const grid = document.getElementById('subcont-modal-info-grid');
+    const defectsTbody = document.getElementById('subcont-modal-defects-tbody');
+    const evidenceBox = document.getElementById('subcont-modal-evidence-box');
+    const evidenceImg = document.getElementById('subcont-modal-evidence-img');
+
+    if (title) title.textContent = ${session.model || 'Model'} ();
+    if (subtitle) subtitle.textContent = Vendor:  | Sesi:  | Auditor: ;
+
+    if (grid) {
+        grid.innerHTML = 
+            <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Tgl Inspeksi</span><span class="font-bold text-slate-800"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Inspect</span><span class="font-bold text-slate-800"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Pass</span><span class="font-bold text-emerald-600"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">FTT Rate</span><span class="font-bold text-emerald-700"></span></div>
+            <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800"></span></div>
+        ;
+    }
+
+    // Filter defect detail for this session
+    const sessionDefects = currentSubcontLogDefects.filter(d => d.session_id === sessionId);
+    if (defectsTbody) {
+        if (sessionDefects.length > 0) {
+            defectsTbody.innerHTML = sessionDefects.map(d => 
+                <tr>
+                    <td class="py-2 px-3 font-medium text-slate-700"></td>
+                    <td class="py-2 px-3 font-bold text-rose-600"></td>
+                    <td class="py-2 px-3 text-right font-mono font-bold"></td>
+                </tr>
+            ).join('');
+        } else {
+            defectsTbody.innerHTML = '<tr><td colspan="3" class="py-3 text-center text-slate-400 italic">Tidak ada rincian defect untuk sesi ini (Pass All).</td></tr>';
+        }
+    }
+
+    if (session.evidence_url && evidenceImg && evidenceBox) {
+        evidenceImg.src = session.evidence_url;
+        evidenceBox.classList.remove('hidden');
+    } else if (evidenceBox) {
+        evidenceBox.classList.add('hidden');
+    }
+
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.exportSubcontInspectionLog = function() {
+    if (typeof XLSX === 'undefined') {
+        alert('Library SheetJS (XLSX) belum dimuat.');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Inspection_Sessions
+    const sRows = (currentSubcontLogSessions || []).map(s => ({
+        'SessionID':     s.session_id || '',
+        'timeStamp':     s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
+        'Date':          s.date || '',
+        'Material Type': s.material_type || '',
+        'User Login':    s.user_login || '',
+        'Vendor':        s.vendor || '',
+        'Component':     s.component || '',
+        'Process':       s.process || '',
+        'Style Number':  s.style_number || '',
+        'Model':         s.model || '',
+        'Qty Incoming':  Number(s.qty_incoming) || 0,
+        'Qty Inspect':   Number(s.qty_inspect) || 0,
+        'Qty Pass':      Number(s.qty_pass) || 0,
+        'Qty Defect':    Number(s.qty_defect) || 0,
+        'FTT (%)':       s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
+        'TanggalInsp':   s.tanggal_insp || '',
+        'Bucket':        s.bucket || '',
+        'ApprovedBy':    s.approved_by || '',
+        'EvidenceUrl':   s.evidence_url || '',
+        'Status':        s.status || 'Done',
+    }));
+    const ws1 = XLSX.utils.json_to_sheet(sRows);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Inspection_Sessions');
+
+    // Sheet 2: Defect_Breakdown
+    const dRows = (currentSubcontLogDefects || []).map(d => ({
+        'SessionId':     d.session_id || '',
+        'Date':          d.date || '',
+        'Vendor':        d.vendor || '',
+        'Component':     d.component || '',
+        'Issue Finding': d.issue_finding || '',
+        'Count':         Number(d.count) || 0,
+    }));
+    const ws2 = XLSX.utils.json_to_sheet(dRows);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Defect_Breakdown');
+
+    const nowStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, IQC_Subcont_InspectionLog_.xlsx);
+};

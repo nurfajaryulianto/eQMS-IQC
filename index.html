@@ -1779,8 +1779,7 @@
                         </button>
                         <button id="admin-tab-spreadsheet"
                             class="px-4 py-2.5 text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 -mb-px transition-colors">
-                            <span
-                                class="material-symbols-outlined text-[16px] align-middle mr-1">grid_on</span>Spreadsheet
+                            <span class="material-symbols-outlined text-[16px] align-middle mr-1">table_chart</span>Inspection Log
                         </button>
                     </div>
 
@@ -2296,41 +2295,178 @@
 
                     <!-- SPREADSHEET PANEL -->
                     <div id="admin-panel-spreadsheet" class="hidden">
-                        <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-6 max-w-2xl">
-                            <h3 class="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-emerald-600">grid_on</span>
-                                Google Spreadsheet Integration
-                            </h3>
-                            <p class="text-sm text-slate-500 mb-6 font-normal">
-                                eQMS uses Google Spreadsheet as a backend transaction database. Here, you can
-                                directly create and initialize a new spreadsheet to store your data (which sets up
-                                Sessions, DefectDetails, and PivotReady sheets with proper headers).
-                            </p>
-
-                            <div class="space-y-4">
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                                    <span
-                                        class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Active
-                                        Spreadsheet Status</span>
-                                    <div id="admin-spreadsheet-info" class="text-sm font-medium text-slate-700">
-                                        Connecting to Google Apps Script...
-                                    </div>
+                        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+                            
+                            <!-- Header & Actions -->
+                            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-emerald-600">table_chart</span>
+                                        Inspection Log ? IQC Subcont
+                                    </h3>
+                                    <p class="text-xs text-slate-500 mt-1">
+                                        Log data transaksi inspeksi Subcont real-time langsung dari Supabase Database (100% Identik Spreadsheet).
+                                    </p>
                                 </div>
-
-                                <div class="flex flex-wrap gap-3">
-                                    <a id="admin-open-spreadsheet-btn" target="_blank" href="#"
-                                        class="hidden flex items-center gap-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer">
-                                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>
-                                        <span>Open Active Spreadsheet</span>
-                                    </a>
+                                <div class="flex items-center gap-2">
+                                    <button id="admin-export-subcont-log-btn" onclick="window.exportSubcontInspectionLog()"
+                                        class="flex items-center gap-1.5 py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer">
+                                        <span class="material-symbols-outlined text-[16px]">download</span>
+                                        <span>Export Excel (2 Sheet)</span>
+                                    </button>
+                                    <button onclick="window.loadSubcontInspectionLog()"
+                                        class="flex items-center gap-1.5 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer">
+                                        <span class="material-symbols-outlined text-[16px]">refresh</span>
+                                        <span>Refresh</span>
+                                    </button>
                                 </div>
                             </div>
+
+                            <!-- Sub-tabs: Sesi vs Defect -->
+                            <div class="flex items-center justify-between gap-4 flex-wrap">
+                                <div class="flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+                                    <button id="subcont-log-tab-sessions" onclick="window.switchSubcontLogSubtab('sessions')"
+                                        class="py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                                        <span class="material-symbols-outlined text-[15px] text-emerald-600">format_list_bulleted</span>
+                                        <span>Sesi Inspeksi (Sheet 1)</span>
+                                        <span id="subcont-sessions-count-badge" class="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-700 font-bold ml-1">0</span>
+                                    </button>
+                                    <button id="subcont-log-tab-defects" onclick="window.switchSubcontLogSubtab('defects')"
+                                        class="py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer">
+                                        <span class="material-symbols-outlined text-[15px] text-rose-500">report_problem</span>
+                                        <span>Rincian Defect (Sheet 2)</span>
+                                        <span id="subcont-defects-count-badge" class="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-200 text-slate-700 font-bold ml-1">0</span>
+                                    </button>
+                                </div>
+
+                                <!-- Filter Controls -->
+                                <div class="flex flex-wrap items-center gap-2 text-xs">
+                                    <input type="date" id="subcont-log-start" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
+                                    <span class="text-slate-400">s/d</span>
+                                    <input type="date" id="subcont-log-end" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
+                                    <select id="subcont-log-vendor-filter" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
+                                        <option value="all">Semua Vendor</option>
+                                    </select>
+                                    <select id="subcont-log-status-filter" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
+                                        <option value="all">Semua Status</option>
+                                        <option value="Done">Done</option>
+                                        <option value="In-Progress">In-Progress</option>
+                                    </select>
+                                    <button onclick="window.loadSubcontInspectionLog()" class="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium cursor-pointer">
+                                        Filter
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- VIEW 1: TABEL SESI INSPEKSI (Sheet 1) -->
+                            <div id="subcont-view-sessions" class="overflow-x-auto rounded-lg border border-slate-200">
+                                <table class="w-full text-xs text-left text-slate-700">
+                                    <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[11px] border-b border-slate-200">
+                                        <tr>
+                                            <th class="py-3 px-3">Tanggal</th>
+                                            <th class="py-3 px-3">Vendor</th>
+                                            <th class="py-3 px-3">Model / Style</th>
+                                            <th class="py-3 px-3">Komponen / Proses</th>
+                                            <th class="py-3 px-3">Auditor</th>
+                                            <th class="py-3 px-3 text-right">Qty In</th>
+                                            <th class="py-3 px-3 text-right">Insp</th>
+                                            <th class="py-3 px-3 text-right text-emerald-600">Pass</th>
+                                            <th class="py-3 px-3 text-right text-rose-600">Defect</th>
+                                            <th class="py-3 px-3 text-center">Status</th>
+                                            <th class="py-3 px-3 text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subcont-sessions-tbody" class="divide-y divide-slate-100">
+                                        <tr><td colspan="11" class="py-8 text-center text-slate-400">Memuat data sesi inspeksi...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- VIEW 2: TABEL RINCIAN DEFECT (Sheet 2) -->
+                            <div id="subcont-view-defects" class="hidden overflow-x-auto rounded-lg border border-slate-200">
+                                <table class="w-full text-xs text-left text-slate-700">
+                                    <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[11px] border-b border-slate-200">
+                                        <tr>
+                                            <th class="py-3 px-3">No</th>
+                                            <th class="py-3 px-3">Tanggal</th>
+                                            <th class="py-3 px-3">Vendor</th>
+                                            <th class="py-3 px-3">Komponen</th>
+                                            <th class="py-3 px-3 text-rose-600">Jenis Defect (Issue Finding)</th>
+                                            <th class="py-3 px-3 text-right font-bold">Jumlah (Count)</th>
+                                            <th class="py-3 px-3">Session ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subcont-defects-tbody" class="divide-y divide-slate-100">
+                                        <tr><td colspan="7" class="py-8 text-center text-slate-400">Memuat rincian defect...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
                         </div>
                     </div>
                     </div>
                 </div>
 
         </main>
+    </div>
+
+    <!-- MODAL DETAIL INSPEKSI SUBCONT -->
+    <div id="subcont-session-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div>
+                    <h3 id="subcont-modal-title" class="text-sm font-bold text-slate-900">Detail Sesi Inspeksi</h3>
+                    <p id="subcont-modal-subtitle" class="text-xs text-slate-500 mt-0.5"></p>
+                </div>
+                <button onclick="document.getElementById('subcont-session-detail-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+                <!-- Info Grid -->
+                <div id="subcont-modal-info-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                </div>
+                
+                <!-- Defect Breakdown Table -->
+                <div>
+                    <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-rose-500">list_alt</span>
+                        Rincian Temuan Defect
+                    </h4>
+                    <div class="rounded-lg border border-slate-200 overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-2 px-3">Komponen</th>
+                                    <th class="py-2 px-3 text-rose-600">Jenis Defect</th>
+                                    <th class="py-2 px-3 text-right">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subcont-modal-defects-tbody" class="divide-y divide-slate-100">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Evidence Photo Preview -->
+                <div id="subcont-modal-evidence-box" class="hidden pt-2 border-t border-slate-100">
+                    <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-emerald-600">image</span>
+                        Foto Evidence Inspeksi
+                    </h4>
+                    <div class="rounded-xl border border-slate-200 overflow-hidden bg-slate-900 flex items-center justify-center max-h-64">
+                        <img id="subcont-modal-evidence-img" src="" alt="Evidence Photo" class="max-h-64 object-contain">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button onclick="document.getElementById('subcont-session-detail-modal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
     </div>
 
 

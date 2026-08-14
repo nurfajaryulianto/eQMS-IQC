@@ -1,3 +1,4 @@
+import { supabase } from './db.js';
 // ===========================================
 // 1. Deklarasi Variabel Global dan DOM References (Modifikasi)
 // ===========================================
@@ -873,22 +874,86 @@ async function saveData() {
         }
         // ── Akhir UI TESTING MODE ──
 
-        const response = await fetch(GAS_URL, {
-            method: "POST",
-            body: JSON.stringify(dataToSend),
-        });
-        const resultText = await response.text();
-        console.log("Respons server:", resultText);
-        let parsedResult = {};
-        try { parsedResult = JSON.parse(resultText); } catch { /* plain text response */ }
-        const isSuccess = response.ok && (parsedResult.status === 'ok' || resultText.toLowerCase().includes('berhasil'));
-        if (isSuccess) {
-            await showAlert(parsedResult.message || 'Data berhasil disimpan!', 'success', 'Tersimpan!');
-            resetAllFields();
-            if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
-        } else {
-            await showAlert(parsedResult.message || resultText || 'Gagal menyimpan data.', 'error');
+        // Simpan foto evidence ke Supabase Storage jika ada
+        let evidenceUrl = '';
+        if (dataToSend.file_data && dataToSend.file_name) {
+            try {
+                const byteCharacters = atob(dataToSend.file_data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: dataToSend.file_type || 'image/png' });
+                const cleanName = dataToSend.file_name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+                const filePath = evidence__;
+                const { error: upErr } = await supabase.storage.from('subcont-evidence').upload(filePath, blob, { upsert: true });
+                if (!upErr) {
+                    const { data: pData } = supabase.storage.from('subcont-evidence').getPublicUrl(filePath);
+                    evidenceUrl = pData?.publicUrl || '';
+                }
+            } catch (errUp) {
+                console.warn('Upload evidence error:', errUp);
+            }
         }
+
+        const sessId = dataToSend.sessionId || SESS-;
+        const headerRow = {
+            session_id: sessId,
+            timestamp: dataToSend.timestamp || new Date().toISOString(),
+            date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
+            material_type: dataToSend.materialType || '',
+            user_login: dataToSend.auditor || '',
+            vendor: dataToSend.vendor || '',
+            component: dataToSend.component || '',
+            process: dataToSend.process || '',
+            style_number: dataToSend.styleNumber || '',
+            model: dataToSend.modelName || '',
+            qty_incoming: Number(dataToSend.qtyIncoming) || 0,
+            qty_inspect: Number(dataToSend.qtyInspect) || 0,
+            qty_pass: Number(dataToSend.pass) || 0,
+            qty_defect: Number(dataToSend.defect) || 0,
+            ftt: Number(dataToSend.ftt) || 0,
+            redo_rate: Number(dataToSend.redoRate) || 0,
+            tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+            bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
+            approved_by: dataToSend.approvedByLeader || '',
+            evidence_url: evidenceUrl,
+            status: dataToSend.status || 'Done',
+            updated_at: new Date().toISOString()
+        };
+
+        const { error: insErr } = await supabase.from('subcont_inspections').upsert(headerRow, { onConflict: 'session_id' });
+        if (insErr) throw new Error(insErr.message);
+
+        // Simpan defect details
+        if (Array.isArray(dataToSend.items)) {
+            await supabase.from('subcont_defect_logs').delete().eq('session_id', sessId);
+            const dRows = [];
+            dataToSend.items.forEach(it => {
+                if (Array.isArray(it.defects)) {
+                    it.defects.forEach(d => {
+                        const cnt = Number(d.count || d.qty || 1);
+                        if (cnt > 0 && d.defectType) {
+                            dRows.push({
+                                session_id: sessId,
+                                date: headerRow.tanggal_insp,
+                                vendor: dataToSend.vendor || '',
+                                component: it.component || '',
+                                issue_finding: d.defectType,
+                                count: cnt
+                            });
+                        }
+                    });
+                }
+            });
+            if (dRows.length > 0) {
+                await supabase.from('subcont_defect_logs').insert(dRows);
+            }
+        }
+
+        await showAlert('Data inspeksi berhasil disimpan ke Supabase Database!', 'success', 'Tersimpan!');
+        resetAllFields();
+        if (typeof window.loadInspectionResults === 'function') window.loadInspectionResults();
+        if (typeof window.loadSubcontInspectionLog === 'function') window.loadSubcontInspectionLog();
     } catch (error) {
         console.error("Error saat mengirim data:", error);
         await showAlert('Terjadi kesalahan saat menyimpan data. Periksa koneksi internet.', 'error');

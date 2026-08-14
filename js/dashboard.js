@@ -1,3 +1,4 @@
+import { supabase } from './db.js';
 // PENTING: Ganti dengan URL Web App Google Apps Script Anda
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 
@@ -172,53 +173,55 @@ async function fetchData() {
 
     loadingOverlay.style.display = 'flex';
     try {
-        const response = await fetch(SCRIPT_URL);
-        const data = await response.json();
+        // Query directly from Supabase subcont_inspections & subcont_defect_logs (<100ms)
+        const [resSess, resDef] = await Promise.all([
+            supabase.from('subcont_inspections').select('*').order('date', { ascending: true }),
+            supabase.from('subcont_defect_logs').select('*').order('date', { ascending: true })
+        ]);
 
-        if (data.error) throw new Error(data.error);
+        if (resSess.error) throw resSess.error;
+        if (resDef.error) throw resDef.error;
 
-        // Mapping dari schema GAS baru (sessions + defects)
-        const rawSessions = data.sessions || data.inspections || [];
-        const rawDefects = data.defects || [];
+        const rawSessions = resSess.data || [];
+        const rawDefects = resDef.data || [];
 
         allInspections = rawSessions.map(item => {
-            // Support both new schema (camelCase) and old schema (spaced headers)
-            const qtyInspect = Number(item.QtyInspect || item.Qty_Inspect || item['Qty Inspect']) || 0;
-            const pass = Number(item.Pass || item['Qty Pass']) || 0;
-            const defect = Number(item.Defect || item['Qty Defect']) || 0;
+            const qtyInspect = Number(item.qty_inspect) || 0;
+            const pass = Number(item.qty_pass) || 0;
+            const defect = Number(item.qty_defect) || 0;
             const ftt = qtyInspect > 0 ? pass / qtyInspect : 0;
             const defectRate = qtyInspect > 0 ? defect / qtyInspect : 0;
             return {
-                Timestamp: new Date(item.Timestamp || item.timeStamp),
-                TanggalIncoming: item.TanggalIncoming || item.Date || '',
-                TanggalInspection: item.TanggalInspection || item['Tanggal Inspection'] || '',
-                Bucket: item.Bucket || '',
-                MaterialType: item.MaterialType || item['Material Type'] || '',
-                Auditor: item.Auditor || item['User Login'] || '',
-                Vendor: item.Vendor || '',
-                Component: item.Component || '',
-                Process: item.Process || '',
-                'Style Number': item.StyleNumber || item['Style Number'] || '',
-                Model: item.ModelName || item.Model || '',
-                QtyIncoming: Number(item.QtyIncoming || item['Qty Incoming']) || 0,
+                Timestamp: new Date(item.timestamp || item.created_at),
+                TanggalIncoming: item.date || '',
+                TanggalInspection: item.tanggal_insp || item.date || '',
+                Bucket: item.bucket || '',
+                MaterialType: item.material_type || '',
+                Auditor: item.user_login || '',
+                Vendor: item.vendor || '',
+                Component: item.component || '',
+                Process: item.process || '',
+                'Style Number': item.style_number || '',
+                Model: item.model || '',
+                QtyIncoming: Number(item.qty_incoming) || 0,
                 Qty_Inspect: qtyInspect,
                 Pass: pass,
                 Defect: defect,
                 FTT: ftt,
                 Rework_Rate: defectRate,
-                SessionId: item.SessionId || item.SessionID || '',
-                ApprovedByLeader: item.ApprovedByLeader || item['Approved By Leader'] || '',
-                EvidenceUrl: item.EvidenceUrl || item['Evidence Url'] || '',
+                SessionId: item.session_id || '',
+                ApprovedByLeader: item.approved_by || '',
+                EvidenceUrl: item.evidence_url || '',
             };
         });
 
         allDefects = rawDefects.map(item => ({
-            SessionId: item.SessionId || item.SessionID || '',
-            TanggalIncoming: item.TanggalIncoming || item.Date || '',
-            Vendor: item.Vendor || '',
-            Component: item.Component || '',
-            DefectType: item.DefectType || item['Issue Findings'] || item.Type || '',
-            Count: Number(item.Count) || 0,
+            SessionId: item.session_id || '',
+            TanggalIncoming: item.date || '',
+            Vendor: item.vendor || '',
+            Component: item.component || '',
+            DefectType: item.issue_finding || '',
+            Count: Number(item.count) || 0,
         }));
 
         populateFilters({
