@@ -1274,8 +1274,8 @@ window.loadSubcontInspectionLog = async function() {
     const badgeSessions = document.getElementById('subcont-sessions-count-badge');
     const badgeDefects = document.getElementById('subcont-defects-count-badge');
 
-    if (tbodySessions) tbodySessions.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">?</span>Memuat data sesi inspeksi...</td></tr>';
-    if (tbodyDefects) tbodyDefects.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">?</span>Memuat rincian defect...</td></tr>';
+    if (tbodySessions) tbodySessions.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat data sesi inspeksi...</td></tr>';
+    if (tbodyDefects) tbodyDefects.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat rincian defect...</td></tr>';
 
     try {
         const dateStart = document.getElementById('subcont-log-start')?.value || '';
@@ -1287,14 +1287,14 @@ window.loadSubcontInspectionLog = async function() {
         let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false }).limit(200);
         if (dateStart) qSess = qSess.gte('tanggal_insp', dateStart);
         if (dateEnd) qSess = qSess.lte('tanggal_insp', dateEnd);
-        if (vendorVal !== 'all') qSess = qSess.ilike('vendor', %%);
+        if (vendorVal !== 'all') qSess = qSess.ilike('vendor', `%${vendorVal}%`);
         if (statusVal !== 'all') qSess = qSess.eq('status', statusVal);
 
         // Query Supabase subcont_defect_logs (Sheet 2)
         let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).limit(500);
         if (dateStart) qDef = qDef.gte('date', dateStart);
         if (dateEnd) qDef = qDef.lte('date', dateEnd);
-        if (vendorVal !== 'all') qDef = qDef.ilike('vendor', %%);
+        if (vendorVal !== 'all') qDef = qDef.ilike('vendor', `%${vendorVal}%`);
 
         const [resSess, resDef] = await Promise.all([qSess, qDef]);
 
@@ -1324,8 +1324,8 @@ window.loadSubcontInspectionLog = async function() {
 
     } catch (err) {
         console.error('loadSubcontInspectionLog error:', err);
-        if (tbodySessions) tbodySessions.innerHTML = <tr><td colspan="11" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: </td></tr>;
-        if (tbodyDefects) tbodyDefects.innerHTML = <tr><td colspan="7" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: </td></tr>;
+        if (tbodySessions) tbodySessions.innerHTML = `<tr><td colspan="11" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: ${err.message || err}</td></tr>`;
+        if (tbodyDefects) tbodyDefects.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: ${err.message || err}</td></tr>`;
     }
 };
 
@@ -1346,36 +1346,36 @@ function renderSubcontLogSessions(sessions) {
 
         const safeSessionId = encodeURIComponent(s.session_id);
 
-        return 
+        return `
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900"></td>
-                <td class="py-2.5 px-3 font-semibold text-slate-800"></td>
+                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${tgl}</td>
+                <td class="py-2.5 px-3 font-semibold text-slate-800">${s.vendor || '-'}</td>
                 <td class="py-2.5 px-3">
-                    <div class="font-bold text-slate-900"></div>
-                    <div class="text-[10px] text-slate-500 font-mono"></div>
+                    <div class="font-bold text-slate-900">${s.model || '-'}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${s.style_number || ''}</div>
                 </td>
                 <td class="py-2.5 px-3">
-                    <div class="font-medium text-slate-800"></div>
-                    <div class="text-[10px] text-slate-500"></div>
+                    <div class="font-medium text-slate-800">${s.component || '-'}</div>
+                    <div class="text-[10px] text-slate-500">${s.process || ''}</div>
                 </td>
-                <td class="py-2.5 px-3 text-slate-600"></td>
-                <td class="py-2.5 px-3 text-right font-mono"></td>
-                <td class="py-2.5 px-3 text-right font-mono font-medium"></td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-600"></td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-600"></td>
+                <td class="py-2.5 px-3 text-slate-600">${s.user_login || '-'}</td>
+                <td class="py-2.5 px-3 text-right font-mono">${(Number(s.qty_incoming) || 0).toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-medium">${(Number(s.qty_inspect) || 0).toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">${(Number(s.qty_pass) || 0).toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-600">${(Number(s.qty_defect) || 0).toLocaleString()}</td>
                 <td class="py-2.5 px-3 text-center">
-                    <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ">
-                        
+                    <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ${stClass}">
+                        ${s.status || 'Done'}
                     </span>
                 </td>
                 <td class="py-2.5 px-3 text-center whitespace-nowrap">
-                    <button onclick="window.showSubcontSessionDetail('')" 
+                    <button onclick="window.showSubcontSessionDetail('${safeSessionId}')" 
                         class="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1">
                         <span class="material-symbols-outlined text-[13px]">visibility</span> Detail
                     </button>
                 </td>
             </tr>
-        ;
+        `;
     }).join('');
 }
 
@@ -1389,17 +1389,17 @@ function renderSubcontLogDefects(defects) {
     }
 
     tbody.innerHTML = defects.map((d, idx) => {
-        return 
+        return `
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="py-2.5 px-3 text-slate-400 font-mono"></td>
-                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900"></td>
-                <td class="py-2.5 px-3 font-semibold text-slate-800"></td>
-                <td class="py-2.5 px-3 font-medium text-slate-700"></td>
-                <td class="py-2.5 px-3 font-bold text-rose-600"></td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900"></td>
-                <td class="py-2.5 px-3 text-[10px] text-slate-400 font-mono max-w-[150px] truncate"></td>
+                <td class="py-2.5 px-3 text-slate-400 font-mono">${idx + 1}</td>
+                <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${d.date || '-'}</td>
+                <td class="py-2.5 px-3 font-semibold text-slate-800">${d.vendor || '-'}</td>
+                <td class="py-2.5 px-3 font-medium text-slate-700">${d.component || '-'}</td>
+                <td class="py-2.5 px-3 font-bold text-rose-600">${d.issue_finding || '-'}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">${(Number(d.count) || 0).toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-[10px] text-slate-400 font-mono max-w-[150px] truncate" title="${d.session_id || ''}">${d.session_id || '-'}</td>
             </tr>
-        ;
+        `;
     }).join('');
 }
 
@@ -1416,33 +1416,33 @@ window.showSubcontSessionDetail = function(rawSessionId) {
     const evidenceBox = document.getElementById('subcont-modal-evidence-box');
     const evidenceImg = document.getElementById('subcont-modal-evidence-img');
 
-    if (title) title.textContent = ${session.model || 'Model'} ();
-    if (subtitle) subtitle.textContent = Vendor:  | Sesi:  | Auditor: ;
+    if (title) title.textContent = `${session.model || 'Model'} (${session.style_number || '-'})`;
+    if (subtitle) subtitle.textContent = `Vendor: ${session.vendor || '-'} | Sesi: ${session.session_id || '-'} | Auditor: ${session.user_login || '-'}`;
 
     if (grid) {
-        grid.innerHTML = 
-            <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Tgl Inspeksi</span><span class="font-bold text-slate-800"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Qty Inspect</span><span class="font-bold text-slate-800"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Qty Pass</span><span class="font-bold text-emerald-600"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">FTT Rate</span><span class="font-bold text-emerald-700"></span></div>
-            <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800"></span></div>
-        ;
+        grid.innerHTML = `
+            <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800">${session.date || '-'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Tgl Inspeksi</span><span class="font-bold text-slate-800">${session.tanggal_insp || '-'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800">${(Number(session.qty_incoming) || 0).toLocaleString()}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Inspect</span><span class="font-bold text-slate-800">${(Number(session.qty_inspect) || 0).toLocaleString()}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Pass</span><span class="font-bold text-emerald-600">${(Number(session.qty_pass) || 0).toLocaleString()}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600">${(Number(session.qty_defect) || 0).toLocaleString()}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">FTT Rate</span><span class="font-bold text-emerald-700">${session.ftt ? (Number(session.ftt) * 100).toFixed(1) + '%' : '-'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800">${session.status || 'Done'}</span></div>
+        `;
     }
 
     // Filter defect detail for this session
     const sessionDefects = currentSubcontLogDefects.filter(d => d.session_id === sessionId);
     if (defectsTbody) {
         if (sessionDefects.length > 0) {
-            defectsTbody.innerHTML = sessionDefects.map(d => 
+            defectsTbody.innerHTML = sessionDefects.map(d => `
                 <tr>
-                    <td class="py-2 px-3 font-medium text-slate-700"></td>
-                    <td class="py-2 px-3 font-bold text-rose-600"></td>
-                    <td class="py-2 px-3 text-right font-mono font-bold"></td>
+                    <td class="py-2 px-3 font-medium text-slate-700">${d.component || '-'}</td>
+                    <td class="py-2 px-3 font-bold text-rose-600">${d.issue_finding || '-'}</td>
+                    <td class="py-2 px-3 text-right font-mono font-bold">${Number(d.count) || 0}</td>
                 </tr>
-            ).join('');
+            `).join('');
         } else {
             defectsTbody.innerHTML = '<tr><td colspan="3" class="py-3 text-center text-slate-400 italic">Tidak ada rincian defect untuk sesi ini (Pass All).</td></tr>';
         }
@@ -1505,5 +1505,5 @@ window.exportSubcontInspectionLog = function() {
     XLSX.utils.book_append_sheet(wb, ws2, 'Defect_Breakdown');
 
     const nowStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
-    XLSX.writeFile(wb, IQC_Subcont_InspectionLog_.xlsx);
+    XLSX.writeFile(wb, `IQC_Subcont_InspectionLog_${nowStr}.xlsx`);
 };
