@@ -404,34 +404,48 @@ export async function apiGetClaims({ poNumber = '', limit = 200 } = {}) {
     return { data: data || [] };
 }
 
-// ─── USERS (dari app_users yang sudah ada) ────────────────────
+// ─── USERS (tabel material_users khusus IQC Material) ─────────
 
 /**
- * Ambil daftar users dari tabel app_users Supabase.
+ * Ambil daftar users dari tabel material_users Supabase.
  */
 export async function apiGetUsers() {
-    const { data, error } = await supabase
-        .from('app_users')
+    let { data, error } = await supabase
+        .from('material_users')
         .select('*')
         .order('display_name', { ascending: true });
-    if (error) throw new Error(error.message);
+
+    // Fallback ke app_users jika material_users belum dimigrasi
+    if (error && (error.code === '42P01' || error.message.includes('not found') || error.message.includes('does not exist'))) {
+        const fb = await supabase.from('app_users').select('*').order('display_name', { ascending: true });
+        if (fb.error) throw new Error(fb.error.message);
+        data = fb.data;
+    } else if (error) {
+        throw new Error(error.message);
+    }
+
     return { data: data || [] };
 }
 
 /**
- * Buat atau update user.
- * Untuk create: gunakan Supabase Admin API via /api/create-user.js (Vercel function)
- * Untuk update metadata: update langsung di app_users
+ * Buat atau update user material di material_users.
  */
 export async function apiSaveUser(userData) {
-    const { nik, name, role, isNew } = userData;
+    const { nik, name, role, isNew, material_assignment } = userData;
 
     if (isNew) {
-        // Panggil Vercel serverless function (sudah ada di /api/create-user.js)
+        // Panggil Vercel serverless function
         const res = await fetch('/api/create-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nik, name, role, password: userData.password }),
+            body: JSON.stringify({
+                nik,
+                display_name: name,
+                role,
+                password: userData.password,
+                material_assignment: material_assignment || '',
+                module: 'material',
+            }),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({ error: 'Gagal membuat user' }));
@@ -440,29 +454,53 @@ export async function apiSaveUser(userData) {
         return await res.json();
     }
 
-    // Update user yang sudah ada di app_users
-    const { data, error } = await supabase
-        .from('app_users')
-        .update({ display_name: name, role })
+    // Update user yang sudah ada di material_users
+    let { data, error } = await supabase
+        .from('material_users')
+        .update({
+            display_name: name,
+            role,
+            material_assignment: material_assignment || '',
+            updated_at: new Date().toISOString(),
+        })
         .eq('nik', nik)
         .select()
         .single();
-    if (error) throw new Error(error.message);
+
+    // Fallback update ke app_users jika material_users belum dibuat
+    if (error && (error.code === '42P01' || error.message.includes('not found') || error.message.includes('does not exist'))) {
+        const fb = await supabase
+            .from('app_users')
+            .update({ display_name: name, role, material_assignment: material_assignment || '' })
+            .eq('nik', nik)
+            .select()
+            .single();
+        if (fb.error) throw new Error(fb.error.message);
+        data = fb.data;
+    } else if (error) {
+        throw new Error(error.message);
+    }
+
     return data;
 }
 
 /**
- * Hapus user.
+ * Hapus user dari material_users.
  */
 export async function apiDeleteUser(nik) {
     const res = await fetch('/api/delete-user', {
-        method: 'POST',
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nik }),
+        body: JSON.stringify({ nik, module: 'material' }),
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Gagal menghapus user' }));
-        throw new Error(err.error || 'Gagal menghapus user');
+        // Jika endpoint serverless gagal, coba delete langsung dari material_users via supabase client
+        const { error: delErr } = await supabase.from('material_users').delete().eq('nik', nik);
+        if (delErr) {
+            const err = await res.json().catch(() => ({ error: 'Gagal menghapus user' }));
+            throw new Error(err.error || delErr.message);
+        }
+        return { success: true };
     }
     return await res.json();
 }

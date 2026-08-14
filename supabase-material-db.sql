@@ -121,6 +121,23 @@ CREATE TABLE IF NOT EXISTS public.material_assignments (
   updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+-- ─── 4B. TABEL: material_users (Khusus Modul IQC Material) ────
+
+CREATE TABLE IF NOT EXISTS public.material_users (
+  id                  BIGSERIAL PRIMARY KEY,
+  nik                 VARCHAR(50)  NOT NULL UNIQUE,
+  display_name        TEXT         NOT NULL,
+  role                VARCHAR(50)  NOT NULL CHECK (role IN ('admin', 'supervisor', 'manager', 'inspector')),
+  material_assignment TEXT         DEFAULT '',
+  auth_user_id        UUID         UNIQUE,
+  created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Indexes material_users
+CREATE INDEX IF NOT EXISTS idx_mat_users_nik  ON public.material_users(nik);
+CREATE INDEX IF NOT EXISTS idx_mat_users_role ON public.material_users(role);
+
 -- ─── 5. TRIGGER: auto-update status master_data ──────────────
 -- Setiap kali inspection di-insert/update, hitung ulang status
 -- master_data berdasarkan SUM(ok+no_qty) vs batch_size.
@@ -196,7 +213,7 @@ BEGIN
     v_insp_name := NULL;
     v_mat_type := UPPER(TRIM(COALESCE(v_row.material_type, '')));
 
-    -- 1. Look up material_assignments by exact material_type match
+    -- 1. Match material_assignments by exact material_type match
     IF v_mat_type <> '' THEN
       SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
       FROM public.material_assignments
@@ -225,20 +242,20 @@ BEGIN
       LIMIT 1;
     END IF;
 
-    -- 4. Fallback: lookup from public.app_users where role = 'inspector' and material_assignment matches
+    -- 4. Fallback: lookup from public.material_users (or app_users fallback)
     IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_mat_type <> '' THEN
       SELECT nik, display_name INTO v_insp_nik, v_insp_name
-      FROM public.app_users
+      FROM public.material_users
       WHERE LOWER(role) = 'inspector'
         AND (UPPER(material_assignment) LIKE '%' || v_mat_type || '%' OR UPPER(material_assignment) = 'ALL')
       ORDER BY id ASC
       LIMIT 1;
     END IF;
 
-    -- 5. Fallback: pick ANY first available inspector from public.app_users
+    -- 5. Fallback: pick ANY first available inspector from public.material_users
     IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
       SELECT nik, display_name INTO v_insp_nik, v_insp_name
-      FROM public.app_users
+      FROM public.material_users
       WHERE LOWER(role) = 'inspector'
       ORDER BY id ASC
       LIMIT 1;
@@ -399,6 +416,18 @@ DROP POLICY IF EXISTS "assign_write_admin"  ON public.material_assignments;
 CREATE POLICY "assign_select_auth" ON public.material_assignments
   FOR SELECT TO authenticated USING (TRUE);
 CREATE POLICY "assign_write_admin" ON public.material_assignments
+  FOR ALL TO authenticated
+  USING (fn_get_material_role() = 'admin')
+  WITH CHECK (fn_get_material_role() = 'admin');
+
+-- material_users
+ALTER TABLE public.material_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "mat_users_select_authenticated" ON public.material_users;
+DROP POLICY IF EXISTS "mat_users_write_admin"          ON public.material_users;
+
+CREATE POLICY "mat_users_select_authenticated" ON public.material_users
+  FOR SELECT TO authenticated USING (TRUE);
+CREATE POLICY "mat_users_write_admin" ON public.material_users
   FOR ALL TO authenticated
   USING (fn_get_material_role() = 'admin')
   WITH CHECK (fn_get_material_role() = 'admin');

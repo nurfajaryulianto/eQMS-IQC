@@ -4,7 +4,7 @@
 // Data diambil langsung dari Supabase melalui api.js.
 // ============================================================
 
-import { apiGetInspectionData, apiGetAssignments } from './api.js';
+import { apiGetInspectionData, apiGetUsers, apiGetAssignments } from './api.js';
 import { exportInspectionLogToExcel } from './export.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -12,8 +12,8 @@ let allInspectionLog = [];
 let currentPage      = 1;
 const PAGE_LIMIT     = 50;
 let currentFilters   = {};
-// map: material_type (uppercase) -> array of inspector names
-let assignmentNameMap = {};
+let appUsersList     = [];
+let nikToNameMap     = {};
 
 // ─── INIT ─────────────────────────────────────────────────────
 export async function initInspectionLog() {
@@ -55,17 +55,16 @@ export async function loadInspectionLog(resetPage = true) {
     };
 
     try {
-        // Load assignments untuk lookup inspector names
+        // Load users from app_users to map NIK -> Name and Material Type -> Inspectors
         try {
-            const asgn = await apiGetAssignments();
-            assignmentNameMap = {};
-            (asgn.data || []).forEach(a => {
-                const key = (a.material_type || '').toUpperCase();
-                if (!assignmentNameMap[key]) assignmentNameMap[key] = [];
-                const nm = (a.inspector_name || a.inspector_nik || '').trim();
-                if (nm && !assignmentNameMap[key].includes(nm)) assignmentNameMap[key].push(nm);
+            const uRes = await apiGetUsers();
+            appUsersList = uRes.data || [];
+            nikToNameMap = {};
+            appUsersList.forEach(u => {
+                const name = (u.display_name || u.name || u.nik || '').trim();
+                if (u.nik) nikToNameMap[String(u.nik).trim()] = name;
             });
-        } catch (_) { /* assignment load failed — non-fatal */ }
+        } catch (_) { /* non-fatal fallback */ }
 
         const result = await apiGetInspectionData(currentFilters);
         allInspectionLog = result.data || [];
@@ -105,7 +104,6 @@ function renderInspectionLog(data) {
         if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
             dateFmt = rawDate.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
         } else if (rawDate) {
-            // Fallback: rawDate is a string
             const s = String(rawDate);
             const iso = s.length >= 10 ? s.substring(0,10) : s;
             const pts = iso.split(/[-/]/);
@@ -119,13 +117,46 @@ function renderInspectionLog(data) {
             }
         }
 
-        // --- Inspector names: lookup all assigned inspectors for this material_type
-        const matTypeKey = (d.inspection_type || '').toUpperCase();
-        const assignedNames = assignmentNameMap[matTypeKey] || [];
-        // fallback: use inspector_nik or inspector_name from row itself
-        const rowInspName = d.inspector_name || d.inspector_nik || '—';
-        const inspDisplay = assignedNames.length > 0 ? assignedNames.join(', ') : rowInspName;
-        const inspTitle   = assignedNames.length > 0 ? assignedNames.join(' / ') : rowInspName;
+        // --- Inspector resolution:
+        // 1. Find all inspectors from app_users whose material_assignment matches this row's inspection_type / material_name
+        const matType = (d.inspection_type || '').toUpperCase().trim();
+        const matName = (d.material_name || '').toUpperCase().trim();
+
+        let assignedInspectors = [];
+        if (matType && matType !== 'RAW MATERIAL') {
+            assignedInspectors = appUsersList.filter(u => {
+                const uAssign = (u.material_assignment || '').toUpperCase();
+                return u.role === 'inspector' && (uAssign.includes(matType) || uAssign === 'ALL');
+            });
+        } else if (matName) {
+            // Check keywords from material name (e.g. LTH -> LEATHER, TXT -> TEXTILE)
+            let inferredType = '';
+            if (matName.includes('LTH') || matName.includes('LEATHER')) inferredType = 'LEATHER';
+            else if (matName.includes('TXT') || matName.includes('TEXTILE')) inferredType = 'TEXTILE';
+            else if (matName.includes('SYN') || matName.includes('PU') || matName.includes('SUEDE')) inferredType = 'SYNTHETIC';
+
+            if (inferredType) {
+                assignedInspectors = appUsersList.filter(u => {
+                    const uAssign = (u.material_assignment || '').toUpperCase();
+                    return u.role === 'inspector' && (uAssign.includes(inferredType) || uAssign === 'ALL');
+                });
+            }
+        }
+
+        let inspDisplay = '—';
+        let inspTitle = '—';
+
+        if (assignedInspectors.length > 0) {
+            const names = assignedInspectors.map(u => (u.display_name || u.name || u.nik || '').trim()).filter(Boolean);
+            inspDisplay = names.join(', ');
+            inspTitle = names.join(' / ');
+        } else {
+            // Fallback: resolve inspector_nik to full name if exists
+            const rawNik = (d.inspector_nik || '').trim();
+            const resolvedName = nikToNameMap[rawNik] || d.inspector_name || rawNik;
+            inspDisplay = resolvedName || '—';
+            inspTitle = resolvedName || '—';
+        }
 
         const ok    = Number(d.ok)     || 0;
         const noQty = Number(d.no_qty) || 0;
@@ -152,7 +183,7 @@ function renderInspectionLog(data) {
             <td style="${TD}font-weight:700;color:#fff;font-size:12px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
             <td style="${TD}color:#34d399;font-weight:600;font-size:12px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
             <td style="padding:10px 12px;overflow:hidden;">${typeBadge(d.inspection_type)}</td>
-            <td style="${TD}color:rgba(255,255,255,0.85);font-size:12px;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
+            <td style="${TD}color:rgba(255,255,255,0.9);font-size:12px;cursor:default;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:13px;">${ok.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;color:#94a3b8;font-size:12px;">${passRate}</td>
@@ -191,7 +222,43 @@ window.exportInspectionLog = async function() {
     try {
         // Load semua data (tanpa pagination) untuk export
         const result = await apiGetInspectionData({ ...currentFilters, page: 1, limit: 9999 });
-        exportInspectionLogToExcel(result.data || []);
+        const enriched = (result.data || []).map(d => {
+            const matType = (d.inspection_type || '').toUpperCase().trim();
+            const matName = (d.material_name || '').toUpperCase().trim();
+            let assignedInspectors = [];
+            if (matType && matType !== 'RAW MATERIAL') {
+                assignedInspectors = appUsersList.filter(u => {
+                    const uAssign = (u.material_assignment || '').toUpperCase();
+                    return u.role === 'inspector' && (uAssign.includes(matType) || uAssign === 'ALL');
+                });
+            } else if (matName) {
+                let inferredType = '';
+                if (matName.includes('LTH') || matName.includes('LEATHER')) inferredType = 'LEATHER';
+                else if (matName.includes('TXT') || matName.includes('TEXTILE')) inferredType = 'TEXTILE';
+                else if (matName.includes('SYN') || matName.includes('PU') || matName.includes('SUEDE')) inferredType = 'SYNTHETIC';
+                if (inferredType) {
+                    assignedInspectors = appUsersList.filter(u => {
+                        const uAssign = (u.material_assignment || '').toUpperCase();
+                        return u.role === 'inspector' && (uAssign.includes(inferredType) || uAssign === 'ALL');
+                    });
+                }
+            }
+
+            let inspName = '';
+            if (assignedInspectors.length > 0) {
+                inspName = assignedInspectors.map(u => (u.display_name || u.name || u.nik || '').trim()).filter(Boolean).join(', ');
+            } else {
+                const rawNik = (d.inspector_nik || '').trim();
+                inspName = nikToNameMap[rawNik] || d.inspector_name || rawNik;
+            }
+
+            return {
+                ...d,
+                inspector_nik: inspName || d.inspector_nik,
+            };
+        });
+
+        exportInspectionLogToExcel(enriched);
     } catch (err) {
         alert('Gagal export: ' + err.message);
     } finally {
