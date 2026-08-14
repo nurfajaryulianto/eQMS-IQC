@@ -4,7 +4,7 @@
 // Semua fungsi menggunakan Supabase JS SDK dari auth.js.
 // ============================================================
 
-import { supabase } from './auth.js';
+import { supabase, MATERIAL_GAS_URL } from './auth.js';
 
 // ─── HELPER ──────────────────────────────────────────────────
 
@@ -671,33 +671,31 @@ function parseDateSafe(val) {
 }
 
 /**
- * Upload file evidence ke Supabase Storage bucket 'iqc-evidence'.
- * Menggantikan Google Drive upload di GAS.
+ * Upload file evidence ke Google Drive via GAS micro-uploader.
+ * Menggantikan Supabase Storage agar tidak memakan limit free tier.
  */
 async function uploadEvidenceFile(fileDataBase64, fileName, mimeType) {
     try {
-        // Decode base64 ke Uint8Array
-        const binary = atob(fileDataBase64);
-        const bytes  = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const gasUrl = MATERIAL_GAS_URL || 'https://script.google.com/macros/s/AKfycbxPpUaDT-1xipllWqR4d-hrEDCK2AcR5d5oM7euWuTVIcSXyNXohz4dE5MK85WeIL8pRQ/exec';
+        const res = await fetch(gasUrl, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'uploadEvidence',
+                file_data: fileDataBase64,
+                file_name: fileName,
+                file_type: mimeType || 'image/png'
+            })
+        });
 
-        const filePath = `evidence/${Date.now()}_${fileName}`;
-        const { data, error } = await supabase.storage
-            .from('iqc-evidence')
-            .upload(filePath, bytes, { contentType: mimeType, upsert: false });
-
-        if (error) {
-            console.warn('Upload evidence gagal, lanjut tanpa URL:', error.message);
-            return '';
+        if (res.ok) {
+            const resData = await res.json();
+            if (resData && resData.status === 'ok') {
+                return resData.evidenceUrl || resData.directUrl || '';
+            }
         }
-
-        const { data: urlData } = supabase.storage
-            .from('iqc-evidence')
-            .getPublicUrl(data.path);
-
-        return urlData?.publicUrl || '';
+        return '';
     } catch (e) {
-        console.warn('uploadEvidenceFile error:', e);
+        console.warn('uploadEvidenceFile ke Google Drive error:', e);
         return '';
     }
 }
@@ -706,39 +704,31 @@ async function uploadEvidenceFile(fileDataBase64, fileName, mimeType) {
 // ─── SUBCONT SUPABASE API SERVICE (100% IDENTIK SPREADSHEET) ─
 // ============================================================
 
+const GAS_EVIDENCE_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
+
 /**
- * Upload evidence photo ke Supabase Storage (bucket: subcont-evidence)
+ * Upload evidence photo ke Google Drive via GAS
  */
 export async function uploadSubcontEvidenceFile(base64Data, fileName, contentType = 'image/png') {
     try {
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const res = await fetch(GAS_EVIDENCE_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'uploadEvidence',
+                file_data: base64Data,
+                file_name: fileName,
+                file_type: contentType
+            })
+        });
+        if (res.ok) {
+            const resData = await res.json();
+            if (resData && resData.status === 'ok') {
+                return resData.evidenceUrl || resData.directUrl || '';
+            }
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: contentType });
-
-        const ext = fileName.split('.').pop() || 'png';
-        const cleanName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
-        const filePath = `evidence_${Date.now()}_${cleanName}.${ext}`;
-
-        const { error } = await supabase.storage
-            .from('subcont-evidence')
-            .upload(filePath, blob, {
-                contentType,
-                upsert: true,
-            });
-
-        if (error) throw error;
-
-        const { data: publicUrlData } = supabase.storage
-            .from('subcont-evidence')
-            .getPublicUrl(filePath);
-
-        return publicUrlData?.publicUrl || '';
+        return '';
     } catch (err) {
-        console.warn('Gagal upload evidence ke Supabase Storage:', err);
+        console.warn('Gagal upload evidence ke Google Drive:', err);
         return '';
     }
 }

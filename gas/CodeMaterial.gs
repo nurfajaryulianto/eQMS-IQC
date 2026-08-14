@@ -176,6 +176,12 @@ function doPost(e) {
   }
 
   var action = payload.action || '';
+
+  // Dedicated action: Upload Evidence file ke Google Drive (bebas limit Supabase Storage)
+  if (action === 'uploadEvidence') {
+    return jsonResponse(uploadMaterialEvidenceFile(payload));
+  }
+
   try {
     authorizeAction(action, payload.token); // ← BARU: validasi sebelum apa pun dieksekusi
 
@@ -192,6 +198,33 @@ function doPost(e) {
     return jsonResponse({ error: 'Unknown action: ' + action });
   } catch (err) {
     return jsonResponse({ error: err.message });
+  }
+}
+
+function uploadMaterialEvidenceFile(payload) {
+  if (!payload.file_data || !payload.file_name) {
+    return { status: 'error', message: 'File data atau nama file kosong.' };
+  }
+  try {
+    var spreadsheetFile = DriveApp.getFileById(SPREADSHEET_ID);
+    var parents = spreadsheetFile.getParents();
+    var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+    var subDepartmentFolder = getOrCreateSubfolder(parentFolder, "IQC Material Evidence");
+    
+    var fileBlob = Utilities.newBlob(Utilities.base64Decode(payload.file_data), payload.file_type || 'image/png', payload.file_name);
+    var driveFile = subDepartmentFolder.createFile(fileBlob);
+    driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+    var fileId = driveFile.getId();
+    var webViewUrl = driveFile.getUrl();
+
+    return {
+      status: 'ok',
+      fileId: fileId,
+      evidenceUrl: webViewUrl,
+      directUrl: "https://lh3.googleusercontent.com/d/" + fileId
+    };
+  } catch (err) {
+    return { status: 'error', message: 'Gagal upload file ke Google Drive: ' + err.message };
   }
 }
 

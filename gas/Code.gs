@@ -124,6 +124,30 @@ function doPost(e) {
       return jsonResponse(result);
     }
 
+    // Dedicated Action: Upload Evidence Photo ke Google Drive
+    if (data && data.action === 'uploadEvidence') {
+      if (!data.file_data || !data.file_name) {
+        return jsonResponse({ status: 'error', message: 'File data atau nama file kosong.' });
+      }
+      var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
+      var parents = spreadsheetFile.getParents();
+      var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+      var evidenceFolder = getOrCreateSubfolder(parentFolder, "IQC Subcont Evidence");
+      
+      var fileBlob = Utilities.newBlob(Utilities.base64Decode(data.file_data), data.file_type || 'image/png', data.file_name);
+      var driveFile = evidenceFolder.createFile(fileBlob);
+      driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+      var fileId = driveFile.getId();
+      var webViewUrl = driveFile.getUrl();
+
+      return jsonResponse({
+        status: 'ok',
+        fileId: fileId,
+        evidenceUrl: webViewUrl,
+        directUrl: "https://lh3.googleusercontent.com/d/" + fileId
+      });
+    }
+
     const ss   = SpreadsheetApp.openById(getActiveSpreadsheetId());
 
     // Save evidence file if uploaded

@@ -2,6 +2,7 @@ import { supabase } from './db.js';
 // ===========================================
 // 1. Deklarasi Variabel Global dan DOM References (Modifikasi)
 // ===========================================
+const GAS_EVIDENCE_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 // --- IMPOR DATABASE DARI FILE TERPISAH ---
 // --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
@@ -874,24 +875,27 @@ async function saveData() {
         }
         // ── Akhir UI TESTING MODE ──
 
-        // Simpan foto evidence ke Supabase Storage jika ada
+        // Simpan foto evidence ke Google Drive via GAS micro-uploader jika ada
         let evidenceUrl = '';
         if (dataToSend.file_data && dataToSend.file_name) {
             try {
-                const byteCharacters = atob(dataToSend.file_data);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: dataToSend.file_type || 'image/png' });
-                const cleanName = dataToSend.file_name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-                const filePath = `evidence_${Date.now()}_${cleanName}`;
-                const { error: upErr } = await supabase.storage.from('subcont-evidence').upload(filePath, blob, { upsert: true });
-                if (!upErr) {
-                    const { data: pData } = supabase.storage.from('subcont-evidence').getPublicUrl(filePath);
-                    evidenceUrl = pData?.publicUrl || '';
+                const res = await fetch(GAS_EVIDENCE_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'uploadEvidence',
+                        file_data: dataToSend.file_data,
+                        file_name: dataToSend.file_name,
+                        file_type: dataToSend.file_type || 'image/png'
+                    })
+                });
+                if (res.ok) {
+                    const resData = await res.json();
+                    if (resData && resData.status === 'ok') {
+                        evidenceUrl = resData.evidenceUrl || resData.directUrl || '';
+                    }
                 }
             } catch (errUp) {
-                console.warn('Upload evidence error:', errUp);
+                console.warn('Upload evidence ke Google Drive gagal:', errUp);
             }
         }
 
