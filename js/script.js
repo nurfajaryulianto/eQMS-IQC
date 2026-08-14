@@ -9,11 +9,11 @@ import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendo
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
-let defectCounts = {}; 
+let defectCounts = {};
 
 // --- VARIABEL UNTUK POLA MULTIPLE DEFECT ---
-let selectedDefects = []; 
-let currentInspectionPairs = []; 
+let selectedDefects = [];
+let currentInspectionPairs = [];
 
 // --- REWORK LOG: menyimpan posisi rework per item untuk kalkulasi FTT ---
 // Karena posisi L/R/Pairs dihilangkan, default selalu 'PAIRS'
@@ -21,7 +21,7 @@ let reworkLog = [];
 // ---------------------------------------------
 
 // --- STATE UNTUK MULTI ITEM KOMPONEN & PROSES ---
-let inspectionItems = []; 
+let inspectionItems = [];
 let editingItemIndex = null;
 
 const qtyInspectOutputs = {
@@ -64,12 +64,12 @@ const STORAGE_KEYS = {
 
 // ─── Vendor Button-Selection ──────────────────────────
 // State: single selection for vendor
-let selectedVendor    = '';
+let selectedVendor = '';
 let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 
-const VENDOR_BTN_CLS    = 'vendor-sel-btn';
+const VENDOR_BTN_CLS = 'vendor-sel-btn';
 const COMPONENT_BTN_CLS = 'component-sel-btn';
-const PROCESS_BTN_CLS   = 'process-sel-btn';
+const PROCESS_BTN_CLS = 'process-sel-btn';
 
 function renderVendorButtons() {
     const container = document.getElementById('vendor-btn-container');
@@ -79,7 +79,7 @@ function renderVendorButtons() {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">— Pilih material type terlebih dahulu —</span>';
         return;
     }
-    const vendors  = getVendors();
+    const vendors = getVendors();
     const filtered = vendors.filter(v => v.material_type === selectedMaterialType);
     if (!filtered.length) {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada vendor untuk tipe ini —</span>';
@@ -101,7 +101,7 @@ function renderVendorButtons() {
             // Clear items when vendor changes
             inspectionItems = [];
             renderInspectedItems();
-            
+
             refreshVendorButtons();
             checkInfoCompleteAndLockButtons();
             saveToLocalStorage();
@@ -137,9 +137,9 @@ function renderModalComponentButtons(vendorName) {
         return;
     }
     const components = getComponents();
-    const vendors    = getVendors();
-    const vendor     = vendors.find(v => v.name === vendorName);
-    const filtered   = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
+    const vendors = getVendors();
+    const vendor = vendors.find(v => v.name === vendorName);
+    const filtered = vendor ? components.filter(c => c.vendor_id === vendor.id) : [];
     if (!filtered.length) {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">— Tidak ada component untuk vendor ini —</span>';
         return;
@@ -150,11 +150,11 @@ function renderModalComponentButtons(vendorName) {
         btn.textContent = c.name;
         btn.dataset.value = c.name;
         btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
-        
+
         if (modalComponent === c.name) {
             btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
         }
-        
+
         btn.addEventListener('click', () => {
             modalComponent = c.name;
             updateModalComponentButtonsActiveState();
@@ -190,7 +190,7 @@ function renderModalProcessButtons() {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.value = p.name;
-        
+
         const isSelected = modalProcesses.includes(p.name);
         if (isSelected) {
             btn.innerHTML = `<span class="material-symbols-outlined text-[14px]">check</span> ${p.name}`;
@@ -199,7 +199,7 @@ function renderModalProcessButtons() {
             btn.textContent = p.name;
             btn.className = 'modal-proc-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer flex items-center gap-1';
         }
-        
+
         btn.addEventListener('click', () => {
             if (modalProcesses.includes(p.name)) {
                 modalProcesses = modalProcesses.filter(val => val !== p.name);
@@ -254,17 +254,17 @@ function resetAllFields() {
     selectedVendor = '';
     inspectionItems = [];
     editingItemIndex = null;
-    
+
     // Reset datepickers
     const today = new Date().toISOString().split('T')[0];
     if (tanggalIncomingInput) tanggalIncomingInput.value = today;
     if (tanggalInspectionInput) tanggalInspectionInput.value = today;
     if (tanggalBucketInput) tanggalBucketInput.value = today;
-    
+
     // Reset texts
     if (styleNumberInput) styleNumberInput.value = '';
     if (modelNameInput) modelNameInput.value = '';
-    
+
     // Reset quantities
     if (qtySampleSetInput) qtySampleSetInput.value = 0;
     if (qtyInspectModeSelect) qtyInspectModeSelect.value = 'manual';
@@ -272,21 +272,21 @@ function resetAllFields() {
         qtyInspectInput.value = 0;
         qtyInspectInput.readOnly = false;
     }
-    
+
     // Reset overall counters
     totalInspected = 0;
     defectCounts = {};
     qtyInspectOutputs['pass'] = 0;
     qtyInspectOutputs['defect'] = 0;
-    
+
     // Render
     renderVendorButtons();
     renderInspectedItems();
-    
+
     if (addItemBtn) {
         addItemBtn.disabled = true;
     }
-    
+
     const leaderSelect = document.getElementById("approved-by-leader");
     if (leaderSelect) leaderSelect.value = '';
     const leaderSelectMobile = document.getElementById("approved-by-leader-mobile");
@@ -506,14 +506,14 @@ function updateTotalQtyInspect(isManualPassChange = false) {
     let totalPass = 0;
     let totalDefect = 0;
     let totalInspect = 0;
-    
+
     // Aggregation
     defectCounts = {};
     inspectionItems.forEach(item => {
         totalPass += item.pass || 0;
         totalDefect += item.defect || 0;
         totalInspect += item.qtyInspect || 0;
-        
+
         if (Array.isArray(item.defects)) {
             item.defects.forEach(d => {
                 const type = d.type;
@@ -528,25 +528,25 @@ function updateTotalQtyInspect(isManualPassChange = false) {
             });
         }
     });
-    
+
     qtyInspectOutputs['pass'] = totalPass;
     qtyInspectOutputs['defect'] = totalDefect;
     totalInspected = totalInspect;
-    
+
     const passDisplay = document.getElementById('pass-counter');
     if (passDisplay) {
         passDisplay.textContent = totalPass;
     }
-    
+
     const defectDisplay = document.getElementById('defect-counter');
     if (defectDisplay) {
         defectDisplay.textContent = totalDefect;
     }
-    
+
     if (qtyInspectOutput) {
         qtyInspectOutput.textContent = totalInspected;
     }
-    
+
     updateFTT();
     updateRedoRate();
     updateDefectSummaryDisplay();
@@ -562,14 +562,14 @@ function syncDefectButtonActiveStates() {
     if (!defectButtons) return;
     defectButtons.forEach(button => {
         const defectType = button.dataset.defect || button.textContent.trim();
-        const hasDefect = defectCounts[defectType] && 
-                          defectCounts[defectType]['PAIRS'] && 
-                          defectCounts[defectType]['PAIRS']['defect'] > 0;
+        const hasDefect = defectCounts[defectType] &&
+            defectCounts[defectType]['PAIRS'] &&
+            defectCounts[defectType]['PAIRS']['defect'] > 0;
         button.classList.toggle('active', hasDefect);
     });
 }
 
-window.__updateDefectCount = function(defectType, position, grade, newValue) {
+window.__updateDefectCount = function (defectType, position, grade, newValue) {
     const val = parseInt(newValue, 10);
     if (isNaN(val) || val < 1) {
         defectCounts[defectType][position][grade] = 1;
@@ -580,7 +580,7 @@ window.__updateDefectCount = function(defectType, position, grade, newValue) {
     updateTotalQtyInspect();
 };
 
-window.__removeDefect = function(defectType, position, grade) {
+window.__removeDefect = function (defectType, position, grade) {
     if (defectCounts[defectType] && defectCounts[defectType][position]) {
         delete defectCounts[defectType][position][grade];
         if (Object.keys(defectCounts[defectType][position]).length === 0) {
@@ -657,7 +657,7 @@ function handleDefectClick(button) {
     if (!defectCounts[defectType][position]) {
         defectCounts[defectType][position] = {};
     }
-    
+
     if (defectCounts[defectType][position][grade]) {
         // Jika sudah ada, hapus (fungsi toggle)
         delete defectCounts[defectType][position][grade];
@@ -693,16 +693,16 @@ function processGradeClick(button, gradeCategory) {
     }
 
     qtyInspectOutputs[gradeCategory]++;
-    
-    updateAllDisplays();  
-    
+
+    updateAllDisplays();
+
     if (gradeCategory === 'defect') {
         addAllDefectsToSummary(gradeCategory);
     }
-    
-    updateDefectSummaryDisplay(); 
+
+    updateDefectSummaryDisplay();
     saveToLocalStorage();
-    
+
     setTimeout(() => {
         initButtonStates();
     }, 150);
@@ -884,7 +884,7 @@ async function saveData() {
                 const byteArray = new Uint8Array(byteNumbers);
                 const blob = new Blob([byteArray], { type: dataToSend.file_type || 'image/png' });
                 const cleanName = dataToSend.file_name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-                const filePath = evidence__;
+                const filePath = `evidence_${Date.now()}_${cleanName}`;
                 const { error: upErr } = await supabase.storage.from('subcont-evidence').upload(filePath, blob, { upsert: true });
                 if (!upErr) {
                     const { data: pData } = supabase.storage.from('subcont-evidence').getPublicUrl(filePath);
@@ -895,7 +895,7 @@ async function saveData() {
             }
         }
 
-        const sessId = dataToSend.sessionId || SESS-;
+        const sessId = dataToSend.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
         const headerRow = {
             session_id: sessId,
             timestamp: dataToSend.timestamp || new Date().toISOString(),
@@ -1058,7 +1058,7 @@ function renderInspectedItems() {
     const tbody = document.getElementById('inspected-items-tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    
+
     if (inspectionItems.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -1067,7 +1067,7 @@ function renderInspectedItems() {
         `;
         return;
     }
-    
+
     inspectionItems.forEach((item, index) => {
         const tr = document.createElement('tr');
         tr.className = 'border-b border-slate-150 hover:bg-slate-100/50 transition-colors';
@@ -1085,11 +1085,11 @@ function renderInspectedItems() {
                 </button>
             </td>
         `;
-        
+
         tr.querySelector('.edit-item-btn').addEventListener('click', () => {
             openInspectionItemModal(index);
         });
-        
+
         tr.querySelector('.delete-item-btn').addEventListener('click', async () => {
             const yes = await showConfirm(`Apakah Anda yakin ingin menghapus item inspeksi ${item.component} - ${item.process}?`, 'Hapus Item', 'Ya, Hapus', 'Batal');
             if (yes) {
@@ -1099,7 +1099,7 @@ function renderInspectedItems() {
                 checkInfoCompleteAndLockButtons();
             }
         });
-        
+
         tbody.appendChild(tr);
     });
 }
@@ -1109,7 +1109,7 @@ let modalComponent = '';
 let modalProcesses = [];
 let modalSelectedComponent = '';
 let modalSelectedProcesses = [];
-let modalItemDefects = {}; 
+let modalItemDefects = {};
 let modalPassVal = 0;
 let modalDefectVal = 0;
 let modalQtyIncomingVal = 0;
@@ -1118,9 +1118,9 @@ let modalQtyInspectVal = 0;
 function openInspectionItemModal(index = null) {
     const modal = document.getElementById('inspection-item-modal');
     if (!modal) return;
-    
+
     editingItemIndex = index;
-    
+
     // Clear / Init Modal fields
     const modalTitle = document.getElementById('modal-item-title');
     if (index === null) {
@@ -1130,11 +1130,11 @@ function openInspectionItemModal(index = null) {
         modalItemDefects = {};
         modalPassVal = 0;
         modalDefectVal = 0;
-        
+
         // Default quantities
         modalQtyIncomingVal = 0;
         modalQtyInspectVal = 0;
-        
+
         const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
         if (modalModeSelect) modalModeSelect.value = 'manual';
     } else {
@@ -1146,7 +1146,7 @@ function openInspectionItemModal(index = null) {
         modalQtyInspectVal = item.qtyInspect || 0;
         modalPassVal = item.pass || 0;
         modalDefectVal = item.defect || 0;
-        
+
         // Re-construct modalItemDefects map
         modalItemDefects = {};
         if (Array.isArray(item.defects)) {
@@ -1154,29 +1154,29 @@ function openInspectionItemModal(index = null) {
                 modalItemDefects[d.type] = d.count;
             });
         }
-        
+
         const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
         if (modalModeSelect) modalModeSelect.value = 'manual'; // Always default to manual edit mode for previously saved items
     }
-    
+
     // Set inputs values
     const incomingInput = document.getElementById('modal-qty-incoming');
     if (incomingInput) incomingInput.value = modalQtyIncomingVal;
-    
+
     const inspectInput = document.getElementById('modal-qty-inspect');
     if (inspectInput) inspectInput.value = modalQtyInspectVal;
 
     const customPctContainer = document.getElementById('modal-custom-pct-container');
     const customPctInput = document.getElementById('modal-custom-pct');
     if (customPctContainer) customPctContainer.classList.add('hidden');
-    
+
     // Handle calculations inside modal
     const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
     const updateModalQtyInspect = () => {
         if (!modalModeSelect || !incomingInput || !inspectInput) return;
         const mode = modalModeSelect.value;
         const incoming = parseInt(incomingInput.value, 10) || 0;
-        
+
         if (mode === 'manual') {
             if (customPctContainer) customPctContainer.classList.add('hidden');
             inspectInput.readOnly = false;
@@ -1198,7 +1198,7 @@ function openInspectionItemModal(index = null) {
         modalQtyInspectVal = parseInt(inspectInput.value, 10) || 0;
         updateModalGradeState();
     };
-    
+
     if (modalModeSelect) {
         modalModeSelect.onchange = updateModalQtyInspect;
     }
@@ -1214,13 +1214,13 @@ function openInspectionItemModal(index = null) {
             updateModalGradeState();
         };
     }
-    
+
     // Render Modal Components Buttons
     modalComponent = modalSelectedComponent;
     modalProcesses = [...modalSelectedProcesses];
     renderModalComponentButtons(selectedVendor);
     renderModalProcessButtons();
-    
+
     // Render modal defect buttons dynamically
     const modalDefectsContainer = document.getElementById('modal-defect-buttons');
     if (modalDefectsContainer) {
@@ -1236,10 +1236,10 @@ function openInspectionItemModal(index = null) {
             });
         });
     }
-    
+
     // Render logged defects and update numbers
     updateModalGradeState();
-    
+
     // Show Modal
     modal.classList.remove('hidden');
 }
@@ -1250,18 +1250,18 @@ function updateModalGradeState() {
         defectSum += modalItemDefects[type] || 0;
     }
     modalDefectVal = defectSum;
-    
+
     modalPassVal = Math.max(0, modalQtyInspectVal - modalDefectVal);
-    
+
     const passCounter = document.getElementById('modal-pass-counter');
     if (passCounter) passCounter.textContent = modalPassVal;
-    
+
     const defectCounter = document.getElementById('modal-defect-counter');
     if (defectCounter) defectCounter.textContent = modalDefectVal;
-    
+
     const inspectInput = document.getElementById('modal-qty-inspect');
     if (inspectInput) inspectInput.value = modalQtyInspectVal;
-    
+
     renderModalLoggedDefects();
 }
 
@@ -1269,7 +1269,7 @@ function renderModalLoggedDefects() {
     const container = document.getElementById('modal-logged-defects');
     if (!container) return;
     container.innerHTML = '';
-    
+
     let hasDefects = false;
     for (const type in modalItemDefects) {
         const count = modalItemDefects[type] || 0;
@@ -1293,22 +1293,22 @@ function renderModalLoggedDefects() {
             container.appendChild(div);
         }
     }
-    
+
     if (!hasDefects) {
         container.innerHTML = '<span class="text-xs text-slate-400 italic">Belum ada defect yang tercatat.</span>';
     }
 }
 
-window.setModalDefectCount = function(defectType, val) {
+window.setModalDefectCount = function (defectType, val) {
     const parsed = parseInt(val, 10);
     const newCount = isNaN(parsed) ? 0 : Math.max(0, parsed);
-    
+
     if (newCount === 0) {
         delete modalItemDefects[defectType];
     } else {
         modalItemDefects[defectType] = newCount;
     }
-    
+
     let defectSum = 0;
     for (const type in modalItemDefects) {
         defectSum += modalItemDefects[type] || 0;
@@ -1316,22 +1316,22 @@ window.setModalDefectCount = function(defectType, val) {
     if (defectSum > modalQtyInspectVal) {
         modalQtyInspectVal = defectSum;
     }
-    
+
     updateModalGradeState();
 };
 
-window.adjustModalDefect = function(defectType, amount) {
+window.adjustModalDefect = function (defectType, amount) {
     if (!modalItemDefects[defectType]) modalItemDefects[defectType] = 0;
-    
+
     const currentCount = modalItemDefects[defectType];
     const newCount = Math.max(0, currentCount + amount);
-    
+
     if (newCount === 0) {
         delete modalItemDefects[defectType];
     } else {
         modalItemDefects[defectType] = newCount;
     }
-    
+
     let defectSum = 0;
     for (const type in modalItemDefects) {
         defectSum += modalItemDefects[type] || 0;
@@ -1339,11 +1339,11 @@ window.adjustModalDefect = function(defectType, amount) {
     if (defectSum > modalQtyInspectVal) {
         modalQtyInspectVal = defectSum;
     }
-    
+
     updateModalGradeState();
 };
 
-window.handleModalDefectClick = function(defectType) {
+window.handleModalDefectClick = function (defectType) {
     window.adjustModalDefect(defectType, 1);
 };
 
@@ -1370,7 +1370,7 @@ function saveInspectionItem() {
         showAlert('Qty Inspect harus lebih besar dari 0.', 'warning', 'Peringatan');
         return;
     }
-    
+
     const defectsArray = [];
     for (const type in modalItemDefects) {
         defectsArray.push({
@@ -1378,7 +1378,7 @@ function saveInspectionItem() {
             count: modalItemDefects[type]
         });
     }
-    
+
     const itemData = {
         component: modalComponent,
         process: modalProcesses.join(', '),
@@ -1388,13 +1388,13 @@ function saveInspectionItem() {
         defect: modalDefectVal,
         defects: defectsArray
     };
-    
+
     if (editingItemIndex === null) {
         inspectionItems.push(itemData);
     } else {
         inspectionItems[editingItemIndex] = itemData;
     }
-    
+
     closeInspectionItemModal();
     renderInspectedItems();
     updateTotalQtyInspect();
@@ -1411,9 +1411,9 @@ function autoFillModelName() {
     }
 
     const enteredStyleNumber = styleNumberInput.value.trim().toUpperCase();
-    
+
     // Coba dari Supabase cache terlebih dahulu; fallback kosong jika tidak ada
-    const modelMap     = getStyleModelDatabaseMap();
+    const modelMap = getStyleModelDatabaseMap();
     const matchedModel = modelMap[enteredStyleNumber];
 
     if (matchedModel) {
@@ -1512,7 +1512,7 @@ async function initApp() {
     }
 
     outputElements = {
-        'pass':   document.getElementById('pass-counter'),
+        'pass': document.getElementById('pass-counter'),
         'defect': document.getElementById('defect-counter')
     };
     fttOutput = document.getElementById('fttOutput');
@@ -1520,7 +1520,7 @@ async function initApp() {
     summaryContainer = document.getElementById('summary-list');
     redoRateOutput = document.getElementById('redoRateOutput');
     qtySampleSetInput = document.getElementById('qty-sample-set');
-    
+
     // Bind new DOM references
     qtyInspectModeSelect = document.getElementById('qty-inspect-mode');
     qtyInspectInput = document.getElementById('qty-inspect-input');
@@ -1535,7 +1535,7 @@ async function initApp() {
     // Populate Approved by Leader Select Options (Desktop and Mobile)
     const leaderSelect = document.getElementById('approved-by-leader');
     const leaderSelectMobile = document.getElementById('approved-by-leader-mobile');
-    
+
     function populateSelect(selectEl) {
         if (!selectEl) return;
         selectEl.innerHTML = '<option value="">— Tanpa Persetujuan —</option>';
@@ -1560,10 +1560,10 @@ async function initApp() {
         const mobileSelect = document.getElementById('approved-by-leader-mobile');
         const desktopContainer = document.getElementById('evidence-upload-container');
         const mobileContainer = document.getElementById('evidence-upload-container-mobile');
-        
+
         if (desktopSelect && desktopSelect.value !== val) desktopSelect.value = val;
         if (mobileSelect && mobileSelect.value !== val) mobileSelect.value = val;
-        
+
         if (desktopContainer) {
             if (val) desktopContainer.classList.remove('hidden');
             else {
@@ -1629,15 +1629,15 @@ async function initApp() {
     modelNameInput = document.getElementById("model-name");
     styleNumberInput = document.getElementById("style-number");
     tanggalIncomingInput = document.getElementById('tanggal-incoming');
-    vendorSelect    = document.getElementById('vendor');
+    vendorSelect = document.getElementById('vendor');
     if (vendorSelect) renderVendorOptions(vendorSelect);
-    
+
     // Render new button-based selectors
     renderVendorButtons();
-    
-    window.__reattachVendorOptions    = () => { renderVendorButtons(); };
+
+    window.__reattachVendorOptions = () => { renderVendorButtons(); };
     window.__reattachComponentOptions = () => { };
-    window.__reattachProcessOptions   = () => { };
+    window.__reattachProcessOptions = () => { };
 
     // Wire Reset button in Context Selection card
     const resetSelectionBtn = document.getElementById('reset-selection-btn');
@@ -1651,9 +1651,9 @@ async function initApp() {
             // If current vendor no longer matches the new filter, clear vendor selection
             if (selectedVendor) {
                 const vendors = getVendors();
-                const vendor  = vendors.find(v => v.name === selectedVendor);
+                const vendor = vendors.find(v => v.name === selectedVendor);
                 if (!vendor || (selectedMaterialType && vendor.material_type !== selectedMaterialType)) {
-                    selectedVendor     = '';
+                    selectedVendor = '';
                     inspectionItems = [];
                     renderInspectedItems();
                     if (addItemBtn) addItemBtn.disabled = true;
@@ -1694,7 +1694,7 @@ async function initApp() {
             checkInfoCompleteAndLockButtons();
         });
     }
-    
+
     if (styleNumberInput) {
         styleNumberInput.addEventListener('input', () => {
             saveToLocalStorage();
@@ -1720,13 +1720,13 @@ async function initApp() {
     // Modal buttons bindings
     const modalCloseBtn = document.getElementById('modal-close-btn');
     if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeInspectionItemModal);
-    
+
     const modalCancelBtn = document.getElementById('modal-cancel-btn');
     if (modalCancelBtn) modalCancelBtn.addEventListener('click', closeInspectionItemModal);
-    
+
     const modalSaveItemBtn = document.getElementById('modal-save-item-btn');
     if (modalSaveItemBtn) modalSaveItemBtn.addEventListener('click', saveInspectionItem);
-    
+
     const modalPassIncBtn = document.getElementById('modal-pass-inc-btn');
     if (modalPassIncBtn) {
         modalPassIncBtn.addEventListener('click', () => {
@@ -1839,7 +1839,7 @@ let filterOptionsInitialized = false;
 let editingSessionId = null;
 
 /** Load all Inspection Results (Done & In-Progress) from GAS or mock data */
-window.loadInspectionResults = async function() {
+window.loadInspectionResults = async function () {
     const gallery = document.getElementById('inspection-result-gallery');
     const badge = document.getElementById('inspection-result-count-badge');
     if (gallery) {
@@ -1984,29 +1984,29 @@ function renderInspectionResultTable(sessions) {
             if (!procStr) procStr = [...new Set(s.items.map(i => i.process).filter(Boolean))].join(', ');
         }
 
-        const matchesSearch = !searchVal || 
-               (s.vendor || '').toLowerCase().includes(searchVal) ||
-               (s.auditor || '').toLowerCase().includes(searchVal) ||
-               (s.styleNumber || '').toLowerCase().includes(searchVal) ||
-               (s.modelName || '').toLowerCase().includes(searchVal) ||
-               (compStr || '').toLowerCase().includes(searchVal) ||
-               (procStr || '').toLowerCase().includes(searchVal);
+        const matchesSearch = !searchVal ||
+            (s.vendor || '').toLowerCase().includes(searchVal) ||
+            (s.auditor || '').toLowerCase().includes(searchVal) ||
+            (s.styleNumber || '').toLowerCase().includes(searchVal) ||
+            (s.modelName || '').toLowerCase().includes(searchVal) ||
+            (compStr || '').toLowerCase().includes(searchVal) ||
+            (procStr || '').toLowerCase().includes(searchVal);
 
         const stLower = (s.status || 'Done').toLowerCase();
-        const matchesStatus = statusFilter === 'all' || 
-               (statusFilter === 'Done' && stLower === 'done') ||
-               (statusFilter === 'In-Progress' && stLower.includes('progress')) ||
-               (statusFilter === 'Pending Leader Approval' && (
-                   stLower.includes('leader') || 
-                   stLower.includes('approval') || 
-                   (Boolean(s.approvedByLeader) && stLower !== 'done')
-               ));
+        const matchesStatus = statusFilter === 'all' ||
+            (statusFilter === 'Done' && stLower === 'done') ||
+            (statusFilter === 'In-Progress' && stLower.includes('progress')) ||
+            (statusFilter === 'Pending Leader Approval' && (
+                stLower.includes('leader') ||
+                stLower.includes('approval') ||
+                (Boolean(s.approvedByLeader) && stLower !== 'done')
+            ));
 
-        const matchesAuditor = auditorFilter === 'all' || 
-               (s.auditor || '').toLowerCase() === auditorFilter.toLowerCase();
+        const matchesAuditor = auditorFilter === 'all' ||
+            (s.auditor || '').toLowerCase() === auditorFilter.toLowerCase();
 
-        const matchesVendor = vendorFilter === 'all' || 
-               (s.vendor || '').toLowerCase() === vendorFilter.toLowerCase();
+        const matchesVendor = vendorFilter === 'all' ||
+            (s.vendor || '').toLowerCase() === vendorFilter.toLowerCase();
 
         let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
         let cleanDate = '';
@@ -2153,7 +2153,7 @@ function renderInspectionResultTable(sessions) {
         }
 
         const dateArr = [...g.dates].sort();
-        const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length-1]}` : (dateArr[0] || '—');
+        const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length - 1]}` : (dateArr[0] || '—');
 
         // Aggregate items by component and process
         const itemAgg = {};
@@ -2223,22 +2223,22 @@ function renderInspectionResultTable(sessions) {
                                 </thead>
                                 <tbody class="divide-y divide-slate-700/10 text-slate-300">
                                     ${aggregatedItems.map(item => {
-                                        let actionHTML = '';
-                                        const sessionIds = [...item.sessions];
-                                        
-                                        // Find active session for editing (In-Progress, Pending Leader Approval, etc.)
-                                        const activeInProgSession = sessionIds.find(sid => {
-                                            const sObj = sessions.find(sess => sess.sessionId === sid);
-                                            if (!sObj) return false;
-                                            const st = (sObj.status || '').toLowerCase();
-                                            return st.includes('progress') || st.includes('leader') || st.includes('approval') || (Boolean(sObj.approvedByLeader) && st !== 'done');
-                                        }) || sessionIds[0];
+            let actionHTML = '';
+            const sessionIds = [...item.sessions];
 
-                                        const targetObj = sessions.find(sess => sess.sessionId === activeInProgSession);
-                                        const isDone = targetObj && (targetObj.status || '').toLowerCase() === 'done';
+            // Find active session for editing (In-Progress, Pending Leader Approval, etc.)
+            const activeInProgSession = sessionIds.find(sid => {
+                const sObj = sessions.find(sess => sess.sessionId === sid);
+                if (!sObj) return false;
+                const st = (sObj.status || '').toLowerCase();
+                return st.includes('progress') || st.includes('leader') || st.includes('approval') || (Boolean(sObj.approvedByLeader) && st !== 'done');
+            }) || sessionIds[0];
 
-                                        if (!isDone && activeInProgSession) {
-                                            actionHTML = `
+            const targetObj = sessions.find(sess => sess.sessionId === activeInProgSession);
+            const isDone = targetObj && (targetObj.status || '').toLowerCase() === 'done';
+
+            if (!isDone && activeInProgSession) {
+                actionHTML = `
                                                 <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
                                                         title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
                                                         class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
@@ -2246,11 +2246,11 @@ function renderInspectionResultTable(sessions) {
                                                     <span>Edit</span>
                                                 </button>
                                             `;
-                                        } else {
-                                            actionHTML = `<span class="text-[9px] text-slate-500 font-bold">Done</span>`;
-                                        }
+            } else {
+                actionHTML = `<span class="text-[9px] text-slate-500 font-bold">Done</span>`;
+            }
 
-                                        return `
+            return `
                                             <tr class="hover:bg-slate-700/10 transition-colors">
                                                 <td class="px-2.5 py-1.5 font-medium">
                                                     <span class="text-slate-200 block">${item.component}</span>
@@ -2263,7 +2263,7 @@ function renderInspectionResultTable(sessions) {
                                                 <td class="px-2.5 py-1.5 text-center">${actionHTML}</td>
                                             </tr>
                                         `;
-                                    }).join('')}
+        }).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -2285,7 +2285,7 @@ function renderInspectionResultTable(sessions) {
 }
 
 /** Continue/Load an in-progress or pending approval session back into the form */
-window.continueInProgressSession = function(sessionId) {
+window.continueInProgressSession = function (sessionId) {
     const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
     if (!session) {
         showAlert('Data sesi tidak ditemukan.', 'error');
