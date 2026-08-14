@@ -10,7 +10,7 @@ const SUPABASE_URL      = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15bXpzenVmcndtcGtwbW1sbm5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzgwODksImV4cCI6MjA5Mjg1NDA4OX0.gGu3xJ0yjUmLncz277gGSP8qiV8TiBrlJvg3C-t6ZJw';
 
 // Gunakan client auth yang sudah ada (production), atau buat baru (test mode)
-const db = authClient ?? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const db = authClient ?? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -18,6 +18,7 @@ const db = authClient ?? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         storageKey: 'eqms_auth_v1',
     },
 });
+export const supabase = db;
 
 // ─── Helper internal ─────────────────────────────────────────
 

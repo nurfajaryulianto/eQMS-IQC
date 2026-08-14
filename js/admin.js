@@ -4,6 +4,7 @@
 // =============================================================
 
 import {
+    supabase,
     dbGetDefects,   dbInsertDefect,   dbUpdateDefect,   dbDeleteDefect,
     dbGetAppUsers,
     dbCreateAuthUser, dbUpdateAuthUser, dbDeleteAuthUser,
