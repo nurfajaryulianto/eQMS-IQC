@@ -201,18 +201,25 @@ function doPost(e) {
   }
 }
 
+var MATERIAL_EVIDENCE_FOLDER_ID = '1rOYS8uEZjbl-qcBN-_KkR1bdUNSudhPd'; // Folder GDrive IQC Material Evidence
+
 function uploadMaterialEvidenceFile(payload) {
   if (!payload.file_data || !payload.file_name) {
     return { status: 'error', message: 'File data atau nama file kosong.' };
   }
   try {
-    var spreadsheetFile = DriveApp.getFileById(SPREADSHEET_ID);
-    var parents = spreadsheetFile.getParents();
-    var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-    var subDepartmentFolder = getOrCreateSubfolder(parentFolder, "IQC Material Evidence");
+    var evidenceFolder;
+    try {
+      evidenceFolder = DriveApp.getFolderById(MATERIAL_EVIDENCE_FOLDER_ID);
+    } catch (fErr) {
+      var spreadsheetFile = DriveApp.getFileById(SPREADSHEET_ID);
+      var parents = spreadsheetFile.getParents();
+      var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+      evidenceFolder = getOrCreateSubfolder(parentFolder, "IQC Material Evidence");
+    }
     
     var fileBlob = Utilities.newBlob(Utilities.base64Decode(payload.file_data), payload.file_type || 'image/png', payload.file_name);
-    var driveFile = subDepartmentFolder.createFile(fileBlob);
+    var driveFile = evidenceFolder.createFile(fileBlob);
     driveFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
     var fileId = driveFile.getId();
     var webViewUrl = driveFile.getUrl();

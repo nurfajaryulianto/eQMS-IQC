@@ -129,10 +129,16 @@ function doPost(e) {
       if (!data.file_data || !data.file_name) {
         return jsonResponse({ status: 'error', message: 'File data atau nama file kosong.' });
       }
-      var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
-      var parents = spreadsheetFile.getParents();
-      var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-      var evidenceFolder = getOrCreateSubfolder(parentFolder, "IQC Subcont Evidence");
+      var SUBCONT_EVIDENCE_FOLDER_ID = '1JmRr8r8Fff4vazLexCzMVa_A9EfowHZO'; // Folder GDrive IQC Subcont Evidence
+      var evidenceFolder;
+      try {
+        evidenceFolder = DriveApp.getFolderById(SUBCONT_EVIDENCE_FOLDER_ID);
+      } catch (fErr) {
+        var spreadsheetFile = DriveApp.getFileById(getActiveSpreadsheetId());
+        var parents = spreadsheetFile.getParents();
+        var parentFolder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+        evidenceFolder = getOrCreateSubfolder(parentFolder, "IQC Subcont Evidence");
+      }
       
       var fileBlob = Utilities.newBlob(Utilities.base64Decode(data.file_data), data.file_type || 'image/png', data.file_name);
       var driveFile = evidenceFolder.createFile(fileBlob);
