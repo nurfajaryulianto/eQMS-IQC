@@ -145,25 +145,32 @@ CREATE INDEX IF NOT EXISTS idx_mat_users_role ON public.material_users(role);
 CREATE OR REPLACE FUNCTION fn_sync_master_data_status()
 RETURNS TRIGGER AS $$
 DECLARE
+  v_md_id          BIGINT;
   v_batch_size     NUMERIC;
   v_total_checked  NUMERIC;
   v_has_done       BOOLEAN;
   v_new_status     VARCHAR(20);
 BEGIN
-  IF NEW.master_data_id IS NULL THEN
-    RETURN NEW;
+  IF TG_OP = 'DELETE' THEN
+    v_md_id := OLD.master_data_id;
+  ELSE
+    v_md_id := NEW.master_data_id;
+  END IF;
+
+  IF v_md_id IS NULL THEN
+    RETURN COALESCE(NEW, OLD);
   END IF;
 
   SELECT batch_size INTO v_batch_size
   FROM public.material_master_data
-  WHERE id = NEW.master_data_id;
+  WHERE id = v_md_id;
 
   SELECT
     COALESCE(SUM(ok + no_qty), 0),
     BOOL_OR(status IN ('done', 'pass'))
   INTO v_total_checked, v_has_done
   FROM public.material_inspections
-  WHERE master_data_id = NEW.master_data_id;
+  WHERE master_data_id = v_md_id;
 
   IF v_has_done OR (v_batch_size > 0 AND v_total_checked >= v_batch_size) THEN
     v_new_status := 'done';
@@ -175,15 +182,15 @@ BEGIN
 
   UPDATE public.material_master_data
   SET status = v_new_status
-  WHERE id = NEW.master_data_id;
+  WHERE id = v_md_id;
 
-  RETURN NEW;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS trg_sync_md_status ON public.material_inspections;
 CREATE TRIGGER trg_sync_md_status
-  AFTER INSERT OR UPDATE ON public.material_inspections
+  AFTER INSERT OR UPDATE OR DELETE ON public.material_inspections
   FOR EACH ROW EXECUTE FUNCTION fn_sync_master_data_status();
 
 -- ─── 6. RPC: fn_pass_all_materials ───────────────────────────

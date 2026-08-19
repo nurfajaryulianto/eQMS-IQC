@@ -517,14 +517,62 @@ export async function apiUpdateInspection(id, patch) {
 }
 
 /**
- * Hapus data inspeksi (Admin delete).
+ * Hapus data inspeksi (Admin delete) dengan mekanisme Self-Healing:
+ * Otomatis mengembalikan status Master Data ke 'pending' jika tidak ada inspeksi tersisa.
  */
 export async function apiDeleteInspection(id) {
+    // 1. Ambil data inspeksi sebelum dihapus untuk mengetahui master_data_id
+    const { data: insp } = await supabase
+        .from('material_inspections')
+        .select('id, master_data_id, po_no, material_name')
+        .eq('id', id)
+        .maybeSingle();
+
+    // 2. Hapus baris inspeksi
     const { error } = await supabase
         .from('material_inspections')
         .delete()
         .eq('id', id);
     if (error) throw new Error(error.message);
+
+    // 3. Self-healing: Cek sisa inspeksi untuk master_data terkait
+    if (insp) {
+        let mdId = insp.master_data_id;
+        if (!mdId && insp.po_no && insp.material_name) {
+            const { data: md } = await supabase
+                .from('material_master_data')
+                .select('id')
+                .eq('po_number', insp.po_no)
+                .eq('material_name', insp.material_name)
+                .maybeSingle();
+            if (md) mdId = md.id;
+        }
+
+        if (mdId) {
+            const { data: remaining } = await supabase
+                .from('material_inspections')
+                .select('id, ok, no_qty, status')
+                .eq('master_data_id', mdId);
+
+            let newStatus = 'pending';
+            if (remaining && remaining.length > 0) {
+                const totalChecked = remaining.reduce((sum, r) => sum + (Number(r.ok) || 0) + (Number(r.no_qty) || 0), 0);
+                const hasDone = remaining.some(r => r.status === 'done' || r.status === 'pass');
+                if (hasDone) {
+                    newStatus = 'done';
+                } else if (totalChecked > 0) {
+                    newStatus = 'in-progress';
+                }
+            }
+
+            // Restore status ke master_data
+            await supabase
+                .from('material_master_data')
+                .update({ status: newStatus })
+                .eq('id', mdId);
+        }
+    }
+
     return { success: true };
 }
 
