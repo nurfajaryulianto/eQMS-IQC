@@ -773,6 +773,7 @@ export async function uploadSubcontEvidenceFile(base64Data, fileName, contentTyp
     try {
         const res = await fetch(GAS_EVIDENCE_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
                 action: 'uploadEvidence',
                 file_data: base64Data,

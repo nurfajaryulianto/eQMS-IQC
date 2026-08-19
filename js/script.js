@@ -752,6 +752,61 @@ function showConfirmationPopup(grade, onConfirmCallback) {
     });
 }
 
+async function compressImageFile(file, maxWidth = 1600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        if (!file.type || !file.type.startsWith('image/') || file.type.includes('gif') || file.type.includes('svg')) {
+            const reader = new FileReader();
+            reader.onload = () => resolve({
+                base64: reader.result.split(',')[1],
+                type: file.type || 'image/png',
+                ext: file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : 'png'
+            });
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            img.onload = () => {
+                let w = img.width;
+                let h = img.height;
+                if (w > maxWidth || h > maxWidth) {
+                    if (w > h) {
+                        h = Math.round((h * maxWidth) / w);
+                        w = maxWidth;
+                    } else {
+                        w = Math.round((w * maxWidth) / h);
+                        h = maxWidth;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve({
+                    base64: dataUrl.split(',')[1],
+                    type: 'image/jpeg',
+                    ext: 'jpg'
+                });
+            };
+            img.onerror = () => {
+                resolve({
+                    base64: e.target.result.split(',')[1],
+                    type: file.type || 'image/png',
+                    ext: file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : 'png'
+                });
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 // ===========================================
 // 11. Validasi Input dan Simpan Data (MODIFIKASI FINAL v3 - dengan Lazy Loading)
 // ===========================================
@@ -778,29 +833,25 @@ async function saveData() {
             return;
         }
         const file = fileInput.files[0];
-        const sanitize = (str) => String(str || '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 25);
-        const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
-        const vName = sanitize(selectedVendor) || 'VENDOR';
-        const mName = sanitize(document.getElementById("model-name")?.value) || 'MODEL';
-        const sName = sanitize(document.getElementById("style-number")?.value) || 'STYLE';
-        const nowStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
-        fileName = `EVIDENCE_${vName}_${mName}_${sName}_${nowStr}.${ext}`;
-        fileType = file.type || 'image/png';
         if (loadingOverlay) {
             loadingOverlay.classList.add('visible');
         }
         try {
-            fileData = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = error => reject(error);
-                reader.readAsDataURL(file);
-            });
+            const compressed = await compressImageFile(file);
+            fileData = compressed.base64;
+            fileType = compressed.type;
+            const sanitize = (str) => String(str || '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 25);
+            const ext = compressed.ext || 'jpg';
+            const vName = sanitize(selectedVendor) || 'VENDOR';
+            const mName = sanitize(document.getElementById("model-name")?.value) || 'MODEL';
+            const sName = sanitize(document.getElementById("style-number")?.value) || 'STYLE';
+            const nowStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
+            fileName = `EVIDENCE_${vName}_${mName}_${sName}_${nowStr}.${ext}`;
         } catch (err) {
             if (loadingOverlay) {
                 loadingOverlay.classList.remove('visible');
             }
-            showAlert('Gagal membaca file evidence. Coba file lain.', 'error');
+            showAlert('Gagal memproses file evidence. Coba file lain.', 'error');
             return;
         }
     }
@@ -871,7 +922,37 @@ async function saveData() {
                         items: dataToSend.items
                     };
                 }
+            } else {
+                allInspectionSessions.unshift({
+                    sessionId: dataToSend.sessionId || (`SESS-${Date.now()}`),
+                    timestamp: dataToSend.timestamp,
+                    tanggalIncoming: dataToSend.tanggalIncoming,
+                    tanggalInspection: dataToSend.tanggalInspection,
+                    tanggalBucket: dataToSend.tanggalBucket,
+                    materialType: dataToSend.materialType,
+                    vendor: dataToSend.vendor,
+                    component: dataToSend.component,
+                    process: dataToSend.process,
+                    styleNumber: dataToSend.styleNumber,
+                    modelName: dataToSend.modelName,
+                    qtyIncoming: dataToSend.qtyIncoming,
+                    qtyInspect: dataToSend.qtyInspect,
+                    pass: dataToSend.pass,
+                    defect: dataToSend.defect,
+                    ftt: dataToSend.ftt,
+                    redoRate: dataToSend.redoRate,
+                    auditor: dataToSend.auditor,
+                    approvedByLeader: dataToSend.approvedByLeader,
+                    status: dataToSend.status,
+                    evidenceUrl: '',
+                    items: dataToSend.items
+                });
             }
+
+            if (loadingOverlay) {
+                loadingOverlay.classList.remove('visible');
+            }
+
             await showAlert('Data berhasil disimpan! (simulasi — tidak ada data yang dikirim ke server)', 'success', '[TEST MODE]');
 
             resetAllFields();
@@ -886,11 +967,12 @@ async function saveData() {
             try {
                 const res = await fetch(GAS_EVIDENCE_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         action: 'uploadEvidence',
                         file_data: dataToSend.file_data,
                         file_name: dataToSend.file_name,
-                        file_type: dataToSend.file_type || 'image/png'
+                        file_type: dataToSend.file_type || 'image/jpeg'
                     })
                 });
                 if (res.ok) {
