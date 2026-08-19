@@ -2195,6 +2195,11 @@
                                         <option value="Done">Done</option>
                                         <option value="In-Progress">In-Progress</option>
                                     </select>
+                                    <select id="subcont-log-file-filter" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
+                                        <option value="all">Semua Berkas</option>
+                                        <option value="has_evidence">Ada Foto Bukti</option>
+                                        <option value="no_evidence">Tanpa Bukti</option>
+                                    </select>
                                     <button onclick="window.loadSubcontInspectionLog()" class="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium cursor-pointer">
                                         Filter
                                     </button>
@@ -2217,11 +2222,12 @@
                                                 <th class="py-3 px-3 text-right text-emerald-600">Pass</th>
                                                 <th class="py-3 px-3 text-right text-rose-600">Defect</th>
                                                 <th class="py-3 px-3 text-center">Status</th>
+                                                <th class="py-3 px-3 text-center">Berkas</th>
                                                 <th class="py-3 px-3 text-center">Aksi</th>
                                             </tr>
                                         </thead>
                                         <tbody id="subcont-sessions-tbody" class="divide-y divide-slate-100">
-                                            <tr><td colspan="11" class="py-8 text-center text-slate-400">Memuat data sesi inspeksi...</td></tr>
+                                            <tr><td colspan="12" class="py-8 text-center text-slate-400">Memuat data sesi inspeksi...</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -2303,10 +2309,15 @@
 
                 <!-- Evidence Photo Preview -->
                 <div id="subcont-modal-evidence-box" class="hidden pt-2 border-t border-slate-100">
-                    <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[16px] text-emerald-600">image</span>
-                        Foto Evidence Inspeksi
-                    </h4>
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-emerald-600">image</span>
+                            Foto Evidence Inspeksi
+                        </h4>
+                        <a id="subcont-modal-evidence-link" href="#" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1">
+                            Buka Ukuran Penuh <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                        </a>
+                    </div>
                     <div class="rounded-xl border border-slate-200 overflow-hidden bg-slate-900 flex items-center justify-center max-h-64">
                         <img id="subcont-modal-evidence-img" src="" alt="Evidence Photo" class="max-h-64 object-contain">
                     </div>

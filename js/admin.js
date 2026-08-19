@@ -1245,6 +1245,7 @@ window.loadSubcontInspectionLog = async function() {
         const dateEnd = document.getElementById('subcont-log-end')?.value || '';
         const vendorVal = document.getElementById('subcont-log-vendor-filter')?.value || 'all';
         const statusVal = document.getElementById('subcont-log-status-filter')?.value || 'all';
+        const fileVal = document.getElementById('subcont-log-file-filter')?.value || 'all';
 
         // Query Supabase subcont_inspections (Sheet 1)
         let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false });
@@ -1252,6 +1253,11 @@ window.loadSubcontInspectionLog = async function() {
         if (dateEnd) qSess = qSess.lte('tanggal_insp', dateEnd);
         if (vendorVal !== 'all') qSess = qSess.ilike('vendor', `%${vendorVal}%`);
         if (statusVal !== 'all') qSess = qSess.eq('status', statusVal);
+        if (fileVal === 'has_evidence') {
+            qSess = qSess.not('evidence_url', 'is', null).neq('evidence_url', '');
+        } else if (fileVal === 'no_evidence') {
+            qSess = qSess.or('evidence_url.is.null,evidence_url.eq.');
+        }
 
         // Query Supabase subcont_defect_logs (Sheet 2)
         let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false });
@@ -1290,7 +1296,7 @@ window.loadSubcontInspectionLog = async function() {
 
     } catch (err) {
         console.error('loadSubcontInspectionLog error:', err);
-        if (tbodySessions) tbodySessions.innerHTML = `<tr><td colspan="11" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: ${err.message || err}</td></tr>`;
+        if (tbodySessions) tbodySessions.innerHTML = `<tr><td colspan="12" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: ${err.message || err}</td></tr>`;
         if (tbodyDefects) tbodyDefects.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: ${err.message || err}</td></tr>`;
     }
 };
@@ -1300,7 +1306,7 @@ function renderSubcontLogSessions(sessions) {
     if (!tbody) return;
 
     if (!sessions || sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400 italic">Tidak ada data sesi inspeksi ditemukan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="py-8 text-center text-slate-400 italic">Tidak ada data sesi inspeksi ditemukan.</td></tr>';
         renderPaginationControls('subcont-sessions-pagination', 1, sessionsPageSize, 0, 'window.setSessionsPage', 'window.setSessionsPageSize');
         return;
     }
@@ -1319,6 +1325,16 @@ function renderSubcontLogSessions(sessions) {
             : 'bg-amber-100 text-amber-700 border-amber-200';
 
         const safeSessionId = encodeURIComponent(s.session_id);
+
+        let berkasBadge = '<span class="text-slate-300">—</span>';
+        if (s.evidence_url) {
+            berkasBadge = `
+                <a href="${s.evidence_url}" target="_blank" rel="noopener noreferrer" 
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-300 transition-colors" title="Buka Foto Bukti">
+                    <span class="material-symbols-outlined text-[13px]">image</span> Foto
+                </a>
+            `;
+        }
 
         return `
             <tr class="hover:bg-slate-50 transition-colors">
@@ -1342,6 +1358,7 @@ function renderSubcontLogSessions(sessions) {
                         ${s.status || 'Done'}
                     </span>
                 </td>
+                <td class="py-2.5 px-3 text-center whitespace-nowrap">${berkasBadge}</td>
                 <td class="py-2.5 px-3 text-center whitespace-nowrap">
                     <div class="inline-flex items-center gap-1.5">
                         <button onclick="window.showSubcontSessionDetail('${safeSessionId}')" 
@@ -1455,8 +1472,10 @@ window.showSubcontSessionDetail = function(rawSessionId) {
         }
     }
 
+    const evidenceLink = document.getElementById('subcont-modal-evidence-link');
     if (session.evidence_url && evidenceImg && evidenceBox) {
         evidenceImg.src = session.evidence_url;
+        if (evidenceLink) evidenceLink.href = session.evidence_url;
         evidenceBox.classList.remove('hidden');
     } else if (evidenceBox) {
         evidenceBox.classList.add('hidden');

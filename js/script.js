@@ -778,8 +778,14 @@ async function saveData() {
             return;
         }
         const file = fileInput.files[0];
-        fileName = file.name;
-        fileType = file.type;
+        const sanitize = (str) => String(str || '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 25);
+        const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
+        const vName = sanitize(selectedVendor) || 'VENDOR';
+        const mName = sanitize(document.getElementById("model-name")?.value) || 'MODEL';
+        const sName = sanitize(document.getElementById("style-number")?.value) || 'STYLE';
+        const nowStr = new Date().toISOString().replace(/[-:T]/g, '').substring(0, 14);
+        fileName = `EVIDENCE_${vName}_${mName}_${sName}_${nowStr}.${ext}`;
+        fileType = file.type || 'image/png';
         if (loadingOverlay) {
             loadingOverlay.classList.add('visible');
         }
