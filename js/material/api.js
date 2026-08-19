@@ -382,6 +382,32 @@ export async function apiSubmitInspection(payload) {
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 }
 
+/**
+ * Update data inspeksi spesifik (Admin edit).
+ */
+export async function apiUpdateInspection(id, patch) {
+    const { data, error } = await supabase
+        .from('material_inspections')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data;
+}
+
+/**
+ * Hapus data inspeksi (Admin delete).
+ */
+export async function apiDeleteInspection(id) {
+    const { error } = await supabase
+        .from('material_inspections')
+        .delete()
+        .eq('id', id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+}
+
 // ─── PASS ALL ─────────────────────────────────────────────────
 
 /**

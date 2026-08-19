@@ -1392,10 +1392,20 @@ function renderSubcontLogSessions(sessions) {
                     </span>
                 </td>
                 <td class="py-2.5 px-3 text-center whitespace-nowrap">
-                    <button onclick="window.showSubcontSessionDetail('${safeSessionId}')" 
-                        class="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[13px]">visibility</span> Detail
-                    </button>
+                    <div class="inline-flex items-center gap-1.5">
+                        <button onclick="window.showSubcontSessionDetail('${safeSessionId}')" 
+                            class="p-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1" title="Lihat Detail">
+                            <span class="material-symbols-outlined text-[15px]">visibility</span>
+                        </button>
+                        <button onclick="window.editSubcontSession('${safeSessionId}')" 
+                            class="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1" title="Edit Sesi">
+                            <span class="material-symbols-outlined text-[15px]">edit</span>
+                        </button>
+                        <button onclick="window.deleteSubcontSession('${safeSessionId}')" 
+                            class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-md text-[11px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1" title="Hapus Sesi">
+                            <span class="material-symbols-outlined text-[15px]">delete</span>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -1542,4 +1552,111 @@ window.exportSubcontInspectionLog = function() {
 
     const nowStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
     XLSX.writeFile(wb, `IQC_Subcont_InspectionLog_${nowStr}.xlsx`);
+};
+
+// ─── EDIT & DELETE SUBCONT INSPECTION SESSIONS ───────────────
+window.editSubcontSession = function(rawSessionId) {
+    const sessionId = decodeURIComponent(rawSessionId);
+    const s = currentSubcontLogSessions.find(x => x.session_id === sessionId);
+    if (!s) {
+        alert('Data sesi tidak ditemukan.');
+        return;
+    }
+
+    const modal = document.getElementById('subcont-session-edit-modal');
+    if (!modal) return;
+
+    document.getElementById('edit-subcont-session-id').value = s.session_id;
+    document.getElementById('edit-subcont-vendor').value = s.vendor || '';
+    document.getElementById('edit-subcont-status').value = s.status || 'Done';
+    document.getElementById('edit-subcont-model').value = s.model || '';
+    document.getElementById('edit-subcont-style').value = s.style_number || '';
+    document.getElementById('edit-subcont-component').value = s.component || '';
+    document.getElementById('edit-subcont-process').value = s.process || '';
+    document.getElementById('edit-subcont-qty-in').value = Number(s.qty_incoming) || 0;
+    document.getElementById('edit-subcont-qty-insp').value = Number(s.qty_inspect) || 0;
+    document.getElementById('edit-subcont-qty-pass').value = Number(s.qty_pass) || 0;
+    document.getElementById('edit-subcont-qty-defect').value = Number(s.qty_defect) || 0;
+    document.getElementById('edit-subcont-auditor').value = s.user_login || '';
+    document.getElementById('edit-subcont-evidence-url').value = s.evidence_url || '';
+
+    const sub = document.getElementById('subcont-edit-modal-subtitle');
+    if (sub) sub.textContent = `Sesi: ${s.session_id}`;
+
+    modal.classList.remove('hidden');
+};
+
+window.closeEditSubcontModal = function() {
+    const modal = document.getElementById('subcont-session-edit-modal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.saveEditSubcontSession = async function(event) {
+    if (event) event.preventDefault();
+    const sessionId = document.getElementById('edit-subcont-session-id').value;
+    if (!sessionId) return;
+
+    const vendor = document.getElementById('edit-subcont-vendor').value.trim();
+    const status = document.getElementById('edit-subcont-status').value;
+    const model = document.getElementById('edit-subcont-model').value.trim();
+    const style_number = document.getElementById('edit-subcont-style').value.trim();
+    const component = document.getElementById('edit-subcont-component').value.trim();
+    const process = document.getElementById('edit-subcont-process').value.trim();
+    const qty_incoming = Number(document.getElementById('edit-subcont-qty-in').value) || 0;
+    const qty_inspect = Number(document.getElementById('edit-subcont-qty-insp').value) || 0;
+    const qty_pass = Number(document.getElementById('edit-subcont-qty-pass').value) || 0;
+    const qty_defect = Number(document.getElementById('edit-subcont-qty-defect').value) || 0;
+    const user_login = document.getElementById('edit-subcont-auditor').value.trim();
+    const evidence_url = document.getElementById('edit-subcont-evidence-url').value.trim();
+    const ftt = qty_inspect > 0 ? (qty_pass / qty_inspect) : 1;
+
+    try {
+        const { error } = await supabase
+            .from('subcont_inspections')
+            .update({
+                vendor,
+                status,
+                model,
+                style_number,
+                component,
+                process,
+                qty_incoming,
+                qty_inspect,
+                qty_pass,
+                qty_defect,
+                user_login,
+                evidence_url,
+                ftt
+            })
+            .eq('session_id', sessionId);
+
+        if (error) throw error;
+
+        alert('Sesi inspeksi subcont berhasil diperbarui!');
+        window.closeEditSubcontModal();
+        await window.loadSubcontInspectionLog();
+    } catch (err) {
+        console.error(err);
+        alert('Gagal memperbarui sesi: ' + (err.message || err));
+    }
+};
+
+window.deleteSubcontSession = async function(rawSessionId) {
+    const sessionId = decodeURIComponent(rawSessionId);
+    if (!confirm(`Yakin ingin menghapus sesi inspeksi "${sessionId}" beserta seluruh rincian defect-nya? Tindakan ini tidak dapat dibatalkan.`)) {
+        return;
+    }
+
+    try {
+        // Delete defects first then session
+        await supabase.from('subcont_defect_logs').delete().eq('session_id', sessionId);
+        const { error } = await supabase.from('subcont_inspections').delete().eq('session_id', sessionId);
+        if (error) throw error;
+
+        alert('Sesi inspeksi berhasil dihapus!');
+        await window.loadSubcontInspectionLog();
+    } catch (err) {
+        console.error(err);
+        alert('Gagal menghapus sesi: ' + (err.message || err));
+    }
 };

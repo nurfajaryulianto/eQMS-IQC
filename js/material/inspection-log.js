@@ -4,7 +4,7 @@
 // Data diambil langsung dari Supabase melalui api.js.
 // ============================================================
 
-import { apiGetInspectionData, apiGetUsers, apiGetAssignments } from './api.js';
+import { apiGetInspectionData, apiGetUsers, apiGetAssignments, apiUpdateInspection, apiDeleteInspection } from './api.js';
 import { exportInspectionLogToExcel } from './export.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -176,32 +176,47 @@ function renderInspectionLog(data) {
             return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">` + esc(type || '—') + `</span>`;
         };
 
-        const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-        const TD = `padding:10px 12px;${T}`;
-
         const badges = [];
         if (d.bonding_test_url) {
-            badges.push(`<a href="${d.bonding_test_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Dokumen Bonding Test"><span class="material-symbols-outlined" style="font-size:13px;">science</span>Bonding</a>`);
+            badges.push(`<a href="${d.bonding_test_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Dokumen Bonding Test"><span class="material-symbols-outlined" style="font-size:12px;">science</span>Bonding</a>`);
         }
         if (d.evidence_url && d.evidence_url !== d.bonding_test_url) {
-            badges.push(`<a href="${d.evidence_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Foto Bukti"><span class="material-symbols-outlined" style="font-size:13px;">image</span>Foto</a>`);
+            badges.push(`<a href="${d.evidence_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Foto Bukti"><span class="material-symbols-outlined" style="font-size:12px;">image</span>Foto</a>`);
         }
         const filesHtml = badges.length > 0
-            ? `<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">${badges.join('')}</div>`
+            ? `<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${badges.join('')}</div>`
             : `<span style="color:rgba(255,255,255,0.25);font-size:11px;">—</span>`;
 
+        const actionHtml = `
+            <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
+                <button type="button" onclick="window.editInspectionRow(${d.id})" title="Edit Data Inspeksi"
+                    style="background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.15s;"
+                    onmouseover="this.style.background='rgba(59,130,246,0.3)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
+                    <span class="material-symbols-outlined" style="font-size:14px;">edit</span>
+                </button>
+                <button type="button" onclick="window.deleteInspectionRow(${d.id}, '${esc(d.po_no || d.po_number || '')}')" title="Hapus Data Inspeksi"
+                    style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.15s;"
+                    onmouseover="this.style.background='rgba(239,68,68,0.3)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">
+                    <span class="material-symbols-outlined" style="font-size:14px;">delete</span>
+                </button>
+            </div>
+        `;
+
+        const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        const TD = `padding:8px 6px;${T}`;
+
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-            <td style="${TD}color:rgba(255,255,255,0.5);font-size:12px;" title="${dateFmt}">${dateFmt}</td>
-            <td style="${TD}font-weight:700;color:#fff;font-size:12px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
-            <td style="${TD}color:#34d399;font-weight:600;font-size:12px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
-            <td style="padding:10px 12px;overflow:hidden;">${typeBadge(d.inspection_type)}</td>
-            <td style="${TD}color:rgba(255,255,255,0.9);font-size:12px;cursor:default;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
-            <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:13px;">${ok.toLocaleString('id-ID')}</td>
-            <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
-            <td style="${TD}text-align:right;color:#94a3b8;font-size:12px;">${passRate}</td>
-            <td style="${TD}"><span style="font-size:11px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
-            <td style="padding:10px 8px;text-align:center;">${filesHtml}</td>
-            <td style="${TD}font-size:11px;color:rgba(255,255,255,0.4);" title="${esc(d.defect_notes||'')}">${esc(d.defect_notes || '—')}</td>
+            <td style="${TD}color:rgba(255,255,255,0.5);font-size:11px;" title="${dateFmt}">${dateFmt}</td>
+            <td style="${TD}font-weight:700;color:#fff;font-size:11px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
+            <td style="${TD}color:#34d399;font-weight:600;font-size:11px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
+            <td style="${TD}">${typeBadge(d.inspection_type)}</td>
+            <td style="${TD}color:rgba(255,255,255,0.9);font-size:11px;cursor:default;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
+            <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:11px;">${ok.toLocaleString('id-ID')}</td>
+            <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:11px;">${noQty.toLocaleString('id-ID')}</td>
+            <td style="${TD}text-align:right;color:#94a3b8;font-size:11px;">${passRate}</td>
+            <td style="${TD}text-align:center;"><span style="font-size:10px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
+            <td style="padding:8px 4px;text-align:center;${T}">${filesHtml}</td>
+            <td style="padding:8px 4px;text-align:center;">${actionHtml}</td>
         </tr>`;
     }).join('');
 }
@@ -332,3 +347,90 @@ window.exportInspectionLog = async function() {
 function esc(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ─── EDIT & DELETE INSPECTION ACTIONS ─────────────────────────
+window.editInspectionRow = function(id) {
+    const item = (allInspectionLog || []).find(x => x.id === id);
+    if (!item) {
+        alert('Data inspeksi tidak ditemukan.');
+        return;
+    }
+
+    const modal = document.getElementById('modal-edit-inspection');
+    if (!modal) return;
+
+    document.getElementById('edit-insp-id').value = item.id;
+    document.getElementById('edit-insp-ok').value = Number(item.ok) || 0;
+    document.getElementById('edit-insp-fail').value = Number(item.no_qty) || 0;
+    document.getElementById('edit-insp-status').value = item.status || 'done';
+    document.getElementById('edit-insp-type').value = item.inspection_type || 'Raw Material';
+    document.getElementById('edit-insp-inspector').value = item.inspector_nik || item.inspector_name || '';
+    document.getElementById('edit-insp-leader').value = item.approved_by_leader || '';
+    document.getElementById('edit-insp-notes').value = item.defect_notes || '';
+    document.getElementById('edit-insp-evidence-url').value = item.evidence_url || '';
+    document.getElementById('edit-insp-bonding-url').value = item.bonding_test_url || '';
+
+    const subtitle = document.getElementById('edit-insp-subtitle');
+    if (subtitle) {
+        subtitle.textContent = `PO: ${item.po_no || item.po_number || '-'} | Material: ${item.material_name || '-'}`;
+    }
+
+    modal.style.display = 'flex';
+};
+
+window.closeEditInspectionModal = function() {
+    const modal = document.getElementById('modal-edit-inspection');
+    if (modal) modal.style.display = 'none';
+};
+
+window.saveEditInspection = async function(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('edit-insp-id').value;
+    if (!id) return;
+
+    const ok = Number(document.getElementById('edit-insp-ok').value) || 0;
+    const fail = Number(document.getElementById('edit-insp-fail').value) || 0;
+    const status = document.getElementById('edit-insp-status').value || 'done';
+    const inspection_type = document.getElementById('edit-insp-type').value.trim();
+    const inspector_nik = document.getElementById('edit-insp-inspector').value.trim();
+    const approved_by_leader = document.getElementById('edit-insp-leader').value.trim();
+    const defect_notes = document.getElementById('edit-insp-notes').value.trim();
+    const evidence_url = document.getElementById('edit-insp-evidence-url').value.trim();
+    const bonding_test_url = document.getElementById('edit-insp-bonding-url').value.trim();
+
+    try {
+        await apiUpdateInspection(id, {
+            ok,
+            no_qty: fail,
+            status,
+            inspection_type,
+            inspector_nik,
+            approved_by_leader,
+            defect_notes,
+            evidence_url,
+            bonding_test_url,
+        });
+
+        alert('Data inspeksi berhasil diperbarui!');
+        window.closeEditInspectionModal();
+        await loadInspectionLog(false);
+    } catch (err) {
+        console.error(err);
+        alert('Gagal memperbarui data inspeksi: ' + err.message);
+    }
+};
+
+window.deleteInspectionRow = async function(id, poNo) {
+    if (!confirm(`Yakin ingin menghapus data inspeksi untuk PO "${poNo || id}"? Tindakan ini tidak dapat dibatalkan.`)) {
+        return;
+    }
+
+    try {
+        await apiDeleteInspection(id);
+        alert('Data inspeksi berhasil dihapus!');
+        await loadInspectionLog(false);
+    } catch (err) {
+        console.error(err);
+        alert('Gagal menghapus data inspeksi: ' + err.message);
+    }
+};

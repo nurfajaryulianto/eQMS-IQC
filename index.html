@@ -2457,6 +2457,94 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL EDIT INSPEKSI SUBCONT (Sheet 1 Session) -->
+    <div id="subcont-session-edit-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600 text-[20px]">edit_note</span>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Edit Sesi Inspeksi Subcont</h3>
+                        <p id="subcont-edit-modal-subtitle" class="text-xs text-slate-500"></p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeEditSubcontModal()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            <form id="form-edit-subcont-session" onsubmit="window.saveEditSubcontSession(event)" class="p-6 space-y-3.5 max-h-[75vh] overflow-y-auto text-xs">
+                <input type="hidden" id="edit-subcont-session-id">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Vendor</label>
+                        <input type="text" id="edit-subcont-vendor" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="edit-subcont-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                            <option value="Done">Done</option>
+                            <option value="In-Progress">In-Progress</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Model</label>
+                        <input type="text" id="edit-subcont-model" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Style Number</label>
+                        <input type="text" id="edit-subcont-style" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Komponen</label>
+                        <input type="text" id="edit-subcont-component" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Proses</label>
+                        <input type="text" id="edit-subcont-process" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-4 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Qty In</label>
+                        <input type="number" id="edit-subcont-qty-in" min="0" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Qty Insp</label>
+                        <input type="number" id="edit-subcont-qty-insp" min="0" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 text-emerald-700">Pass</label>
+                        <input type="number" id="edit-subcont-qty-pass" min="0" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 text-rose-700">Defect</label>
+                        <input type="number" id="edit-subcont-qty-defect" min="0" required class="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Auditor / Inspector</label>
+                    <input type="text" id="edit-subcont-auditor" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Link Evidence (Google Drive URL)</label>
+                    <input type="url" id="edit-subcont-evidence-url" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500" placeholder="https://drive.google.com/...">
+                </div>
+                <div class="px-2 pt-3 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" onclick="window.closeEditSubcontModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg cursor-pointer flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">save</span> Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </main>
     </div>
 

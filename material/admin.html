@@ -1036,42 +1036,55 @@
                 </div>
                 <!-- Table -->
                 <div class="thin-scroll" style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%;">
+                    <table class="data-table" style="width:100%;table-layout:fixed;border-collapse:collapse;">
+                        <colgroup>
+                            <col style="width: 8.5%;">  <!-- Tgl -->
+                            <col style="width: 13%;">   <!-- PO Number -->
+                            <col style="width: 14.5%;"> <!-- Material Name -->
+                            <col style="width: 9.5%;">  <!-- Jenis -->
+                            <col style="width: 11.5%;"> <!-- Inspector -->
+                            <col style="width: 5.5%;">  <!-- Qty OK -->
+                            <col style="width: 5.5%;">  <!-- Qty Fail -->
+                            <col style="width: 6%;">    <!-- Pass Rate -->
+                            <col style="width: 7%;">    <!-- Status -->
+                            <col style="width: 8.5%;">  <!-- Berkas / Bukti -->
+                            <col style="width: 10.5%;"> <!-- Aksi -->
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;white-space:nowrap;">
+                                    style="padding:10px 8px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;white-space:nowrap;font-size:11px;">
                                     Tgl Inspeksi</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     PO Number</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Material Name</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Jenis</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Inspector</th>
                                 <th
-                                    style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 6px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Qty OK</th>
                                 <th
-                                    style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 6px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Qty Fail</th>
                                 <th
-                                    style="padding:11px 12px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 6px;text-align:right;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Pass Rate</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;text-align:center;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Status</th>
                                 <th
-                                    style="padding:11px 12px;text-align:center;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    style="padding:10px 8px;text-align:center;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
                                     Berkas / Bukti</th>
                                 <th
-                                    style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
-                                    Catatan</th>
+                                    style="padding:10px 8px;text-align:center;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;font-size:11px;">
+                                    Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="ilog-tbody">
@@ -1338,6 +1351,77 @@
                     <button type="button" onclick="window.closeEditMasterModal()" class="btn-secondary" style="padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;">Batal</button>
                     <button type="submit" id="btn-save-master-edit" class="btn-gradient" style="padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;">
                         <span class="material-symbols-outlined" style="font-size:16px;">save</span>Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT INSPECTION RECORD -->
+    <div id="modal-edit-inspection" class="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:16px;width:100%;max-width:560px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="material-symbols-outlined" style="color:#60a5fa;font-size:22px;">edit_note</span>
+                    <div>
+                        <h3 style="font-size:14px;font-weight:700;color:#fff;margin:0;">Edit Data Inspeksi</h3>
+                        <p id="edit-insp-subtitle" style="font-size:11px;color:rgba(255,255,255,0.45);margin:0;"></p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeEditInspectionModal()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;padding:4px;" class="hover-white">
+                    <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+                </button>
+            </div>
+            <form id="form-edit-inspection" onsubmit="window.saveEditInspection(event)" style="padding:20px;display:flex;flex-direction:column;gap:14px;max-height:75vh;overflow-y:auto;">
+                <input type="hidden" id="edit-insp-id">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Qty OK</label>
+                        <input type="number" id="edit-insp-ok" min="0" required class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Qty Fail (Reject)</label>
+                        <input type="number" id="edit-insp-fail" min="0" required class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Status Inspeksi</label>
+                        <select id="edit-insp-status" class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                            <option value="done">Done (Selesai)</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Jenis Inspeksi</label>
+                        <input type="text" id="edit-insp-type" class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Inspector (NIK / Nama)</label>
+                    <input type="text" id="edit-insp-inspector" class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Leader Approval</label>
+                    <input type="text" id="edit-insp-leader" class="styled-input" placeholder="Nama leader..." style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Catatan Defect / Temuan</label>
+                    <textarea id="edit-insp-notes" rows="2" class="styled-input" style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;resize:vertical;"></textarea>
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Link Evidence (Google Drive URL)</label>
+                    <input type="url" id="edit-insp-evidence-url" class="styled-input" placeholder="https://drive.google.com/..." style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px;">Link Bonding Test (Google Drive URL)</label>
+                    <input type="url" id="edit-insp-bonding-url" class="styled-input" placeholder="https://drive.google.com/..." style="width:100%;padding:8px 10px;font-size:12px;border-radius:8px;">
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">
+                    <button type="button" onclick="window.closeEditInspectionModal()" class="btn-secondary" style="padding:9px 18px;border-radius:8px;font-size:12px;">Batal</button>
+                    <button type="submit" class="btn-gradient" style="padding:9px 20px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
+                        <span class="material-symbols-outlined" style="font-size:15px;">save</span>Simpan Perubahan
                     </button>
                 </div>
             </form>
