@@ -4,6 +4,7 @@
 
 import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, supabase, nikToEmail } from './auth.js';
 import { showAlert } from '../dialog.js';
+import './inspection-log.js';
 import {
     apiGetMasterData, apiUpdateMasterData, apiDeleteMasterData, apiBulkUpsertMasterData,
     apiPassAll, apiGetInspectionData,
