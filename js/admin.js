@@ -770,7 +770,6 @@ function refreshDefectButtonsInForm() {
             window.__reattachDefectListeners();
         }
     }
-    renderDefectLibrary();
 }
 
 function populateAdminFormSelects() {

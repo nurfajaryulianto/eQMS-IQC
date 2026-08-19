@@ -4,9 +4,8 @@ import { supabase } from './db.js';
 // ===========================================
 const GAS_EVIDENCE_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 // --- IMPOR DATABASE DARI FILE TERPISAH ---
-// --- IMPOR AUTH MODULE ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderDefectLibrary, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap } from './admin.js';
+import { renderDefectButtons, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap } from './admin.js';
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
@@ -1653,8 +1652,6 @@ async function initApp() {
         statusSelectMobile.addEventListener('change', () => syncInspectionStatusState(statusSelectMobile.value));
     }
 
-    // Render defect buttons dynamically from admin-managed catalog (not rendering flat defect buttons anymore)
-    renderDefectLibrary();
     // Show admin nav items for admin role
     if (userRole === ROLES.ADMIN) {
         document.querySelectorAll('[data-view="admin"]').forEach(el => { el.style.display = ''; });
