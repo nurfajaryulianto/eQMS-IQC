@@ -158,20 +158,29 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
     console.log('[upload] parsed rows sample:', insertRows[0]);
     console.log('[upload] total valid rows:', insertRows.length, 'of', rows.length);
 
-    // Cek duplikat di sisi client sebelum insert
-    const { data: existing } = await supabase
-        .from('material_master_data')
-        .select('po_number, receive_date, material_name, receive_number, batch_size')
-        .in('po_number', insertRows.map(r => r.po_number));
+    // Cek duplikat di sisi client dengan chunking agar aman dari URL length limit
+    const uniquePoList = [...new Set(insertRows.map(r => r.po_number))];
+    let existing = [];
+    const PO_CHUNK = 100;
+    for (let i = 0; i < uniquePoList.length; i += PO_CHUNK) {
+        const chunk = uniquePoList.slice(i, i + PO_CHUNK);
+        const { data: exData, error: exErr } = await supabase
+            .from('material_master_data')
+            .select('po_number, receive_date, material_name, receive_number, batch_size')
+            .in('po_number', chunk);
+        if (!exErr && exData) {
+            existing.push(...exData);
+        }
+    }
 
     const existingKeys = new Set(
         (existing || []).map(e =>
-            `${e.po_number.toLowerCase()}|${e.receive_date || ''}|${e.material_name.toLowerCase()}|${(e.receive_number || '').toLowerCase()}|${e.batch_size}`
+            `${(e.po_number || '').toLowerCase()}|${e.receive_date || ''}|${(e.material_name || '').toLowerCase()}|${(e.receive_number || '').toLowerCase()}|${e.batch_size}`
         )
     );
 
     const newRows = insertRows.filter(r => {
-        const key = `${r.po_number.toLowerCase()}|${r.receive_date || ''}|${r.material_name.toLowerCase()}|${(r.receive_number || '').toLowerCase()}|${r.batch_size}`;
+        const key = `${(r.po_number || '').toLowerCase()}|${r.receive_date || ''}|${(r.material_name || '').toLowerCase()}|${(r.receive_number || '').toLowerCase()}|${r.batch_size}`;
         return !existingKeys.has(key);
     });
 
@@ -179,7 +188,7 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
     let inserted = 0;
 
     if (newRows.length > 0) {
-        // Debug: cek auth session aktif
+        // Cek auth session aktif
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
         if (!token) {
@@ -194,10 +203,12 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
             const { data, error } = await supabase
                 .from('material_master_data')
                 .insert(batch)
-                .select();
-            console.log('[upload] batch result:', { data: data?.length, error: error?.message });
-            if (error) throw new Error(error.message);
-            inserted += data?.length || 0;
+                .select('id');
+            if (error) {
+                console.error(`[upload] Error batch ${Math.floor(i / BATCH) + 1} (${i + 1}-${Math.min(i + BATCH, newRows.length)}):`, error);
+                throw new Error(`Gagal menyimpan batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+            }
+            inserted += data?.length || batch.length;
         }
     }
 

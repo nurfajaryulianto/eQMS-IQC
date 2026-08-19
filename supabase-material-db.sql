@@ -8,26 +8,26 @@
 
 CREATE TABLE IF NOT EXISTS public.material_master_data (
   id                  BIGSERIAL PRIMARY KEY,
-  po_number           VARCHAR(255)  NOT NULL,
+  po_number           TEXT          NOT NULL,
   material_name       TEXT          NOT NULL,
   material_description TEXT,
-  uom                 VARCHAR(50),
+  uom                 TEXT,
   supplier            TEXT,
   supplier_name       TEXT,
-  po_area             VARCHAR(100),
+  po_area             TEXT,
   batch_size          NUMERIC(12,2) DEFAULT 0,
-  product_code        VARCHAR(255),
+  product_code        TEXT,
   model_name          TEXT,
-  bucket              VARCHAR(100),
+  bucket              TEXT,
   receive_date        DATE,
   shipment_number     TEXT,
-  no_bc               VARCHAR(100),
-  bc_type             VARCHAR(100),
-  receive_number      VARCHAR(255),
-  material_type       VARCHAR(100),
+  no_bc               TEXT,
+  bc_type             TEXT,
+  receive_number      TEXT,
+  material_type       TEXT,
   status              VARCHAR(20)   NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending','in-progress','done')),
-  uploaded_by         VARCHAR(100),
+  uploaded_by         TEXT,
   created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
