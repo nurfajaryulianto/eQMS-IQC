@@ -1419,7 +1419,7 @@ function renderSubcontLogDefects(defects) {
     if (!tbody) return;
 
     if (!defects || defects.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400 italic">Tidak ada temuan defect ditemukan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 italic">Tidak ada temuan defect ditemukan.</td></tr>';
         renderPaginationControls('subcont-defects-pagination', 1, defectsPageSize, 0, 'window.setDefectsPage', 'window.setDefectsPageSize');
         return;
     }
@@ -1428,16 +1428,26 @@ function renderSubcontLogDefects(defects) {
     if (defectsCurrentPage > totalPages) defectsCurrentPage = totalPages;
     if (defectsCurrentPage < 1) defectsCurrentPage = 1;
 
+    const sessionMap = new Map((currentSubcontLogSessions || []).map(s => [s.session_id, s]));
+
     const startIdx = (defectsCurrentPage - 1) * defectsPageSize;
     const pageItems = defects.slice(startIdx, startIdx + defectsPageSize);
 
     tbody.innerHTML = pageItems.map((d, idx) => {
         const itemNumber = startIdx + idx + 1;
+        const sess = sessionMap.get(d.session_id);
+        const model = d.model || (sess ? sess.model : '') || '-';
+        const style = d.style_number || (sess ? sess.style_number : '') || '';
+
         return `
             <tr class="hover:bg-slate-50 transition-colors">
                 <td class="py-2.5 px-3 text-slate-400 font-mono">${itemNumber}</td>
                 <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${d.date || '-'}</td>
                 <td class="py-2.5 px-3 font-semibold text-slate-800">${d.vendor || '-'}</td>
+                <td class="py-2.5 px-3">
+                    <div class="font-bold text-slate-900">${model}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${style}</div>
+                </td>
                 <td class="py-2.5 px-3 font-medium text-slate-700">${d.component || '-'}</td>
                 <td class="py-2.5 px-3 font-bold text-rose-600">${d.issue_finding || '-'}</td>
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">${(Number(d.count) || 0).toLocaleString()}</td>
@@ -1539,14 +1549,20 @@ window.exportSubcontInspectionLog = function() {
     XLSX.utils.book_append_sheet(wb, ws1, 'Inspection_Sessions');
 
     // Sheet 2: Defect_Breakdown
-    const dRows = (currentSubcontLogDefects || []).map(d => ({
-        'SessionId':     d.session_id || '',
-        'Date':          d.date || '',
-        'Vendor':        d.vendor || '',
-        'Component':     d.component || '',
-        'Issue Finding': d.issue_finding || '',
-        'Count':         Number(d.count) || 0,
-    }));
+    const sessionMap = new Map((currentSubcontLogSessions || []).map(s => [s.session_id, s]));
+    const dRows = (currentSubcontLogDefects || []).map(d => {
+        const sess = sessionMap.get(d.session_id);
+        return {
+            'SessionId':     d.session_id || '',
+            'Date':          d.date || '',
+            'Vendor':        d.vendor || '',
+            'Model':         d.model || (sess ? sess.model : '') || '',
+            'Style Number':  d.style_number || (sess ? sess.style_number : '') || '',
+            'Component':     d.component || '',
+            'Issue Finding': d.issue_finding || '',
+            'Count':         Number(d.count) || 0,
+        };
+    });
     const ws2 = XLSX.utils.json_to_sheet(dRows);
     XLSX.utils.book_append_sheet(wb, ws2, 'Defect_Breakdown');
 
