@@ -497,6 +497,8 @@
                         </tbody>
                     </table>
                 </div>
+                <!-- Pagination for Master Data -->
+                <div id="master-pagination" style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.06);"></div>
             </div>
         </div>
 
@@ -1253,6 +1255,79 @@
                     <span class="material-symbols-outlined" style="font-size:16px;">flag</span>Ajukan Klaim
                 </button>
             </div>
+        </div>
+    <!-- ── EDIT MASTER DATA MODAL ── -->
+    <div id="modal-edit-master" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:250;display:none;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity 0.2s ease;">
+        <div class="edit-master-box" style="background:#0b1928;border:1px solid rgba(255,255,255,0.12);border-radius:20px;width:100%;max-width:620px;box-shadow:0 24px 64px rgba(0,0,0,0.6);transform:scale(0.95);transition:transform 0.2s ease;overflow:hidden;">
+            <!-- Header -->
+            <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.02);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.3);display:flex;align-items:center;justify-content:center;color:#60a5fa;">
+                        <span class="material-symbols-outlined" style="font-size:20px;">edit_note</span>
+                    </div>
+                    <div>
+                        <h3 style="font-size:15px;font-weight:700;color:#fff;margin:0;">Edit Master Data PO</h3>
+                        <p style="font-size:12px;color:rgba(255,255,255,0.45);margin:0;">Perbarui informasi master data PO & Material</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.closeEditMasterModal()" style="background:transparent;border:none;color:rgba(255,255,255,0.4);cursor:pointer;display:flex;align-items:center;padding:4px;border-radius:6px;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">
+                    <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+                </button>
+            </div>
+            <!-- Body -->
+            <form id="form-edit-master" onsubmit="window.saveEditMasterRow(event)" style="padding:24px;display:flex;flex-direction:column;gap:14px;max-height:70vh;overflow-y:auto;" class="thin-scroll">
+                <input type="hidden" id="edit-master-id">
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">PO Number</label>
+                        <input type="text" id="edit-master-po" class="styled-input" required>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Status</label>
+                        <select id="edit-master-status" class="styled-input" style="cursor:pointer;" required>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In-Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Material Name</label>
+                    <input type="text" id="edit-master-matname" class="styled-input" required>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Vendor / Supplier</label>
+                        <input type="text" id="edit-master-vendor" class="styled-input">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Material Type</label>
+                        <input type="text" id="edit-master-mattype" class="styled-input" placeholder="Misal: LEATHER, TEXTILE...">
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Planned Qty (Batch Size)</label>
+                        <input type="number" step="any" id="edit-master-planned" class="styled-input" required>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">UOM</label>
+                        <input type="text" id="edit-master-uom" class="styled-input" placeholder="Yard, Square Feet, Pair...">
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
+                    <button type="button" onclick="window.closeEditMasterModal()" class="btn-secondary" style="padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;">Batal</button>
+                    <button type="submit" id="btn-save-master-edit" class="btn-gradient" style="padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">save</span>Simpan Perubahan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

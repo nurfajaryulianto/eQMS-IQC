@@ -10,7 +10,7 @@ import { exportInspectionLogToExcel } from './export.js';
 // ─── STATE ───────────────────────────────────────────────────
 let allInspectionLog = [];
 let currentPage      = 1;
-const PAGE_LIMIT     = 50;
+let pageLimit        = 25;
 let currentFilters   = {};
 let appUsersList     = [];
 let nikToNameMap     = {};
@@ -51,7 +51,7 @@ export async function loadInspectionLog(resetPage = true) {
         inspectorNik:   document.getElementById('ilog-inspector')?.value || '',
         inspectionType: document.getElementById('ilog-type')?.value  || '',
         page:           currentPage,
-        limit:          PAGE_LIMIT,
+        limit:          pageLimit,
     };
 
     try {
@@ -195,22 +195,71 @@ function renderInspectionLog(data) {
 
 function renderPagination(total, container) {
     if (!container) return;
-    const totalPages = Math.ceil(total / PAGE_LIMIT);
-    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    if (total === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const totalPages = Math.ceil(total / pageLimit) || 1;
+    const startRow = (currentPage - 1) * pageLimit + 1;
+    const endRow = Math.min(currentPage * pageLimit, total);
 
     const pages = [];
-    if (currentPage > 1) pages.push(`<button onclick="ilogGoPage(${currentPage - 1})" style="padding:5px 12px;border-radius:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:#fff;cursor:pointer;font-size:12px;">‹ Prev</button>`);
-    for (let p = Math.max(1, currentPage - 2); p <= Math.min(totalPages, currentPage + 2); p++) {
-        const active = p === currentPage;
-        pages.push(`<button onclick="ilogGoPage(${p})" style="padding:5px 12px;border-radius:6px;background:${active ? '#10b981' : 'rgba(255,255,255,0.07)'};border:1px solid ${active ? '#10b981' : 'rgba(255,255,255,0.12)'};color:#fff;cursor:pointer;font-size:12px;font-weight:${active ? '700' : '400'};">${p}</button>`);
-    }
-    if (currentPage < totalPages) pages.push(`<button onclick="ilogGoPage(${currentPage + 1})" style="padding:5px 12px;border-radius:6px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);color:#fff;cursor:pointer;font-size:12px;">Next ›</button>`);
+    const prevDisabled = currentPage <= 1;
+    pages.push(`<button onclick="ilogGoPage(${currentPage - 1})" ${prevDisabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:${prevDisabled ? 'rgba(255,255,255,0.25)' : '#fff'};cursor:${prevDisabled ? 'not-allowed' : 'pointer'};font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;">‹ Prev</button>`);
 
-    container.innerHTML = `<div style="display:flex;gap:6px;align-items:center;justify-content:center;">${pages.join('')}</div>`;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+    if (currentPage <= 3) endPage = Math.min(5, totalPages);
+    if (currentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
+
+    if (startPage > 1) {
+        pages.push(`<button onclick="ilogGoPage(1)" style="padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;cursor:pointer;font-size:12px;">1</button>`);
+        if (startPage > 2) pages.push(`<span style="color:rgba(255,255,255,0.3);padding:0 2px;">...</span>`);
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        const active = p === currentPage;
+        pages.push(`<button onclick="ilogGoPage(${p})" style="padding:6px 12px;border-radius:8px;background:${active ? '#10b981' : 'rgba(255,255,255,0.06)'};border:1px solid ${active ? '#10b981' : 'rgba(255,255,255,0.1)'};color:#fff;cursor:pointer;font-size:12px;font-weight:${active ? '700' : '500'};box-shadow:${active ? '0 2px 8px rgba(16,185,129,0.35)' : 'none'};">${p}</button>`);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) pages.push(`<span style="color:rgba(255,255,255,0.3);padding:0 2px;">...</span>`);
+        pages.push(`<button onclick="ilogGoPage(${totalPages})" style="padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;cursor:pointer;font-size:12px;">${totalPages}</button>`);
+    }
+
+    const nextDisabled = currentPage >= totalPages;
+    pages.push(`<button onclick="ilogGoPage(${currentPage + 1})" ${nextDisabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:${nextDisabled ? 'rgba(255,255,255,0.25)' : '#fff'};cursor:${nextDisabled ? 'not-allowed' : 'pointer'};font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;">Next ›</button>`);
+
+    container.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);">
+                Menampilkan <strong style="color:#fff;">${startRow} - ${endRow}</strong> dari <strong style="color:#34d399;">${total}</strong> data
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.5);">
+                    <span>Baris per halaman:</span>
+                    <select onchange="window.ilogSetPageLimit(this.value)" class="styled-input" style="padding:4px 8px;font-size:12px;width:auto;cursor:pointer;">
+                        <option value="15" ${pageLimit === 15 ? 'selected' : ''}>15</option>
+                        <option value="25" ${pageLimit === 25 ? 'selected' : ''}>25</option>
+                        <option value="50" ${pageLimit === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${pageLimit === 100 ? 'selected' : ''}>100</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;">${pages.join('')}</div>
+            </div>
+        </div>
+    `;
 }
 
 window.ilogGoPage = function(page) {
     currentPage = page;
+    loadInspectionLog(false);
+};
+
+window.ilogSetPageLimit = function(limit) {
+    pageLimit = parseInt(limit, 10) || 25;
+    currentPage = 1;
     loadInspectionLog(false);
 };
 

@@ -71,17 +71,30 @@ function setupLogout() {
     });
 }
 
-// ─── MASTER DATA TAB ─────────────────────────────────────────
+// ─── MASTER DATA TAB & PAGINATION ───────────────────────────
+let masterCurrentPage = 1;
+let masterPageSize = 25;
+
+window.setMasterPage = function (page) {
+    masterCurrentPage = page;
+    renderMasterTable();
+};
+
+window.setMasterPageSize = function (size) {
+    masterPageSize = parseInt(size, 10) || 25;
+    masterCurrentPage = 1;
+    renderMasterTable();
+};
 
 window.loadMasterData = async function () {
     const tbody = document.getElementById('master-tbody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data...</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data...</td></tr>`;
 
     try {
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
-            const result = await apiGetMasterData({ status: 'all' });
+            const result = await apiGetMasterData({ status: 'all', limit: 10000 });
             allMasterData = result.data || [];
         }
         window.__allMasterData = allMasterData;  // expose untuk Export Excel
@@ -102,18 +115,28 @@ window.renderMasterTable = function () {
     if (countEl) countEl.textContent = `${filtered.length} item`;
 
     const tbody = document.getElementById('master-tbody');
+    const paginationEl = document.getElementById('master-pagination');
     if (!tbody) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding:48px;text-align:center;">
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:48px;text-align:center;">
             <div style="color:#94a3b8;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
                 <span class="material-symbols-outlined" style="font-size:32px;">inbox</span>
                 Tidak ada data untuk filter ini.
             </div></td></tr>`;
+        if (paginationEl) paginationEl.innerHTML = '';
         return;
     }
 
-    tbody.innerHTML = filtered.map(d => {
+    const totalPages = Math.ceil(filtered.length / masterPageSize) || 1;
+    if (masterCurrentPage > totalPages) masterCurrentPage = totalPages;
+    if (masterCurrentPage < 1) masterCurrentPage = 1;
+
+    const startIdx = (masterCurrentPage - 1) * masterPageSize;
+    const endIdx = Math.min(startIdx + masterPageSize, filtered.length);
+    const pageItems = filtered.slice(startIdx, endIdx);
+
+    tbody.innerHTML = pageItems.map(d => {
         let badge;
         if (d.status === 'done') {
             badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`;
@@ -133,9 +156,9 @@ window.renderMasterTable = function () {
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
             <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
-            <td class="truncate" title="${esc(d.vendor_name)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(d.vendor_name)}</td>
+            <td class="truncate" title="${esc(d.vendor_name || d.supplier_name || d.supplier)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(d.vendor_name || d.supplier_name || d.supplier)}</td>
             <td class="truncate" style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
-            <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty).toLocaleString('id-ID')}</td>
+            <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty || d.batch_size || 0).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
             <td style="padding:10px 14px;text-align:center;">${claimBtn}</td>
             <td style="padding:10px 14px;text-align:center;">
@@ -143,6 +166,184 @@ window.renderMasterTable = function () {
             </td>
         </tr>`;
     }).join('');
+
+    renderMasterPagination(totalPages, filtered.length, startIdx + 1, endIdx);
+};
+
+function renderMasterPagination(totalPages, totalRows, startRow, endRow) {
+    const el = document.getElementById('master-pagination');
+    if (!el) return;
+
+    if (totalRows === 0) {
+        el.innerHTML = '';
+        return;
+    }
+
+    const pages = [];
+    const prevDisabled = masterCurrentPage <= 1;
+    pages.push(`<button onclick="window.setMasterPage(${masterCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:${prevDisabled ? 'rgba(255,255,255,0.25)' : '#fff'};cursor:${prevDisabled ? 'not-allowed' : 'pointer'};font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;">‹ Prev</button>`);
+
+    let startPage = Math.max(1, masterCurrentPage - 2);
+    let endPage = Math.min(totalPages, masterCurrentPage + 2);
+    if (masterCurrentPage <= 3) endPage = Math.min(5, totalPages);
+    if (masterCurrentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
+
+    if (startPage > 1) {
+        pages.push(`<button onclick="window.setMasterPage(1)" style="padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;cursor:pointer;font-size:12px;">1</button>`);
+        if (startPage > 2) pages.push(`<span style="color:rgba(255,255,255,0.3);padding:0 2px;">...</span>`);
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        const active = p === masterCurrentPage;
+        pages.push(`<button onclick="window.setMasterPage(${p})" style="padding:6px 12px;border-radius:8px;background:${active ? '#10b981' : 'rgba(255,255,255,0.06)'};border:1px solid ${active ? '#10b981' : 'rgba(255,255,255,0.1)'};color:#fff;cursor:pointer;font-size:12px;font-weight:${active ? '700' : '500'};box-shadow:${active ? '0 2px 8px rgba(16,185,129,0.35)' : 'none'};">${p}</button>`);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) pages.push(`<span style="color:rgba(255,255,255,0.3);padding:0 2px;">...</span>`);
+        pages.push(`<button onclick="window.setMasterPage(${totalPages})" style="padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#fff;cursor:pointer;font-size:12px;">${totalPages}</button>`);
+    }
+
+    const nextDisabled = masterCurrentPage >= totalPages;
+    pages.push(`<button onclick="window.setMasterPage(${masterCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:${nextDisabled ? 'rgba(255,255,255,0.25)' : '#fff'};cursor:${nextDisabled ? 'not-allowed' : 'pointer'};font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;">Next ›</button>`);
+
+    el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);">
+                Menampilkan <strong style="color:#fff;">${startRow} - ${endRow}</strong> dari <strong style="color:#34d399;">${totalRows}</strong> PO
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.5);">
+                    <span>Baris per halaman:</span>
+                    <select onchange="window.setMasterPageSize(this.value)" class="styled-input" style="padding:4px 8px;font-size:12px;width:auto;cursor:pointer;">
+                        <option value="15" ${masterPageSize === 15 ? 'selected' : ''}>15</option>
+                        <option value="25" ${masterPageSize === 25 ? 'selected' : ''}>25</option>
+                        <option value="50" ${masterPageSize === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${masterPageSize === 100 ? 'selected' : ''}>100</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;">${pages.join('')}</div>
+            </div>
+        </div>
+    `;
+}
+
+// ─── MASTER DATA EDIT & DELETE ACTIONS ────────────────────────
+
+window.editMasterRow = function (id) {
+    const row = allMasterData.find(d => String(d.id) === String(id));
+    if (!row) {
+        showToast('Data PO tidak ditemukan.', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('modal-edit-master');
+    if (!modal) return;
+
+    document.getElementById('edit-master-id').value = row.id;
+    document.getElementById('edit-master-po').value = row.po_number || '';
+    document.getElementById('edit-master-status').value = row.status || 'pending';
+    document.getElementById('edit-master-matname').value = row.material_name || '';
+    document.getElementById('edit-master-vendor').value = row.vendor_name || row.supplier_name || row.supplier || '';
+    document.getElementById('edit-master-mattype').value = row.material_type || '';
+    document.getElementById('edit-master-planned').value = row.planned_qty || row.batch_size || 0;
+    document.getElementById('edit-master-uom').value = row.uom || '';
+
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => {
+        modal.style.opacity = '1';
+        const box = modal.querySelector('.edit-master-box');
+        if (box) box.style.transform = 'scale(1)';
+    });
+};
+
+window.closeEditMasterModal = function () {
+    const modal = document.getElementById('modal-edit-master');
+    if (modal) {
+        modal.style.opacity = '0';
+        const box = modal.querySelector('.edit-master-box');
+        if (box) box.style.transform = 'scale(0.95)';
+        setTimeout(() => { modal.style.display = 'none'; }, 200);
+    }
+};
+
+window.saveEditMasterRow = async function (e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-master-id').value;
+    if (!id) return;
+
+    const po_number = document.getElementById('edit-master-po').value.trim();
+    const status = document.getElementById('edit-master-status').value;
+    const material_name = document.getElementById('edit-master-matname').value.trim();
+    const supplier_name = document.getElementById('edit-master-vendor').value.trim();
+    const material_type = document.getElementById('edit-master-mattype').value.trim();
+    const batch_size = Number(document.getElementById('edit-master-planned').value) || 0;
+    const uom = document.getElementById('edit-master-uom').value.trim();
+
+    const saveBtn = document.getElementById('btn-save-master-edit');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Menyimpan...'; }
+
+    try {
+        if (MATERIAL_TEST_MODE) {
+            const idx = allMasterData.findIndex(d => String(d.id) === String(id));
+            if (idx >= 0) {
+                allMasterData[idx] = {
+                    ...allMasterData[idx],
+                    po_number, status, material_name, vendor_name: supplier_name, supplier_name, material_type, planned_qty: batch_size, batch_size, uom
+                };
+            }
+        } else {
+            await apiUpdateMasterData(id, {
+                po_number,
+                status,
+                material_name,
+                supplier_name,
+                supplier: supplier_name,
+                material_type,
+                batch_size,
+                uom
+            });
+            const idx = allMasterData.findIndex(d => String(d.id) === String(id));
+            if (idx >= 0) {
+                allMasterData[idx] = {
+                    ...allMasterData[idx],
+                    po_number, status, material_name, vendor_name: supplier_name, supplier_name, material_type, planned_qty: batch_size, batch_size, uom
+                };
+            }
+        }
+
+        window.closeEditMasterModal();
+        renderMasterTable();
+        showToast('Data PO berhasil diperbarui!', 'success');
+    } catch (err) {
+        console.error('saveEditMasterRow error:', err);
+        showToast('Gagal memperbarui data: ' + err.message, 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">save</span>Simpan Perubahan`; }
+    }
+};
+
+window.deleteMasterRow = async function (id, poNumber) {
+    if (!confirm(`Yakin ingin menghapus data PO "${poNumber}" dari Master Data?`)) {
+        return;
+    }
+
+    try {
+        setLoading(true, 'Menghapus data PO...');
+        if (MATERIAL_TEST_MODE) {
+            allMasterData = allMasterData.filter(d => String(d.id) !== String(id));
+        } else {
+            await apiDeleteMasterData(id);
+            allMasterData = allMasterData.filter(d => String(d.id) !== String(id));
+        }
+
+        renderMasterTable();
+        showToast(`PO ${poNumber} berhasil dihapus.`, 'success');
+    } catch (err) {
+        console.error('deleteMasterRow error:', err);
+        showToast('Gagal menghapus data: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
 };
 
 // ─── UPLOAD TAB: GENERATE TEMPLATE ───────────────────────────
