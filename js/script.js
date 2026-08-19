@@ -1520,10 +1520,7 @@ async function initApp() {
 
 
 
-    // Hide settings nav items for non-admin roles (only admin sees it)
-    if (userRole !== ROLES.ADMIN) {
-        document.querySelectorAll('[data-view="settings"]').forEach(el => { el.style.display = 'none'; });
-    }
+
 
     // Hide "New Inspection" button for supervisor and manager only (admin keeps full access)
     if (userRole === ROLES.SUPERVISOR || userRole === ROLES.MANAGER) {

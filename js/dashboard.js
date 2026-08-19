@@ -293,28 +293,41 @@ function resetFilters() {
     updateDashboard();
 }
 
+function getItemDateStr(item) {
+    if (item.TanggalInspection && typeof item.TanggalInspection === 'string') {
+        const trimmed = item.TanggalInspection.trim().substring(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    }
+    if (item.TanggalIncoming && typeof item.TanggalIncoming === 'string') {
+        const trimmed = item.TanggalIncoming.trim().substring(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    }
+    if (item.Timestamp instanceof Date && !isNaN(item.Timestamp)) {
+        const year = item.Timestamp.getFullYear();
+        const month = String(item.Timestamp.getMonth() + 1).padStart(2, '0');
+        const day = String(item.Timestamp.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    return '';
+}
+
 function updateDashboard() {
-    const parseLocalDate = (dateStr) => {
-        if (!dateStr) return null;
-        const [y, m, d] = dateStr.split('-').map(Number);
-        return new Date(y, m - 1, d);
-    };
+    const startVal = document.getElementById('startDate')?.value || '';
+    const endVal = document.getElementById('endDate')?.value || '';
 
     const filters = {
-        startDate: parseLocalDate(document.getElementById('startDate').value),
-        endDate: parseLocalDate(document.getElementById('endDate').value),
-        auditor: document.getElementById('auditorFilter').value,
+        startDate: startVal,
+        endDate: endVal,
+        auditor: document.getElementById('auditorFilter')?.value || '',
         vendor: document.getElementById('vendorFilter')?.value || '',
         materialType: document.getElementById('materialTypeFilter')?.value || '',
-        model: document.getElementById('modelFilter').value,
+        model: document.getElementById('modelFilter')?.value || '',
     };
 
-    if (filters.endDate) filters.endDate.setHours(23, 59, 59, 999);
-
     const filteredInspections = allInspections.filter(item => {
-        const d = item.Timestamp;
-        return (!filters.startDate || d >= filters.startDate) &&
-            (!filters.endDate || d <= filters.endDate) &&
+        const d = getItemDateStr(item);
+        return (!filters.startDate || (d && d >= filters.startDate)) &&
+            (!filters.endDate || (d && d <= filters.endDate)) &&
             (!filters.auditor || item.Auditor === filters.auditor) &&
             (!filters.vendor || item.Vendor === filters.vendor) &&
             (!filters.materialType || item.MaterialType === filters.materialType) &&
@@ -326,9 +339,9 @@ function updateDashboard() {
     const filteredDefects = sessionIds.size > 0
         ? allDefects.filter(d => sessionIds.has(d.SessionId))
         : allDefects.filter(d => {
-            const dt = d.TanggalIncoming ? new Date(d.TanggalIncoming) : null;
-            return (!filters.startDate || !dt || dt >= filters.startDate) &&
-                (!filters.endDate || !dt || dt <= filters.endDate) &&
+            const dt = (d.TanggalIncoming || '').trim().substring(0, 10);
+            return (!filters.startDate || (dt && dt >= filters.startDate)) &&
+                (!filters.endDate || (dt && dt <= filters.endDate)) &&
                 (!filters.vendor || d.Vendor === filters.vendor);
         });
 
@@ -373,17 +386,20 @@ function updateFttChart(data, period) {
     const groupedData = {};
 
     data.forEach(item => {
-        const date = item.Timestamp;
-        let key;
-        if (period === 'days') {
-            // Ini adalah bagian yang mengatur format MM/DD/YYYY
-            const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Bulan (01-12)
-            const day = date.getDate().toString().padStart(2, '0');        // Hari (01-31)
-            const year = date.getFullYear();                                  // Tahun (YYYY)
-            key = `${month}/${day}/${year}`; // Format MM/DD/YYYY
-        } else { // months
-            // Untuk periode bulanan, tetap tampilkan nama bulan dan tahun (contoh: "Juli 2025")
-            key = date.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+        const dateStr = getItemDateStr(item);
+        let key = '';
+        if (dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            if (period === 'days') {
+                const month = String(m).padStart(2, '0');
+                const day = String(d).padStart(2, '0');
+                key = `${month}/${day}/${y}`;
+            } else {
+                const dt = new Date(y, m - 1, d);
+                key = dt.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+            }
+        } else {
+            key = 'N/A';
         }
         if (!groupedData[key]) {
             groupedData[key] = { fttSum: 0, count: 0 };
@@ -394,11 +410,8 @@ function updateFttChart(data, period) {
 
     const labels = Object.keys(groupedData).sort((a, b) => {
         if (period === 'days') {
-            // Saat mengurutkan, pastikan kita mengurutkan sebagai tanggal, bukan string
-            // Karena format MM/DD/YYYY, new Date(string) akan bekerja dengan baik.
             return new Date(a) - new Date(b);
         } else {
-            // Logika pengurutan untuk bulan tetap sama
             const dateA = new Date(a.replace(/(\w+)\s(\d{4})/, "1 $1 $2"));
             const dateB = new Date(b.replace(/(\w+)\s(\d{4})/, "1 $1 $2"));
             return dateA - dateB;
@@ -579,37 +592,43 @@ function updateInspectionTable(data) {
         limitedData = limitedData.filter(item => item.Auditor === currentAuditorTableFilter);
     }
 
+    const toYMD = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = toYMD(now);
+    const yest = new Date(now);
+    yest.setDate(yest.getDate() - 1);
+    const yesterdayStr = toYMD(yest);
 
     // --- MODIFIKASI: Logika pemfilteran tanggal berdasarkan currentLimitView ---
     if (currentLimitView === 'today') {
-        limitedData = limitedData.filter(item => {
-            const itemDate = new Date(item.Timestamp.getFullYear(), item.Timestamp.getMonth(), item.Timestamp.getDate());
-            return itemDate.getTime() === today.getTime();
-        });
+        limitedData = limitedData.filter(item => getItemDateStr(item) === todayStr);
     } else if (currentLimitView === 'yesterday') {
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1); // Mundur 1 hari
-        limitedData = limitedData.filter(item => {
-            const itemDate = new Date(item.Timestamp.getFullYear(), item.Timestamp.getMonth(), item.Timestamp.getDate());
-            return itemDate.getTime() === yesterday.getTime();
-        });
+        limitedData = limitedData.filter(item => getItemDateStr(item) === yesterdayStr);
     } else if (currentLimitView === 'this_week') {
-        const firstDayOfWeek = new Date(today);
-        firstDayOfWeek.setDate(today.getDate() - today.getDay()); // Mendapat hari Minggu minggu ini (00:00:00)
-        firstDayOfWeek.setHours(0, 0, 0, 0); // Pastikan tepat di awal hari Minggu
-        limitedData = limitedData.filter(item => item.Timestamp >= firstDayOfWeek);
-    } else if (currentLimitView === 'last_week') { // Logika untuk "Last Week"
-        const endOfLastWeek = new Date(today);
-        endOfLastWeek.setDate(today.getDate() - today.getDay() - 1); // Mundur ke hari Sabtu minggu lalu
-        endOfLastWeek.setHours(23, 59, 59, 999); // Hingga akhir hari Sabtu
-
+        const firstDayOfWeek = new Date(now);
+        firstDayOfWeek.setDate(now.getDate() - now.getDay());
+        const startWeekStr = toYMD(firstDayOfWeek);
+        limitedData = limitedData.filter(item => {
+            const d = getItemDateStr(item);
+            return d >= startWeekStr && d <= todayStr;
+        });
+    } else if (currentLimitView === 'last_week') {
+        const endOfLastWeek = new Date(now);
+        endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
         const startOfLastWeek = new Date(endOfLastWeek);
-        startOfLastWeek.setDate(startOfLastWeek.getDate() - 6); // Mundur 6 hari dari Sabtu untuk mendapatkan Minggu minggu lalu
-        startOfLastWeek.setHours(0, 0, 0, 0); // Mulai dari awal hari Minggu
-
-        limitedData = limitedData.filter(item => item.Timestamp >= startOfLastWeek && item.Timestamp <= endOfLastWeek);
+        startOfLastWeek.setDate(startOfLastWeek.getDate() - 6);
+        const startLastWeekStr = toYMD(startOfLastWeek);
+        const endLastWeekStr = toYMD(endOfLastWeek);
+        limitedData = limitedData.filter(item => {
+            const d = getItemDateStr(item);
+            return d >= startLastWeekStr && d <= endLastWeekStr;
+        });
     }
     // --- AKHIR MODIFIKASI FILTER TANGGAL ---
 

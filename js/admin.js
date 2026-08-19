@@ -212,55 +212,7 @@ export function renderDefectButtons(container) {
     });
 }
 
-const LIBRARY_CATS = [
-    {
-        key: 'minor',
-        headerBg: 'bg-blue-600', icon: 'info', title: 'Minor / Cosmetic',
-        itemBg: 'bg-blue-50', itemBorder: 'border-blue-100', itemText: 'text-blue-900',
-        footerBg: 'bg-blue-50', footerBorder: 'border-blue-100', footerText: 'text-blue-600',
-        footnote: 'Usually reworkable. Does not affect structural integrity.'
-    },
-    {
-        key: 'major',
-        headerBg: 'bg-amber-500', icon: 'warning', title: 'Major / Aesthetic',
-        itemBg: 'bg-amber-50', itemBorder: 'border-amber-100', itemText: 'text-amber-900',
-        footerBg: 'bg-amber-50', footerBorder: 'border-amber-100', footerText: 'text-amber-700',
-        footnote: 'Visible defects affecting appearance.'
-    },
-    {
-        key: 'critical',
-        headerBg: 'bg-red-600', icon: 'error', title: 'Critical / Structural',
-        itemBg: 'bg-red-50', itemBorder: 'border-red-100', itemText: 'text-red-900',
-        footerBg: 'bg-red-50', footerBorder: 'border-red-100', footerText: 'text-red-600',
-        footnote: 'Structural/safety critical. Typically reject or quarantine.'
-    }
-];
 
-export function renderDefectLibrary() {
-    const grid = document.getElementById('defect-library-grid');
-    if (!grid) return;
-    const defects = getDefects();
-    const grouped = { minor: [], major: [], critical: [] };
-    defects.forEach(d => { if (grouped[d.category]) grouped[d.category].push(d); });
-    grid.innerHTML = LIBRARY_CATS.map(c => {
-        const list = grouped[c.key] || [];
-        const items = list.length > 0
-            ? list.map(d => `<div class="${c.itemBg} border ${c.itemBorder} rounded-lg px-3 py-2 text-xs font-medium ${c.itemText}">${escHtml(d.label)}</div>`).join('')
-            : `<div class="col-span-2 text-xs text-slate-400 text-center py-4 italic">Belum ada defect</div>`;
-        return `
-        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-4 py-3 ${c.headerBg} flex items-center gap-2">
-                <span class="material-symbols-outlined text-white text-[18px]">${c.icon}</span>
-                <h3 class="text-sm font-semibold text-white">${c.title}</h3>
-                <span class="ml-auto text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">${list.length} types</span>
-            </div>
-            <div class="p-3 grid grid-cols-2 gap-2">${items}</div>
-            <div class="px-4 py-2 ${c.footerBg} border-t ${c.footerBorder}">
-                <p class="text-xs ${c.footerText}">${c.footnote}</p>
-            </div>
-        </div>`;
-    }).join('');
-}
 
 // ─── ADMIN PANEL INIT ────────────────────────────────────────
 
