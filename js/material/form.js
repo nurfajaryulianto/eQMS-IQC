@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // js/material/form.js — IQC Material: Form Inspeksi Logic
 // ============================================================
 
@@ -445,9 +445,9 @@ async function fetchMasterData() {
             balance_qty:    Math.max(0, (Number(row.planned_qty) || 0) - (Number(row.checked_qty) || 0)),
             receive_date:   row.receive_date || '',
             status:         (row.status || 'pending').toLowerCase(),
-            raw_done:       row.status === 'done',
-            laminating_done: false,
-            bonding_done:   false,
+            raw_done:       Boolean(row.raw_done),
+            laminating_done: Boolean(row.laminating_done),
+            bonding_done:   Boolean(row.bonding_done),
             material_type:  row.material_type || '',
         }));
 
@@ -1099,8 +1099,23 @@ async function submitInspection() {
         if (result.status === 'ok') {
             loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan!`, 'success');
+            const curPoNum = selectedPO.po_number;
+            const curPoId = selectedPO.id;
+            const curTab = currentInspectionType;
             await fetchMasterData();
-            resetForm();
+
+            const updatedPO = allPOData.find(p => (curPoId && p.id === curPoId) || p.po_number === curPoNum);
+            if (updatedPO) {
+                const cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                if (cardEl) {
+                    await selectPO(updatedPO, cardEl);
+                    switchInspectionTab(curTab);
+                } else {
+                    resetForm();
+                }
+            } else {
+                resetForm();
+            }
         } else {
             throw new Error(result.message || 'Gagal menyimpan data.');
         }

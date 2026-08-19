@@ -4,7 +4,7 @@
 // Data diambil langsung dari Supabase melalui api.js.
 // ============================================================
 
-import { apiGetInspectionData, apiGetUsers, apiGetAssignments, apiUpdateInspection, apiDeleteInspection } from './api.js';
+import { apiGetInspectionData, apiGetUsers, apiGetAssignments, apiUpdateInspection, apiDeleteInspection, apiConsolidateDuplicateInspections } from './api.js';
 import { exportInspectionLogToExcel } from './export.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -18,6 +18,7 @@ let nikToNameMap     = {};
 // ─── INIT ─────────────────────────────────────────────────────
 export async function initInspectionLog() {
     setupFilters();
+    await apiConsolidateDuplicateInspections();
     await loadInspectionLog();
 }
 

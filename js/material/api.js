@@ -223,39 +223,49 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
 // ─── INSPECTIONS ─────────────────────────────────────────────
 
 /**
- * Ambil data inspeksi untuk Dashboard / Inspection Log.
+ * Ambil riwayat log inspeksi dari tabel material_inspections.
  */
-export async function apiGetInspectionData({
+export async function apiGetInspectionLogs({
     startDate = '',
-    endDate   = '',
+    endDate = '',
+    inspectionType = 'all',
     inspectorNik = '',
-    inspectionType = '',
     fileFilter = 'all',
-    page  = 1,
-    limit = 200,
+    page = 1,
+    limit = 25,
 } = {}) {
     let query = supabase
         .from('material_inspections')
         .select('*', { count: 'exact' })
         .order('inspection_date', { ascending: false });
 
-    if (startDate) query = query.gte('inspection_date', startDate + 'T00:00:00');
-    if (endDate)   query = query.lte('inspection_date', endDate   + 'T23:59:59');
-    if (inspectorNik)   query = query.eq('inspector_nik', inspectorNik);
-    if (inspectionType) query = query.ilike('inspection_type', `%${inspectionType}%`);
+    if (startDate) {
+        query = query.gte('inspection_date', startDate + 'T00:00:00.000Z');
+    }
+    if (endDate) {
+        query = query.lte('inspection_date', endDate + 'T23:59:59.999Z');
+    }
+    if (inspectionType && inspectionType !== 'all') {
+        query = query.ilike('inspection_type', inspectionType);
+    }
+    if (inspectorNik) {
+        query = query.ilike('inspector_nik', `%${inspectorNik}%`);
+    }
 
-    if (fileFilter === 'has_file') {
+    // Filter berkas: has_files / has_bonding / has_evidence / no_files
+    if (fileFilter === 'has_files') {
         query = query.or('evidence_url.neq.,bonding_test_url.neq.');
-    } else if (fileFilter === 'bonding') {
+    } else if (fileFilter === 'has_bonding') {
         query = query.not('bonding_test_url', 'is', null).neq('bonding_test_url', '');
-    } else if (fileFilter === 'evidence') {
+    } else if (fileFilter === 'has_evidence') {
         query = query.not('evidence_url', 'is', null).neq('evidence_url', '');
-    } else if (fileFilter === 'no_file') {
+    } else if (fileFilter === 'no_files') {
         query = query.is('evidence_url', null).is('bonding_test_url', null);
     }
 
     const from = (page - 1) * limit;
-    query = query.range(from, from + limit - 1);
+    const to   = from + limit - 1;
+    query = query.range(from, to);
 
     const { data, error, count } = await query;
     if (error) throw new Error(error.message);
@@ -263,7 +273,7 @@ export async function apiGetInspectionData({
     return {
         data: (data || []).map(d => ({
             ...d,
-            po_number:        d.po_no || '',
+            po_number:        d.po_no || d.po_number || '',
             qty_inspect:      (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
             qty_fail:         Number(d.no_qty) || 0,
             result_status:    (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
@@ -276,13 +286,90 @@ export async function apiGetInspectionData({
     };
 }
 
+export const apiGetInspectionData = apiGetInspectionLogs;
+
+let consolidatedOnce = false;
+export async function apiConsolidateDuplicateInspections() {
+    if (consolidatedOnce) return;
+    consolidatedOnce = true;
+    try {
+        const { data: rows } = await supabase
+            .from('material_inspections')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (!rows || rows.length <= 1) return;
+
+        const grouped = {};
+        rows.forEach(r => {
+            const key = r.master_data_id
+                ? `md_${r.master_data_id}`
+                : `po_${(r.po_no || r.po_number || '').trim().toLowerCase()}_${(r.material_name || '').trim().toLowerCase()}`;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(r);
+        });
+
+        for (const key in grouped) {
+            const list = grouped[key];
+            if (list.length > 1) {
+                let primary = list.find(r => (Number(r.ok) > 0 || Number(r.no_qty) > 0 || (r.inspection_type || '').includes('Raw'))) || list[0];
+                const others = list.filter(r => r.id !== primary.id);
+
+                let mergedBonding = primary.bonding_test_url || '';
+                let mergedEvidence = primary.evidence_url || '';
+                let mergedColorStatus = primary.color_check_status || '';
+                let mergedColorResult = primary.color_check_result || '';
+                let mergedPkgStatus = primary.packaging_status || '';
+                let mergedPkgReason = primary.packaging_reject_reason || '';
+                let mergedRollFlag = primary.roll_inspection_flag || '';
+                let mergedRollPct = primary.roll_inspection_percentage || '';
+                let mergedNotes = primary.defect_notes || '';
+
+                others.forEach(o => {
+                    if (o.bonding_test_url) mergedBonding = o.bonding_test_url;
+                    if (o.evidence_url && !mergedEvidence) mergedEvidence = o.evidence_url;
+                    if (o.color_check_status) mergedColorStatus = o.color_check_status;
+                    if (o.color_check_result) mergedColorResult = o.color_check_result;
+                    if (o.packaging_status) mergedPkgStatus = o.packaging_status;
+                    if (o.packaging_reject_reason) mergedPkgReason = o.packaging_reject_reason;
+                    if (o.roll_inspection_flag) mergedRollFlag = o.roll_inspection_flag;
+                    if (o.roll_inspection_percentage) mergedRollPct = o.roll_inspection_percentage;
+                    if (o.defect_notes && !mergedNotes.includes(o.defect_notes)) {
+                        mergedNotes = mergedNotes ? `${mergedNotes}; ${o.defect_notes}` : o.defect_notes;
+                    }
+                });
+
+                await supabase.from('material_inspections').update({
+                    bonding_test_url: mergedBonding,
+                    evidence_url: mergedEvidence,
+                    color_check_status: mergedColorStatus,
+                    color_check_result: mergedColorResult,
+                    packaging_status: mergedPkgStatus,
+                    packaging_reject_reason: mergedPkgReason,
+                    roll_inspection_flag: mergedRollFlag,
+                    roll_inspection_percentage: mergedRollPct,
+                    defect_notes: mergedNotes,
+                    inspection_type: 'Raw Material'
+                }).eq('id', primary.id);
+
+                const otherIds = others.map(o => o.id);
+                await supabase.from('material_inspections').delete().in('id', otherIds);
+            }
+        }
+    } catch (e) {
+        console.warn('Auto-consolidation error:', e);
+    }
+}
+
 /**
  * Submit satu hasil inspeksi.
- * File evidence (gambar) di-upload ke Supabase Storage, bukan Google Drive.
+ * Seluruh tipe inspeksi (Raw Material, Laminating, Bonding) disatukan ke baris yang sama per Master Data.
  */
 export async function apiSubmitInspection(payload) {
     let evidenceUrl = payload.evidence_url || '';
     const isBonding = (payload.inspection_type || '').toLowerCase().includes('bonding');
+    const isLam = (payload.inspection_type || '').toLowerCase().includes('laminating');
+    const isRaw = (payload.inspection_type || '').toLowerCase().includes('raw') || (!isBonding && !isLam);
 
     // Upload file evidence/bonding ke Google Drive jika ada
     if (payload.file_data && payload.file_name) {
@@ -304,50 +391,76 @@ export async function apiSubmitInspection(payload) {
     const ok  = Math.max(0, (Number(payload.qty_inspect) || 0) - (Number(payload.qty_fail) || 0));
     const noQ = Number(payload.qty_fail) || 0;
 
-    // Cek apakah sudah ada inspeksi untuk master_data_id ini (update vs insert)
+    // Cek apakah sudah ada baris inspeksi untuk master_data_id ini (atau PO + Material)
+    let existing = null;
     if (payload.master_data_id) {
-        const { data: existing } = await supabase
+        const { data } = await supabase
             .from('material_inspections')
-            .select('id, ok, no_qty, defect_notes, inspection_type')
+            .select('*')
             .eq('master_data_id', payload.master_data_id)
-            .eq('inspection_type', payload.inspection_type || 'Raw Material')
+            .order('created_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
-
-        if (existing) {
-            // UPDATE: akumulasi qty + append notes
-            const updatedOk  = (Number(existing.ok)    || 0) + ok;
-            const updatedNoQ = (Number(existing.no_qty) || 0) + noQ;
-            const oldNotes   = String(existing.defect_notes || '').trim();
-            const newNotes   = payload.defect_notes
-                ? (oldNotes ? oldNotes + '; ' + payload.defect_notes : payload.defect_notes)
-                : oldNotes;
-
-            const patch = {
-                ok: updatedOk,
-                no_qty: updatedNoQ,
-                defect_notes: newNotes,
-                status: payload.status || 'done',
-                inspection_date: payload.inspection_date || new Date().toISOString(),
-                approved_by_leader: payload.approved_by_leader || '',
-                ...(evidenceUrl ? { evidence_url: evidenceUrl } : {}),
-                ...(payload.color_check_status  ? { color_check_status: payload.color_check_status }   : {}),
-                ...(payload.color_check_result  ? { color_check_result: payload.color_check_result }   : {}),
-                ...(payload.packaging_status    ? { packaging_status: payload.packaging_status }       : {}),
-                ...(payload.packaging_reject_reason ? { packaging_reject_reason: payload.packaging_reject_reason } : {}),
-                ...(bUrl ? { bonding_test_url: bUrl } : {}),
-            };
-
-            const { error } = await supabase
-                .from('material_inspections')
-                .update(patch)
-                .eq('id', existing.id);
-
-            if (error) throw new Error(error.message);
-            return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil diperbarui.' };
-        }
+        existing = data;
+    } else if (payload.po_number && payload.material_name) {
+        const { data } = await supabase
+            .from('material_inspections')
+            .select('*')
+            .eq('po_no', payload.po_number)
+            .eq('material_name', payload.material_name)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        existing = data;
     }
 
-    // INSERT baru
+    if (existing) {
+        // UPDATE: Gabungkan data ke baris yang sama
+        const updatedOk = isRaw ? (Number(payload.qty_inspect ? ok : existing.ok) || 0) : (Number(existing.ok) || 0);
+        const updatedNoQ = isRaw ? (Number(payload.qty_inspect ? noQ : existing.no_qty) || 0) : (Number(existing.no_qty) || 0);
+
+        let newNotes = existing.defect_notes || '';
+        if (payload.defect_notes && !newNotes.includes(payload.defect_notes)) {
+            newNotes = newNotes ? `${newNotes}; ${payload.defect_notes}` : payload.defect_notes;
+        }
+
+        const patch = {
+            ...(isRaw ? { ok: updatedOk, no_qty: updatedNoQ } : {}),
+            defect_notes: newNotes,
+            status: payload.status || existing.status || 'done',
+            inspection_date: payload.inspection_date || new Date().toISOString(),
+            inspector_nik: payload.inspector_nik || existing.inspector_nik,
+            approved_by_leader: payload.approved_by_leader || existing.approved_by_leader || '',
+            ...(isRaw && evidenceUrl ? { evidence_url: evidenceUrl } : {}),
+            ...(bUrl ? { bonding_test_url: bUrl } : {}),
+            ...(payload.color_check_status ? { color_check_status: payload.color_check_status } : {}),
+            ...(payload.color_check_result ? { color_check_result: payload.color_check_result } : {}),
+            ...(payload.packaging_status ? { packaging_status: payload.packaging_status } : {}),
+            ...(payload.packaging_reject_reason ? { packaging_reject_reason: payload.packaging_reject_reason } : {}),
+            ...(payload.roll_inspection_flag ? { roll_inspection_flag: payload.roll_inspection_flag } : {}),
+            ...(payload.roll_inspection_percentage ? { roll_inspection_percentage: payload.roll_inspection_percentage } : {}),
+            ...(payload.rolling_inspection ? { rolling_inspection: payload.rolling_inspection } : {}),
+        };
+
+        const { error } = await supabase
+            .from('material_inspections')
+            .update(patch)
+            .eq('id', existing.id);
+
+        if (error) throw new Error(error.message);
+
+        // Update status master data
+        if (payload.master_data_id && payload.status) {
+            await supabase
+                .from('material_master_data')
+                .update({ status: payload.status })
+                .eq('id', payload.master_data_id);
+        }
+
+        return { status: 'ok', inspection_id: existing.inspection_id || inspectionId, message: 'Data inspeksi berhasil diperbarui.' };
+    }
+
+    // INSERT BARIS PERTAMA
     const row = {
         inspection_id:            inspectionId,
         master_data_id:           payload.master_data_id || null,
@@ -355,8 +468,8 @@ export async function apiSubmitInspection(payload) {
         material_name:            payload.material_name || '',
         item_description:         payload.item_description || '',
         qty_receive:              payload.qty_receive || payload.planned_qty || 0,
-        ok,
-        no_qty:                   noQ,
+        ok:                       isRaw ? ok : 0,
+        no_qty:                   isRaw ? noQ : 0,
         receive_date:             parseDateSafe(payload.receive_date),
         status:                   payload.status || 'done',
         inspection_date:          payload.inspection_date || new Date().toISOString(),
@@ -364,7 +477,7 @@ export async function apiSubmitInspection(payload) {
         defect_notes:             payload.defect_notes || payload.bonding_notes || '',
         rolling_inspection:       payload.rolling_inspection || 'No',
         approved_by_leader:       payload.approved_by_leader || '',
-        evidence_url:             evidenceUrl,
+        evidence_url:             isRaw ? evidenceUrl : '',
         inspection_type:          payload.inspection_type || 'Raw Material',
         color_check_status:       payload.color_check_status || '',
         color_check_result:       payload.color_check_result || '',
@@ -378,6 +491,13 @@ export async function apiSubmitInspection(payload) {
 
     const { error } = await supabase.from('material_inspections').insert(row);
     if (error) throw new Error(error.message);
+
+    if (payload.master_data_id && payload.status) {
+        await supabase
+            .from('material_master_data')
+            .update({ status: payload.status })
+            .eq('id', payload.master_data_id);
+    }
 
     return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
 }
@@ -622,6 +742,30 @@ export async function apiDeleteAssignment(id) {
  * Normalize baris master data dari Supabase ke format yang dipakai frontend.
  */
 function normalizeRow(row) {
+    const inspections = Array.isArray(row.material_inspections)
+        ? row.material_inspections
+        : (row.material_inspections ? [row.material_inspections] : []);
+
+    let rawDone = (row.status || '').toLowerCase() === 'done';
+    let lamDone = false;
+    let bondDone = false;
+    let checkedQty = 0;
+
+    inspections.forEach(insp => {
+        const ok = Number(insp.ok) || 0;
+        const noQ = Number(insp.no_qty) || 0;
+        checkedQty += (ok + noQ);
+        if (ok > 0 || noQ > 0 || (insp.status || '').toLowerCase() === 'done' || (insp.status || '').toLowerCase() === 'pass') {
+            rawDone = true;
+        }
+        if (insp.color_check_status || insp.packaging_status || (insp.roll_inspection_flag && insp.roll_inspection_flag !== 'No') || (insp.inspection_type && insp.inspection_type.toLowerCase().includes('laminating'))) {
+            lamDone = true;
+        }
+        if ((insp.bonding_test_url && insp.bonding_test_url.trim() !== '') || (insp.inspection_type && insp.inspection_type.toLowerCase().includes('bonding'))) {
+            bondDone = true;
+        }
+    });
+
     return {
         id:                   row.id,
         row_idx:              row.id,  // alias agar kompatibel dengan kode lama
@@ -633,13 +777,14 @@ function normalizeRow(row) {
         style:                row.product_code || '',
         model_shoe:           row.model_name || '',
         planned_qty:          Number(row.batch_size) || 0,
-        checked_qty:          0,  // dihitung dari inspections jika diperlukan
+        checked_qty:          checkedQty,
+        balance_qty:          Math.max(0, (Number(row.batch_size) || 0) - checkedQty),
         receive_date:         row.receive_date || '',
         status:               (row.status || 'pending').toLowerCase(),
         material_type:        row.material_type || '',
-        raw_done:             row.status === 'done',
-        laminating_done:      false,
-        bonding_done:         false,
+        raw_done:             rawDone,
+        laminating_done:      lamDone,
+        bonding_done:         bondDone,
         supplier:             row.supplier || '',
         supplier_name:        row.supplier_name || '',
         po_area:              row.po_area || '',
