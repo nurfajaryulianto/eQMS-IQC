@@ -1268,13 +1268,13 @@ window.switchSubcontLogSubtab = function(tab) {
     const viewDefects = document.getElementById('subcont-view-defects');
 
     if (tab === 'sessions') {
-        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer';
-        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer';
+        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer font-medium';
+        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer font-medium';
         if (viewSessions) viewSessions.classList.remove('hidden');
         if (viewDefects) viewDefects.classList.add('hidden');
     } else {
-        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer';
-        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer';
+        if (btnDefects) btnDefects.className = 'py-1.5 px-3.5 rounded-md bg-white text-slate-900 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer font-medium';
+        if (btnSessions) btnSessions.className = 'py-1.5 px-3.5 rounded-md text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer font-medium';
         if (viewDefects) viewDefects.classList.remove('hidden');
         if (viewSessions) viewSessions.classList.add('hidden');
     }
@@ -1287,7 +1287,7 @@ window.loadSubcontInspectionLog = async function() {
     const badgeDefects = document.getElementById('subcont-defects-count-badge');
 
     if (tbodySessions) tbodySessions.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat data sesi inspeksi...</td></tr>';
-    if (tbodyDefects) tbodyDefects.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat rincian defect...</td></tr>';
+    if (tbodyDefects) tbodyDefects.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat rincian defect...</td></tr>';
 
     try {
         const dateStart = document.getElementById('subcont-log-start')?.value || '';
@@ -1340,7 +1340,7 @@ window.loadSubcontInspectionLog = async function() {
     } catch (err) {
         console.error('loadSubcontInspectionLog error:', err);
         if (tbodySessions) tbodySessions.innerHTML = `<tr><td colspan="11" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log sesi: ${err.message || err}</td></tr>`;
-        if (tbodyDefects) tbodyDefects.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: ${err.message || err}</td></tr>`;
+        if (tbodyDefects) tbodyDefects.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-rose-500 font-semibold">Gagal memuat log defect: ${err.message || err}</td></tr>`;
     }
 };
 
@@ -1441,16 +1441,16 @@ function renderSubcontLogDefects(defects) {
 
         return `
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="py-2.5 px-3 text-slate-400 font-mono">${itemNumber}</td>
+                <td class="py-2.5 px-3 text-center text-slate-400 font-mono">${itemNumber}</td>
                 <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${d.date || '-'}</td>
                 <td class="py-2.5 px-3 font-semibold text-slate-800">${d.vendor || '-'}</td>
                 <td class="py-2.5 px-3">
                     <div class="font-bold text-slate-900">${model}</div>
                     <div class="text-[10px] text-slate-500 font-mono">${style}</div>
                 </td>
-                <td class="py-2.5 px-3 font-medium text-slate-700">${d.component || '-'}</td>
+                <td class="py-2.5 px-3 font-medium text-slate-800">${d.component || '-'}</td>
                 <td class="py-2.5 px-3 font-bold text-rose-600">${d.issue_finding || '-'}</td>
-                <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">${(Number(d.count) || 0).toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-600">${(Number(d.count) || 0).toLocaleString()}</td>
                 <td class="py-2.5 px-3 text-[10px] text-slate-400 font-mono max-w-[150px] truncate" title="${d.session_id || ''}">${d.session_id || '-'}</td>
             </tr>
         `;
