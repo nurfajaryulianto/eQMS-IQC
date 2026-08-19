@@ -50,6 +50,7 @@ export async function loadInspectionLog(resetPage = true) {
         endDate:        document.getElementById('ilog-end')?.value   || '',
         inspectorNik:   document.getElementById('ilog-inspector')?.value || '',
         inspectionType: document.getElementById('ilog-type')?.value  || '',
+        fileFilter:     document.getElementById('ilog-file-filter')?.value || 'all',
         page:           currentPage,
         limit:          pageLimit,
     };
@@ -90,7 +91,7 @@ function renderInspectionLog(data) {
 
     if (!data.length) {
         tbody.innerHTML = `
-            <tr><td colspan="10" style="padding:48px;text-align:center;color:rgba(255,255,255,0.35);">
+            <tr><td colspan="11" style="padding:48px;text-align:center;color:rgba(255,255,255,0.35);">
                 <span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px;">search_off</span>
                 Tidak ada data inspeksi untuk filter ini.
             </td></tr>`;
@@ -178,6 +179,17 @@ function renderInspectionLog(data) {
         const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         const TD = `padding:10px 12px;${T}`;
 
+        const badges = [];
+        if (d.bonding_test_url) {
+            badges.push(`<a href="${d.bonding_test_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Dokumen Bonding Test"><span class="material-symbols-outlined" style="font-size:13px;">science</span>Bonding</a>`);
+        }
+        if (d.evidence_url && d.evidence_url !== d.bonding_test_url) {
+            badges.push(`<a href="${d.evidence_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Foto Bukti"><span class="material-symbols-outlined" style="font-size:13px;">image</span>Foto</a>`);
+        }
+        const filesHtml = badges.length > 0
+            ? `<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">${badges.join('')}</div>`
+            : `<span style="color:rgba(255,255,255,0.25);font-size:11px;">—</span>`;
+
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
             <td style="${TD}color:rgba(255,255,255,0.5);font-size:12px;" title="${dateFmt}">${dateFmt}</td>
             <td style="${TD}font-weight:700;color:#fff;font-size:12px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
@@ -188,6 +200,7 @@ function renderInspectionLog(data) {
             <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:13px;">${noQty.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;color:#94a3b8;font-size:12px;">${passRate}</td>
             <td style="${TD}"><span style="font-size:11px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
+            <td style="padding:10px 8px;text-align:center;">${filesHtml}</td>
             <td style="${TD}font-size:11px;color:rgba(255,255,255,0.4);" title="${esc(d.defect_notes||'')}">${esc(d.defect_notes || '—')}</td>
         </tr>`;
     }).join('');

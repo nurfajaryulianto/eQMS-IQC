@@ -1019,6 +1019,16 @@
                         <input type="text" id="ilog-inspector" class="styled-input" placeholder="NIK..."
                             style="padding:7px 10px;font-size:12px;border-radius:8px;">
                     </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Filter Berkas</label>
+                        <select id="ilog-file-filter" class="styled-input" style="padding:7px 10px;font-size:12px;border-radius:8px;cursor:pointer;">
+                            <option value="all">Semua Data</option>
+                            <option value="has_file">Memiliki Berkas (Foto/Bonding)</option>
+                            <option value="bonding">Hanya Bonding Test</option>
+                            <option value="evidence">Hanya Foto Evidence</option>
+                            <option value="no_file">Tanpa Berkas</option>
+                        </select>
+                    </div>
                     <button onclick="window.loadInspectionLogTab()" class="btn-gradient"
                         style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
                         <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
@@ -1057,13 +1067,16 @@
                                     style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
                                     Status</th>
                                 <th
+                                    style="padding:11px 12px;text-align:center;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
+                                    Berkas / Bukti</th>
+                                <th
                                     style="padding:11px 12px;background:rgba(15,28,46,0.95);backdrop-filter:blur(12px);color:rgba(255,255,255,0.6);border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:10;">
                                     Catatan</th>
                             </tr>
                         </thead>
                         <tbody id="ilog-tbody">
                             <tr>
-                                <td colspan="10" style="padding:40px;text-align:center;color:rgba(255,255,255,0.35);">
+                                <td colspan="11" style="padding:40px;text-align:center;color:rgba(255,255,255,0.35);">
                                     Pilih tab Inspection Log untuk memuat data.</td>
                             </tr>
                         </tbody>

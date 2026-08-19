@@ -230,6 +230,7 @@ export async function apiGetInspectionData({
     endDate   = '',
     inspectorNik = '',
     inspectionType = '',
+    fileFilter = 'all',
     page  = 1,
     limit = 200,
 } = {}) {
@@ -242,6 +243,16 @@ export async function apiGetInspectionData({
     if (endDate)   query = query.lte('inspection_date', endDate   + 'T23:59:59');
     if (inspectorNik)   query = query.eq('inspector_nik', inspectorNik);
     if (inspectionType) query = query.ilike('inspection_type', `%${inspectionType}%`);
+
+    if (fileFilter === 'has_file') {
+        query = query.or('evidence_url.neq.,bonding_test_url.neq.');
+    } else if (fileFilter === 'bonding') {
+        query = query.not('bonding_test_url', 'is', null).neq('bonding_test_url', '');
+    } else if (fileFilter === 'evidence') {
+        query = query.not('evidence_url', 'is', null).neq('evidence_url', '');
+    } else if (fileFilter === 'no_file') {
+        query = query.is('evidence_url', null).is('bonding_test_url', null);
+    }
 
     const from = (page - 1) * limit;
     query = query.range(from, from + limit - 1);
@@ -271,16 +282,24 @@ export async function apiGetInspectionData({
  */
 export async function apiSubmitInspection(payload) {
     let evidenceUrl = payload.evidence_url || '';
+    const isBonding = (payload.inspection_type || '').toLowerCase().includes('bonding');
 
-    // Upload evidence file ke Supabase Storage jika ada
+    // Upload file evidence/bonding ke Google Drive jika ada
     if (payload.file_data && payload.file_name) {
         evidenceUrl = await uploadEvidenceFile(
             payload.file_data,
             payload.file_name,
-            payload.file_type || 'image/png'
+            payload.file_type || 'image/png',
+            {
+                category: isBonding ? 'bonding' : 'evidence',
+                po_number: payload.po_number,
+                material_name: payload.material_name,
+                inspection_type: payload.inspection_type
+            }
         );
     }
 
+    const bUrl = payload.bonding_test_url || (isBonding ? evidenceUrl : '');
     const inspectionId = payload.inspection_id || ('INSP-' + Date.now());
     const ok  = Math.max(0, (Number(payload.qty_inspect) || 0) - (Number(payload.qty_fail) || 0));
     const noQ = Number(payload.qty_fail) || 0;
@@ -315,7 +334,7 @@ export async function apiSubmitInspection(payload) {
                 ...(payload.color_check_result  ? { color_check_result: payload.color_check_result }   : {}),
                 ...(payload.packaging_status    ? { packaging_status: payload.packaging_status }       : {}),
                 ...(payload.packaging_reject_reason ? { packaging_reject_reason: payload.packaging_reject_reason } : {}),
-                ...(payload.bonding_test_url    ? { bonding_test_url: payload.bonding_test_url }       : {}),
+                ...(bUrl ? { bonding_test_url: bUrl } : {}),
             };
 
             const { error } = await supabase
@@ -353,7 +372,7 @@ export async function apiSubmitInspection(payload) {
         packaging_reject_reason:  payload.packaging_reject_reason || '',
         roll_inspection_flag:     payload.roll_inspection_flag || '',
         roll_inspection_percentage: payload.roll_inspection_percentage || '',
-        bonding_test_url:         payload.bonding_test_url || '',
+        bonding_test_url:         bUrl,
         input_type:               'manual',
     };
 
@@ -685,7 +704,7 @@ function parseDateSafe(val) {
  * Upload file evidence ke Google Drive via GAS micro-uploader.
  * Menggantikan Supabase Storage agar tidak memakan limit free tier.
  */
-async function uploadEvidenceFile(fileDataBase64, fileName, mimeType) {
+async function uploadEvidenceFile(fileDataBase64, fileName, mimeType, meta = {}) {
     try {
         const gasUrl = MATERIAL_GAS_URL || 'https://script.google.com/macros/s/AKfycbxPpUaDT-1xipllWqR4d-hrEDCK2AcR5d5oM7euWuTVIcSXyNXohz4dE5MK85WeIL8pRQ/exec';
         const res = await fetch(gasUrl, {
@@ -694,7 +713,11 @@ async function uploadEvidenceFile(fileDataBase64, fileName, mimeType) {
                 action: 'uploadEvidence',
                 file_data: fileDataBase64,
                 file_name: fileName,
-                file_type: mimeType || 'image/png'
+                file_type: mimeType || 'image/png',
+                category: meta.category || (meta.inspection_type === 'Bonding Test' ? 'bonding' : 'evidence'),
+                po_number: meta.po_number || '',
+                material_name: meta.material_name || '',
+                inspection_type: meta.inspection_type || ''
             })
         });
 
