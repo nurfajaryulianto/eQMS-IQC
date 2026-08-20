@@ -1453,7 +1453,18 @@ window.renderLeaderMonitorLog = function () {
             ? `<div style="display:inline-flex;gap:5px;justify-content:center;align-items:center;flex-direction:row;">${badges.join('')}</div>`
             : '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
 
-        const dateFormatted = item.inspection_date ? new Date(item.inspection_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        let actionBtn = '<span style="color:rgba(255,255,255,0.3);font-size:11px;">—</span>';
+        if (hasDefects && !leaderApproved) {
+            actionBtn = `
+                <button type="button" onclick="window.approveMaterialLeader(${item.id})" 
+                    style="background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#34d399;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:all 0.15s;"
+                    onmouseover="this.style.background='rgba(16,185,129,0.35)'" onmouseout="this.style.background='rgba(16,185,129,0.2)'" title="Setujui Lot Material Defect ini">
+                    <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Approve
+                </button>
+            `;
+        } else if (hasDefects && leaderApproved) {
+            actionBtn = `<span style="font-size:11px;font-weight:700;color:#34d399;display:inline-flex;align-items:center;gap:2px;"><span class="material-symbols-outlined" style="font-size:14px;">verified</span> Disetujui</span>`;
+        }
 
         return `<tr>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.7);">${dateFormatted}</td>
@@ -1467,8 +1478,42 @@ window.renderLeaderMonitorLog = function () {
             <td style="padding:12px 14px;text-align:center;">${statusBadge}</td>
             <td style="padding:12px 14px;font-weight:700;color:white;">${approvedText}</td>
             <td style="padding:12px 14px;text-align:center;">${evidenceLink}</td>
+            <td style="padding:12px 14px;text-align:center;">${actionBtn}</td>
         </tr>`;
     }).join('');
+};
+
+window.approveMaterialLeader = async function(id) {
+    let sessionUser = {};
+    try {
+        sessionUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    } catch (_) {}
+
+    let leaderName = (sessionUser.displayName || sessionUser.name || sessionUser.nik || '').trim();
+    if (!leaderName || leaderName.toUpperCase().includes('OPERATOR')) {
+        leaderName = prompt('Masukkan Nama / NIK Leader yang menyetujui lot ini:', leaderName || 'Leader IQC');
+    }
+    if (!leaderName || !leaderName.trim()) return;
+    leaderName = leaderName.trim();
+
+    try {
+        const { error } = await supabase
+            .from('material_inspections')
+            .update({ approved_by_leader: leaderName })
+            .eq('id', id);
+
+        if (error) throw new Error(error.message);
+
+        // Update local state
+        const item = allLeaderMonitorInspections.find(i => i.id === id);
+        if (item) item.approved_by_leader = leaderName;
+
+        showToast(`Lot berhasil disetujui oleh ${leaderName}`, 'success');
+        window.renderLeaderMonitorLog();
+    } catch (err) {
+        console.error('approveMaterialLeader error:', err);
+        showToast('Gagal menyetujui lot: ' + err.message, 'error');
+    }
 };
 
 window.applyLeaderMonitorFilter = function () {

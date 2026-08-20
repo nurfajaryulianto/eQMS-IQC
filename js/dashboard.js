@@ -354,9 +354,10 @@ function updateDashboard() {
 }
 
 function updateMetrics(data) {
-    const totalQtyInspect = data.reduce((sum, item) => sum + item.Qty_Inspect, 0);
-    const totalPass = data.reduce((sum, item) => sum + item.Pass, 0);
-    const totalDefect = data.reduce((sum, item) => sum + item.Defect, 0);
+    const totalQtyIncoming = data.reduce((sum, item) => sum + (Number(item.QtyIncoming) || 0), 0);
+    const totalQtyInspect = data.reduce((sum, item) => sum + (Number(item.Qty_Inspect) || 0), 0);
+    const totalPass = data.reduce((sum, item) => sum + (Number(item.Pass) || 0), 0);
+    const totalDefect = data.reduce((sum, item) => sum + (Number(item.Defect) || 0), 0);
 
     const fttPct = totalQtyInspect > 0 ? (totalPass / totalQtyInspect) * 100 : 0;
     const defectRatePct = totalQtyInspect > 0 ? (totalDefect / totalQtyInspect) * 100 : 0;
@@ -365,6 +366,8 @@ function updateMetrics(data) {
     document.getElementById('reworkRateOutput').textContent = `${defectRatePct.toFixed(2)}%`;
     const totalEl = document.getElementById('totalInspectedOutput');
     if (totalEl) totalEl.textContent = totalQtyInspect.toLocaleString('id-ID');
+    const totalIncEl = document.getElementById('totalIncomingOutput');
+    if (totalIncEl) totalIncEl.textContent = totalQtyIncoming.toLocaleString('id-ID');
 
     // Animate circular progress rings
     const fttRing = document.getElementById('ftt-ring');
@@ -393,253 +396,216 @@ function updateFttChart(data, period) {
             if (period === 'days') {
                 const month = String(m).padStart(2, '0');
                 const day = String(d).padStart(2, '0');
-                key = `${month}/${day}/${y}`;
+                key = `${day}/${month}`;
             } else {
-                const dt = new Date(y, m - 1, d);
-                key = dt.toLocaleDateString('id-ID', { year: 'numeric', month: 'long' });
+                const month = String(m).padStart(2, '0');
+                key = `${y}-${month}`;
             }
-        } else {
-            key = 'N/A';
         }
-        if (!groupedData[key]) {
-            groupedData[key] = { fttSum: 0, count: 0 };
-        }
-        groupedData[key].fttSum += item.FTT;
-        groupedData[key].count++;
-    });
-
-    const labels = Object.keys(groupedData).sort((a, b) => {
-        if (period === 'days') {
-            return new Date(a) - new Date(b);
-        } else {
-            const dateA = new Date(a.replace(/(\w+)\s(\d{4})/, "1 $1 $2"));
-            const dateB = new Date(b.replace(/(\w+)\s(\d{4})/, "1 $1 $2"));
-            return dateA - dateB;
+        if (key) {
+            if (!groupedData[key]) {
+                groupedData[key] = { totalInspect: 0, totalPass: 0 };
+            }
+            groupedData[key].totalInspect += item.Qty_Inspect;
+            groupedData[key].totalPass += item.Pass;
         }
     });
 
-    const finalLabels = (period === 'days' && labels.length > 11) ? labels.slice(-11) : labels;
-    const chartData = finalLabels.map(label => {
-        const avg = groupedData[label].count > 0 ? groupedData[label].fttSum / groupedData[label].count : 0;
-        return (avg * 100);
+    const labels = Object.keys(groupedData);
+    const fttValues = labels.map(key => {
+        const d = groupedData[key];
+        return d.totalInspect > 0 ? ((d.totalPass / d.totalInspect) * 100).toFixed(2) : '100.00';
     });
 
     renderChart(ctx, 'line', {
-        labels: finalLabels,
+        labels: labels,
         datasets: [{
             label: 'Average FTT (%)',
-            data: chartData,
-            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
+            data: fttValues,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.3
         }]
     }, {
-        responsive: true, maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: {
-                    callback: value => `${value.toFixed(0)}%`
-                }
-            }
-        },
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-            tooltip: {
-                callbacks: {
-                    label: function (context) {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
-                        }
-                        if (context.parsed.y !== null) {
-                            label += `${context.parsed.y.toFixed(2)}%`;
-                        }
-                        return label;
-                    }
-                }
-            }
+            legend: { display: true },
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
+        },
+        scales: {
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }
 
-
 function updateDefectChart(data) {
     const ctx = document.getElementById('defectChart').getContext('2d');
-    const defectTotals = {};
+    const counts = {};
     data.forEach(item => {
-        const name = item.DefectType;
-        if (!name) return;
-        defectTotals[name] = (defectTotals[name] || 0) + (Number(item.Count) || 0);
+        const type = (item.DefectType || '').toUpperCase().trim();
+        if (type) {
+            counts[type] = (counts[type] || 0) + (Number(item.Count) || 1);
+        }
     });
 
-    const sorted = Object.entries(defectTotals)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 5);
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const labels = sorted.map(d => d[0]);
+    const values = sorted.map(d => d[1]);
 
-    const palette = [
-        'rgba(239,68,68,0.75)', 'rgba(245,158,11,0.75)', 'rgba(99,102,241,0.75)',
-        'rgba(16,185,129,0.75)', 'rgba(107,114,128,0.75)',
-    ];
+    const palette = ['#ef4444', '#f59e0b', '#6366f1', '#10b981', '#64748b'];
+
     renderChart(ctx, 'bar', {
-        labels: sorted.map(d => d[0]),
+        labels: labels,
         datasets: [{
-            label: 'Total Defects',
-            data: sorted.map(d => d[1]),
-            backgroundColor: sorted.map((_, i) => palette[i] || palette[4]),
-            borderRadius: 4,
+            label: 'Defect Count',
+            data: values,
+            backgroundColor: palette.slice(0, labels.length),
+            borderRadius: 6
         }]
     }, {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1 } },
+            x: { ticks: { maxRotation: 20, minRotation: 20 } }
+        }
     });
 }
 
 function updateModelPerformanceChart(data, sortOrder) {
-    const el = document.getElementById('modelFttChart');
-    if (!el) return;
-    const ctx = el.getContext('2d');
-    const modelData = {};
+    const ctx = document.getElementById('modelFttChart').getContext('2d');
+    const modelStats = {};
 
     data.forEach(item => {
-        const model = item.Model || item.ModelName;
-        if (!model) return;
-        if (!modelData[model]) modelData[model] = { passSum: 0, inspectSum: 0 };
-        const pass = item.Pass != null ? item.Pass : (item.A_Grade != null ? item.A_Grade : Math.round(item.Qty_Inspect * (item.FTT || 0)));
-        const inspect = item.Qty_Inspect || item.QtyIncoming || 0;
-        modelData[model].passSum += pass;
-        modelData[model].inspectSum += inspect;
+        const model = item.Model || 'Unknown';
+        if (!modelStats[model]) {
+            modelStats[model] = { totalInspect: 0, totalPass: 0 };
+        }
+        modelStats[model].totalInspect += item.Qty_Inspect;
+        modelStats[model].totalPass += item.Pass;
     });
 
-    let processed = Object.entries(modelData).map(([model, vals]) => ({
+    const entries = Object.entries(modelStats).map(([model, stats]) => ({
         model,
-        avgFtt: vals.inspectSum > 0 ? (vals.passSum / vals.inspectSum) * 100 : 0
+        ftt: stats.totalInspect > 0 ? (stats.totalPass / stats.totalInspect) * 100 : 0
     }));
 
-    processed.sort((a, b) => sortOrder === 'asc' ? a.avgFtt - b.avgFtt : b.avgFtt - a.avgFtt);
+    if (sortOrder === 'desc') {
+        entries.sort((a, b) => b.ftt - a.ftt);
+    } else {
+        entries.sort((a, b) => a.ftt - b.ftt);
+    }
+
+    const topEntries = entries.slice(0, 10);
+    const labels = topEntries.map(e => e.model);
+    const values = topEntries.map(e => e.ftt.toFixed(1));
 
     renderChart(ctx, 'bar', {
-        labels: processed.map(d => d.model),
+        labels: labels,
         datasets: [{
             label: 'FTT (%)',
-            data: processed.map(d => d.avgFtt),
-            backgroundColor: 'rgba(16, 185, 129, 0.65)',
-            borderColor: 'rgba(16, 185, 129, 1)',
-            borderWidth: 1,
-            borderRadius: 4,
+            data: values,
+            backgroundColor: '#60a5fa',
+            borderRadius: 4
         }]
     }, {
-        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` FTT: ${ctx.parsed.y.toFixed(2)}%` } }
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x}%` } }
         },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }
 
 function updateNcvsFttChart(data, sortOrder) {
     const ctx = document.getElementById('ncvsFttChart').getContext('2d');
-    const vendorData = {};
+    const compStats = {};
 
     data.forEach(item => {
-        const vendor = item.Vendor;
-        if (!vendor) return;
-        if (!vendorData[vendor]) vendorData[vendor] = { passSum: 0, inspectSum: 0 };
-        vendorData[vendor].passSum += item.Pass;
-        vendorData[vendor].inspectSum += item.Qty_Inspect;
+        const comp = item.Component || 'Unknown';
+        if (!compStats[comp]) {
+            compStats[comp] = { totalInspect: 0, totalPass: 0 };
+        }
+        compStats[comp].totalInspect += item.Qty_Inspect;
+        compStats[comp].totalPass += item.Pass;
     });
 
-    let processed = Object.entries(vendorData).map(([vendor, vals]) => ({
-        vendor,
-        avgFtt: vals.inspectSum > 0 ? (vals.passSum / vals.inspectSum) * 100 : 0
+    const entries = Object.entries(compStats).map(([comp, stats]) => ({
+        component: comp,
+        ftt: stats.totalInspect > 0 ? (stats.totalPass / stats.totalInspect) * 100 : 0
     }));
 
-    processed.sort((a, b) => sortOrder === 'asc' ? a.avgFtt - b.avgFtt : b.avgFtt - a.avgFtt);
+    if (sortOrder === 'desc') {
+        entries.sort((a, b) => b.ftt - a.ftt);
+    } else {
+        entries.sort((a, b) => a.ftt - b.ftt);
+    }
+
+    const topEntries = entries.slice(0, 10);
+    const labels = topEntries.map(e => e.component);
+    const values = topEntries.map(e => e.ftt.toFixed(1));
 
     renderChart(ctx, 'bar', {
-        labels: processed.map(d => d.vendor),
+        labels: labels,
         datasets: [{
             label: 'FTT (%)',
-            data: processed.map(d => d.avgFtt),
-            backgroundColor: 'rgba(99, 102, 241, 0.65)',
-            borderRadius: 4,
+            data: values,
+            backgroundColor: '#818cf8',
+            borderRadius: 4
         }]
     }, {
-        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toFixed(2)}%` } }
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x}%` } }
         },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
         }
     });
 }
 
+let dashTablePage = 1;
+let dashTableLimit = 25;
+
 function updateInspectionTable(data) {
+    window.__lastDashData = data;
     const tbody = document.getElementById('inspectionTableBody');
+    const paginEl = document.getElementById('dashboard-table-pagination');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    let limitedData = data;
+    // Direct unification: Gunakan data yang sudah difilter oleh filter global di atas
+    const sortedData = (data || []).slice().sort((a, b) => b.Timestamp.getTime() - a.Timestamp.getTime());
+    const total = sortedData.length;
 
-    if (currentAuditorTableFilter !== 'all') {
-        limitedData = limitedData.filter(item => item.Auditor === currentAuditorTableFilter);
-    }
-
-    const toYMD = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const now = new Date();
-    const todayStr = toYMD(now);
-    const yest = new Date(now);
-    yest.setDate(yest.getDate() - 1);
-    const yesterdayStr = toYMD(yest);
-
-    // --- MODIFIKASI: Logika pemfilteran tanggal berdasarkan currentLimitView ---
-    if (currentLimitView === 'today') {
-        limitedData = limitedData.filter(item => getItemDateStr(item) === todayStr);
-    } else if (currentLimitView === 'yesterday') {
-        limitedData = limitedData.filter(item => getItemDateStr(item) === yesterdayStr);
-    } else if (currentLimitView === 'this_week') {
-        const firstDayOfWeek = new Date(now);
-        firstDayOfWeek.setDate(now.getDate() - now.getDay());
-        const startWeekStr = toYMD(firstDayOfWeek);
-        limitedData = limitedData.filter(item => {
-            const d = getItemDateStr(item);
-            return d >= startWeekStr && d <= todayStr;
-        });
-    } else if (currentLimitView === 'last_week') {
-        const endOfLastWeek = new Date(now);
-        endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
-        const startOfLastWeek = new Date(endOfLastWeek);
-        startOfLastWeek.setDate(startOfLastWeek.getDate() - 6);
-        const startLastWeekStr = toYMD(startOfLastWeek);
-        const endLastWeekStr = toYMD(endOfLastWeek);
-        limitedData = limitedData.filter(item => {
-            const d = getItemDateStr(item);
-            return d >= startLastWeekStr && d <= endLastWeekStr;
-        });
-    }
-    // --- AKHIR MODIFIKASI FILTER TANGGAL ---
-
-    const sortedData = limitedData.sort((a, b) => b.Timestamp.getTime() - a.Timestamp.getTime());
-
-    if (!sortedData.length) {
-        tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-sm text-slate-400">No data available for the selected period.</td></tr>`;
+    if (!total) {
+        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">Tidak ada data inspeksi yang sesuai filter di atas.</td></tr>`;
+        if (paginEl) paginEl.innerHTML = '';
         return;
     }
 
-    sortedData.forEach(item => {
+    const totalPages = Math.ceil(total / dashTableLimit) || 1;
+    if (dashTablePage > totalPages) dashTablePage = totalPages;
+    if (dashTablePage < 1) dashTablePage = 1;
+
+    const fromIdx = (dashTablePage - 1) * dashTableLimit;
+    const toIdx = Math.min(fromIdx + dashTableLimit, total);
+    const pageData = sortedData.slice(fromIdx, toIdx);
+
+    pageData.forEach(item => {
         const fttPct = item.Qty_Inspect > 0 ? ((item.Pass / item.Qty_Inspect) * 100).toFixed(1) : '0.0';
         const fttColor = parseFloat(fttPct) >= 92 ? 'text-green-600' : parseFloat(fttPct) >= 80 ? 'text-yellow-600' : 'text-red-600';
         const materialBadge = item.MaterialType === 'upper'
@@ -659,15 +625,63 @@ function updateInspectionTable(data) {
             <td class="px-4 py-3 whitespace-nowrap">${materialBadge}</td>
             <td class="px-4 py-3 text-xs text-slate-600 max-w-[140px] truncate">${item.Component || '—'}</td>
             <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-slate-700">${item['Style Number'] || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.QtyIncoming}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.Qty_Inspect}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-green-600 font-medium">${item.Pass}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-red-500 font-medium">${item.Defect}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.QtyIncoming.toLocaleString('id-ID')}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.Qty_Inspect.toLocaleString('id-ID')}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-green-600 font-medium">${item.Pass.toLocaleString('id-ID')}</td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-red-500 font-medium">${item.Defect.toLocaleString('id-ID')}</td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold tabular-nums ${fttColor}">${fttPct}%</td>
         `;
         tbody.appendChild(row);
     });
+
+    if (paginEl) {
+        const pages = [];
+        const prevDisabled = dashTablePage <= 1;
+        pages.push(`<button onclick="window.dashTableGoPage(${dashTablePage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition">‹ Prev</button>`);
+
+        let startP = Math.max(1, dashTablePage - 2);
+        let endP = Math.min(totalPages, dashTablePage + 2);
+        if (dashTablePage <= 3) endP = Math.min(5, totalPages);
+        if (dashTablePage >= totalPages - 2) startP = Math.max(1, totalPages - 4);
+
+        for (let p = startP; p <= endP; p++) {
+            const active = p === dashTablePage;
+            pages.push(`<button onclick="window.dashTableGoPage(${p})" class="px-2.5 py-1 rounded border font-semibold ${active ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">${p}</button>`);
+        }
+
+        const nextDisabled = dashTablePage >= totalPages;
+        pages.push(`<button onclick="window.dashTableGoPage(${dashTablePage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition">Next ›</button>`);
+
+        paginEl.innerHTML = `
+            <div class="font-medium">
+                Menampilkan <strong class="text-slate-900">${fromIdx + 1} - ${toIdx}</strong> dari <strong class="text-blue-600">${total}</strong> data
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                    <span>Baris per halaman:</span>
+                    <select onchange="window.dashTableSetLimit(this.value)" class="border border-slate-200 rounded px-2 py-1 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                        <option value="10" ${dashTableLimit === 10 ? 'selected' : ''}>10</option>
+                        <option value="25" ${dashTableLimit === 25 ? 'selected' : ''}>25</option>
+                        <option value="50" ${dashTableLimit === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${dashTableLimit === 100 ? 'selected' : ''}>100</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1">${pages.join('')}</div>
+            </div>
+        `;
+    }
 }
+
+window.dashTableGoPage = function(p) {
+    dashTablePage = p;
+    if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
+};
+
+window.dashTableSetLimit = function(lim) {
+    dashTableLimit = parseInt(lim, 10) || 25;
+    dashTablePage = 1;
+    if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
+};
 
 function parseDateString(str) {
     if (!str) return null;
@@ -711,7 +725,7 @@ export async function initLeaderMonitor() {
     if (refreshBtn) {
         refreshBtn.onclick = async () => {
             const tbody = document.getElementById('leader-monitor-tbody');
-            if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">Refreshing data from server...</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-sm text-slate-400">Refreshing data from server...</td></tr>';
             await fetchData();
             renderLeaderMonitor();
         };
@@ -753,7 +767,7 @@ function renderLeaderMonitor() {
     });
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">Tidak ada data hasil monitoring yang sesuai filter.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-sm text-slate-400">Tidak ada data hasil monitoring yang sesuai filter.</td></tr>';
         return;
     }
 
@@ -776,9 +790,21 @@ function renderLeaderMonitor() {
         
         let evidenceLink = '<span class="text-slate-400 italic">—</span>';
         if (item.EvidenceUrl) {
-            evidenceLink = `<a href="${item.EvidenceUrl}" target="_blank" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
+            evidenceLink = `<a href="${item.EvidenceUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
                 <span class="material-symbols-outlined text-[14px]">visibility</span> Lihat Bukti
             </a>`;
+        }
+
+        let actionBtn = '<span class="text-slate-400 text-xs">—</span>';
+        const targetId = item.id || item.SessionId || '';
+        if (hasDefects && !leaderApproved) {
+            actionBtn = `
+                <button type="button" onclick="window.approveSubcontLeader('${targetId}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-colors inline-flex items-center gap-1 cursor-pointer" title="Setujui Lot Defect Ini">
+                    <span class="material-symbols-outlined text-[14px]">check_circle</span> Approve
+                </button>
+            `;
+        } else if (hasDefects && leaderApproved) {
+            actionBtn = `<span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><span class="material-symbols-outlined text-[14px]">verified</span> Disetujui</span>`;
         }
 
         const rawDate = item.TanggalInspection || item.TanggalIncoming || '';
@@ -809,7 +835,50 @@ function renderLeaderMonitor() {
                 <td class="px-4 py-3 whitespace-nowrap text-center">${statusBadge}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">${approvedText}</td>
                 <td class="px-4 py-3 whitespace-nowrap text-center">${evidenceLink}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-center">${actionBtn}</td>
             </tr>
         `;
     }).join('');
 }
+
+window.approveSubcontLeader = async function(id) {
+    let sessionUser = {};
+    try {
+        sessionUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    } catch (_) {}
+
+    let leaderName = (sessionUser.displayName || sessionUser.name || sessionUser.nik || '').trim();
+    if (!leaderName || leaderName.toUpperCase().includes('OPERATOR')) {
+        leaderName = prompt('Masukkan Nama / NIK Leader yang menyetujui lot ini:', leaderName || 'Leader IQC');
+    }
+    if (!leaderName || !leaderName.trim()) return;
+    leaderName = leaderName.trim();
+
+    try {
+        if (window.supabaseClient) {
+            let q = window.supabaseClient.from('subcont_inspections').update({ approved_by_leader: leaderName });
+            if (id && !isNaN(Number(id))) {
+                q = q.or(`id.eq.${id},session_id.eq.${id}`);
+            } else if (id) {
+                q = q.eq('session_id', id);
+            }
+            const { error } = await q;
+            if (error) throw error;
+        }
+
+        // Update local state
+        const item = allInspections.find(i => (i.id && i.id == id) || (i.SessionId && i.SessionId == id));
+        if (item) item.ApprovedByLeader = leaderName;
+
+        if (typeof showToast === 'function') {
+            showToast(`Lot berhasil disetujui oleh ${leaderName}`, 'success');
+        } else {
+            alert(`Lot berhasil disetujui oleh ${leaderName}`);
+        }
+
+        renderLeaderMonitor();
+    } catch (err) {
+        console.error('approveSubcontLeader error:', err);
+        alert('Gagal menyetujui lot: ' + err.message);
+    }
+};
