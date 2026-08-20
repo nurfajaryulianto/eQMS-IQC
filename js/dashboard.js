@@ -363,12 +363,39 @@ function updateMetrics(data) {
     if (defectRing) defectRing.setAttribute('stroke-dasharray', `${Math.min(defectRatePct, 100).toFixed(1)}, 100`);
 }
 
-function renderChart(ctx, type, data, options) {
+const fttDataLabelsPlugin = {
+    id: 'fttDataLabelsPlugin',
+    afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        ctx.save();
+        chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            if (meta.hidden) return;
+            meta.data.forEach((point, index) => {
+                const val = dataset.data[index];
+                if (val == null) return;
+                const numVal = typeof val === 'number' ? val : parseFloat(val);
+                const text = `${numVal.toFixed(1)}%`;
+
+                ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = '#38bdf8';
+                
+                const yPos = Math.max(point.y - 6, 14);
+                ctx.fillText(text, point.x, yPos);
+            });
+        });
+        ctx.restore();
+    }
+};
+
+function renderChart(ctx, type, data, options, plugins = []) {
     const id = ctx.canvas.id;
     if (chartInstances[id]) {
         chartInstances[id].destroy();
     }
-    chartInstances[id] = new Chart(ctx, { type, data, options });
+    chartInstances[id] = new Chart(ctx, { type, data, options, plugins });
 }
 
 function updateFttChart(data, period) {
@@ -412,19 +439,36 @@ function updateFttChart(data, period) {
             borderColor: '#38bdf8',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
             fill: true,
-            tension: 0.3
+            tension: 0.3,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#38bdf8',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
         }]
     }, {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+            padding: {
+                top: 20,
+                right: 12,
+                left: 8,
+                bottom: 4
+            }
+        },
         plugins: {
-            legend: { display: true },
+            legend: { display: false },
             tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
         },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            y: {
+                beginAtZero: true,
+                max: 105,
+                ticks: { callback: v => v <= 100 ? `${v}%` : '' }
+            }
         }
-    });
+    }, [fttDataLabelsPlugin]);
 }
 
 function updateDefectChart(data) {
