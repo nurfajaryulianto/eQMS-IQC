@@ -452,7 +452,7 @@ async function fetchMasterData() {
         }));
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
-        renderPOList(allPOData);
+        filterPOList();
 
     } catch (err) {
         console.error('fetchMasterData error:', err);
@@ -513,16 +513,21 @@ function renderPOList(data) {
     });
 
     sorted.forEach(po => {
-
         const card = document.createElement('div');
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
 
-        const badgeClass = po.status === 'done' ? 'badge-done' : (po.status === 'in-progress' ? 'badge-progress' : 'badge-pending');
-        const badgeText = po.status === 'done' ? 'Done' : (po.status === 'in-progress' ? 'In-Progress' : 'Pending');
+        const isAllDone = po.raw_done && po.laminating_done && po.bonding_done;
+        const isPartial = (po.raw_done || po.laminating_done || po.bonding_done) && !isAllDone;
+        const badgeClass = isAllDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
+        const badgeText = isAllDone ? 'Done' : (isPartial ? 'In-Progress' : 'Pending');
+
+        const tagBadge = (done, label) => done 
+            ? `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); font-weight:700; display:inline-flex; align-items:center; gap:2px;">✓ ${label}</span>`
+            : `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.4); font-weight:600; display:inline-flex; align-items:center; gap:2px;">⏳ ${label}</span>`;
 
         card.innerHTML = `
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;">
                 <div>
                     <div style="font-size:13px; font-weight:700; color:#ffffff; margin-bottom:2px;">${esc(po.po_number)}</div>
                     <div style="font-size:12px; color:rgba(255, 255, 255, 0.7); font-weight:500;">${esc(po.vendor_name)}</div>
@@ -531,9 +536,14 @@ function renderPOList(data) {
             </div>
             <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_name)}</div>
             <div style="font-size:11px; color:rgba(255, 255, 255, 0.5); margin-bottom:8px;">${esc(po.item_description)}</div>
-            <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7);">
+            <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7); margin-bottom:8px;">
                 <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
                 <span><span style="color:rgba(255, 255, 255, 0.5);">STYLE </span>${esc(po.style)}</span>
+            </div>
+            <div style="display:flex; gap:5px; flex-wrap:wrap; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06);">
+                ${tagBadge(po.raw_done, 'Raw')}
+                ${tagBadge(po.laminating_done, 'Laminating')}
+                ${tagBadge(po.bonding_done, 'Bonding')}
             </div>
         `;
 
@@ -728,8 +738,18 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const matchStatus = status === 'all' ||
-            (status === 'in-progress' ? (po.status === 'in-progress' || po.status === 'in progress') : po.status === status);
+        const isAllDone = Boolean(po.raw_done && po.laminating_done && po.bonding_done);
+        const hasPending = Boolean(!po.raw_done || !po.laminating_done || !po.bonding_done);
+        const isPartial = Boolean(po.raw_done || po.laminating_done || po.bonding_done) && !isAllDone;
+
+        let matchStatus = true;
+        if (status === 'pending') {
+            matchStatus = po.status === 'pending' || hasPending;
+        } else if (status === 'in-progress') {
+            matchStatus = po.status === 'in-progress' || po.status === 'in progress' || isPartial;
+        } else if (status === 'done') {
+            matchStatus = po.status === 'done' || isAllDone;
+        }
 
         let matchDate = true;
         if (dateVal) {

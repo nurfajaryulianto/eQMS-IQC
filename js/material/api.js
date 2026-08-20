@@ -41,7 +41,7 @@ export async function apiGetMasterData({
 } = {}) {
     let query = supabase
         .from('material_master_data')
-        .select('*', { count: 'exact' })
+        .select('*, material_inspections(*)', { count: 'exact' })
         .order('created_at', { ascending: false });
 
     if (status && status !== 'all') {
@@ -60,12 +60,21 @@ export async function apiGetMasterData({
     const to   = from + limit - 1;
     query = query.range(from, to);
 
-    const { data, error, count } = await query;
-    if (error) throw new Error(error.message);
+    let res = await query;
+    if (res.error) {
+        // Fallback jika nested join error
+        const fb = await supabase
+            .from('material_master_data')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, to);
+        if (fb.error) throw new Error(fb.error.message);
+        res = fb;
+    }
 
     return {
-        data: (data || []).map(normalizeRow),
-        total: count || 0,
+        data: (res.data || []).map(normalizeRow),
+        total: res.count || 0,
         page,
         limit,
     };
@@ -436,7 +445,6 @@ export async function apiSubmitInspection(payload) {
             ...(payload.color_check_status ? { color_check_status: payload.color_check_status } : {}),
             ...(payload.color_check_result ? { color_check_result: payload.color_check_result } : {}),
             ...(payload.packaging_status ? { packaging_status: payload.packaging_status } : {}),
-            ...(payload.packaging_reject_reason ? { packaging_reject_reason: payload.packaging_reject_reason } : {}),
             ...(payload.roll_inspection_flag ? { roll_inspection_flag: payload.roll_inspection_flag } : {}),
             ...(payload.roll_inspection_percentage ? { roll_inspection_percentage: payload.roll_inspection_percentage } : {}),
             ...(payload.rolling_inspection ? { rolling_inspection: payload.rolling_inspection } : {}),
@@ -449,11 +457,17 @@ export async function apiSubmitInspection(payload) {
 
         if (error) throw new Error(error.message);
 
+        const hasRaw = (isRaw && ((Number(payload.qty_inspect) || 0) > 0 || ok > 0 || noQ > 0)) || (existing && (Number(existing.ok) > 0 || Number(existing.no_qty) > 0 || (existing.inspection_type || '').toLowerCase().includes('raw')));
+        const hasLam = Boolean(patch.color_check_status || (existing && (existing.color_check_status || existing.packaging_status)));
+        const hasBond = Boolean(patch.bonding_test_url || (existing && existing.bonding_test_url));
+        const allCompleted = hasRaw && hasLam && hasBond;
+        const newMdStatus = allCompleted ? 'done' : 'in-progress';
+
         // Update status master data
-        if (payload.master_data_id && payload.status) {
+        if (payload.master_data_id) {
             await supabase
                 .from('material_master_data')
-                .update({ status: payload.status })
+                .update({ status: newMdStatus })
                 .eq('id', payload.master_data_id);
         }
 
@@ -492,10 +506,16 @@ export async function apiSubmitInspection(payload) {
     const { error } = await supabase.from('material_inspections').insert(row);
     if (error) throw new Error(error.message);
 
-    if (payload.master_data_id && payload.status) {
+    const hasRaw = (isRaw && ((Number(payload.qty_inspect) || 0) > 0 || ok > 0 || noQ > 0));
+    const hasLam = Boolean(row.color_check_status || row.packaging_status);
+    const hasBond = Boolean(row.bonding_test_url);
+    const allCompleted = hasRaw && hasLam && hasBond;
+    const newMdStatus = allCompleted ? 'done' : 'in-progress';
+
+    if (payload.master_data_id) {
         await supabase
             .from('material_master_data')
-            .update({ status: payload.status })
+            .update({ status: newMdStatus })
             .eq('id', payload.master_data_id);
     }
 
@@ -794,7 +814,7 @@ function normalizeRow(row) {
         ? row.material_inspections
         : (row.material_inspections ? [row.material_inspections] : []);
 
-    let rawDone = (row.status || '').toLowerCase() === 'done';
+    let rawDone = false;
     let lamDone = false;
     let bondDone = false;
     let checkedQty = 0;
@@ -814,6 +834,15 @@ function normalizeRow(row) {
         }
     });
 
+    // Fallback jika status master data sudah done dari batch pass all
+    if ((row.status || '').toLowerCase() === 'done' && !rawDone && !lamDone && !bondDone) {
+        rawDone = true;
+    }
+
+    const isAllDone = rawDone && lamDone && bondDone;
+    const isPartial = rawDone || lamDone || bondDone || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress';
+    const computedStatus = isAllDone ? 'done' : (isPartial ? 'in-progress' : (row.status || 'pending').toLowerCase());
+
     return {
         id:                   row.id,
         row_idx:              row.id,  // alias agar kompatibel dengan kode lama
@@ -828,7 +857,7 @@ function normalizeRow(row) {
         checked_qty:          checkedQty,
         balance_qty:          Math.max(0, (Number(row.batch_size) || 0) - checkedQty),
         receive_date:         row.receive_date || '',
-        status:               (row.status || 'pending').toLowerCase(),
+        status:               computedStatus,
         material_type:        row.material_type || '',
         raw_done:             rawDone,
         laminating_done:      lamDone,
