@@ -114,19 +114,6 @@ export async function initDashboard() {
             }
         });
     }
-
-    // New event listener for the Limit View filter
-    // NEW: Event listener for Auditor Table Filter dropdown
-    document.getElementById('auditorTableFilter').addEventListener('change', (e) => {
-        currentAuditorTableFilter = e.target.value;
-        updateDashboard(); // Panggil updateDashboard saat filter auditor tabel berubah
-    });
-
-    // NEW: Event listener for Limit View Filter dropdown
-    document.getElementById('limitViewFilter').addEventListener('change', (e) => {
-        currentLimitView = e.target.value;
-        updateDashboard(); // Panggil updateDashboard saat filter limit view berubah
-    });
 }
 
 async function fetchData() {
@@ -510,19 +497,19 @@ function updateModelPerformanceChart(data, sortOrder) {
         datasets: [{
             label: 'FTT (%)',
             data: values,
-            backgroundColor: '#60a5fa',
-            borderRadius: 4
+            backgroundColor: '#38bdf8',
+            borderRadius: 6
         }]
     }, {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x}%` } }
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
         },
         scales: {
-            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } },
+            x: { ticks: { maxRotation: 25, minRotation: 0 } }
         }
     });
 }
@@ -561,18 +548,18 @@ function updateNcvsFttChart(data, sortOrder) {
             label: 'FTT (%)',
             data: values,
             backgroundColor: '#818cf8',
-            borderRadius: 4
+            borderRadius: 6
         }]
     }, {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: ctx => `${ctx.parsed.x}%` } }
+            tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
         },
         scales: {
-            x: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } }
+            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } },
+            x: { ticks: { maxRotation: 25, minRotation: 0 } }
         }
     });
 }
