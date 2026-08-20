@@ -1434,17 +1434,23 @@ window.renderLeaderMonitorLog = function () {
 
         const badges = [];
         if (item.bonding_test_url) {
-            badges.push(`<a href="${item.bonding_test_url}" target="_blank" rel="noopener noreferrer" style="color:#60a5fa;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);font-size:11px;" title="Lihat Berkas Bonding Test">
-                <span class="material-symbols-outlined" style="font-size:13px;">science</span> Bonding
+            badges.push(`<a href="${item.bonding_test_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;text-decoration:none;transition:all 0.15s;"
+                title="Lihat Berkas Bonding Test"
+                onmouseover="this.style.background='rgba(59,130,246,0.3)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
+                <span class="material-symbols-outlined" style="font-size:15px;">science</span>
             </a>`);
         }
         if (item.evidence_url && item.evidence_url !== item.bonding_test_url) {
-            badges.push(`<a href="${item.evidence_url}" target="_blank" rel="noopener noreferrer" style="color:#34d399;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);font-size:11px;" title="Lihat Foto Bukti">
-                <span class="material-symbols-outlined" style="font-size:13px;">image</span> Foto
+            badges.push(`<a href="${item.evidence_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;text-decoration:none;transition:all 0.15s;"
+                title="Lihat Foto Bukti"
+                onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                <span class="material-symbols-outlined" style="font-size:15px;">image</span>
             </a>`);
         }
         const evidenceLink = badges.length > 0
-            ? `<div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">${badges.join('')}</div>`
+            ? `<div style="display:inline-flex;gap:5px;justify-content:center;align-items:center;flex-direction:row;">${badges.join('')}</div>`
             : '<span style="color:rgba(255,255,255,0.35);font-style:italic;">—</span>';
 
         const dateFormatted = item.inspection_date ? new Date(item.inspection_date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';

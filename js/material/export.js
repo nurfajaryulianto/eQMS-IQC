@@ -60,19 +60,21 @@ export function exportMasterDataToExcel(data) {
     ];
     const labels = [
         'PO Number', 'Material Name', 'Material Description', 'UOM',
-        'Supplier Name', 'PO Area', 'Batch Size', 'Product Code',
+        'Supplier Name', 'PO Area', 'Batch Size (Planned Qty)', 'Product Code (Style)',
         'Model Name', 'Bucket', 'Receive Date', 'Shipment Number',
         'No BC', 'BC Type', 'Receive Number', 'Material Type', 'Status'
     ];
 
-    // Normalize field names (api.js normalizeRow already does this, but just in case)
     const normalized = data.map(r => ({
         ...r,
         planned_qty:   r.planned_qty  || r.batch_size || 0,
         supplier_name: r.supplier_name || r.vendor_name || r.supplier || '',
+        product_code:  r.product_code || r.style || '',
+        model_name:    r.model_name || r.model_shoe || '',
+        receive_date:  r.receive_date ? String(r.receive_date).split('T')[0] : '',
     }));
 
-    exportToExcel(normalized, headers, labels, 'Master Data', 'IQC_MasterData');
+    exportToExcel(normalized, headers, labels, 'Master Data', 'IQC_Material_MasterData');
 }
 
 // ─── EXPORT INSPECTION LOG ────────────────────────────────────
@@ -80,28 +82,54 @@ export function exportInspectionLogToExcel(data) {
     if (!data || !data.length) { alert('Tidak ada data untuk diekspor.'); return; }
 
     const headers = [
-        'inspection_date', 'po_no', 'material_name', 'item_description',
-        'inspection_type', 'inspector_nik', 'qty_receive', 'ok', 'no_qty',
-        'defect_notes', 'rolling_inspection', 'approved_by_leader',
-        'color_check_status', 'packaging_status', 'status', 'input_type'
+        'inspection_date', 'inspection_id', 'po_no', 'material_name', 'item_description',
+        'uom', 'supplier_name', 'style', 'model_shoe', 'bucket', 'receive_date',
+        'qty_receive', 'ok', 'no_qty', 'pass_rate',
+        'inspection_type', 'inspector_nik', 'approved_by_leader',
+        'defect_notes', 'rolling_inspection',
+        'color_check_status', 'color_check_result',
+        'packaging_status', 'packaging_reject_reason',
+        'roll_inspection_flag', 'roll_inspection_percentage',
+        'evidence_url', 'bonding_test_url',
+        'status'
     ];
     const labels = [
-        'Tanggal Inspeksi', 'PO Number', 'Material Name', 'Deskripsi',
-        'Jenis Inspeksi', 'Inspector NIK', 'Qty Receive', 'Qty OK', 'Qty Fail',
-        'Catatan Defect', 'Rolling Inspection', 'Approved By Leader',
-        'Color Check', 'Packaging Check', 'Status', 'Input Type'
+        'Tanggal Inspeksi', 'Inspection ID', 'PO Number', 'Material Name', 'Deskripsi Item',
+        'UOM', 'Supplier / Vendor', 'Style', 'Model Sepatu', 'Bucket', 'Receive Date',
+        'Qty Receive', 'Qty OK', 'Qty Fail (NO)', 'Pass Rate (%)',
+        'Jenis Inspeksi', 'Inspector', 'Approved By Leader',
+        'Catatan Defect', 'Rolling Inspection',
+        'Color Check Status', 'Color Check Result',
+        'Packaging Status', 'Packaging Reject Reason',
+        'Roll Inspection Flag', 'Roll Inspection %',
+        'Evidence Foto URL', 'Bonding Test URL',
+        'Status'
     ];
 
-    const normalized = data.map(r => ({
-        ...r,
-        inspection_date: r.inspection_date
-            ? (r.inspection_date instanceof Date
-                ? r.inspection_date.toLocaleDateString('id-ID')
-                : String(r.inspection_date).substring(0, 16).replace('T', ' '))
-            : '',
-    }));
+    const normalized = data.map((r, idx) => {
+        const ok = Number(r.ok) || 0;
+        const noQty = Number(r.no_qty) || 0;
+        const total = ok + noQty;
+        const passRate = total > 0 ? ((ok / total) * 100).toFixed(1) + '%' : '100%';
 
-    exportToExcel(normalized, headers, labels, 'Inspection Log', 'IQC_InspectionLog');
+        return {
+            ...r,
+            no: idx + 1,
+            po_no: r.po_no || r.po_number || '',
+            supplier_name: r.supplier_name || r.vendor_name || r.supplier || '',
+            style: r.style || r.product_code || '',
+            model_shoe: r.model_shoe || r.model_name || r.shoe_model || '',
+            pass_rate: passRate,
+            inspection_date: r.inspection_date
+                ? (r.inspection_date instanceof Date
+                    ? r.inspection_date.toLocaleDateString('id-ID') + ' ' + r.inspection_date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                    : String(r.inspection_date).substring(0, 16).replace('T', ' '))
+                : '',
+            receive_date: r.receive_date ? String(r.receive_date).split('T')[0] : '',
+        };
+    });
+
+    exportToExcel(normalized, headers, labels, 'Inspection Log', 'IQC_Material_InspectionLog');
 }
 
 // ─── EXPORT CLAIMS ────────────────────────────────────────────

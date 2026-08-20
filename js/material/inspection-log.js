@@ -179,13 +179,23 @@ function renderInspectionLog(data) {
 
         const badges = [];
         if (d.bonding_test_url) {
-            badges.push(`<a href="${d.bonding_test_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Dokumen Bonding Test"><span class="material-symbols-outlined" style="font-size:12px;">science</span>Bonding</a>`);
+            badges.push(`<a href="${d.bonding_test_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;text-decoration:none;transition:all 0.15s;"
+                title="Buka Dokumen Bonding Test"
+                onmouseover="this.style.background='rgba(59,130,246,0.3)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
+                <span class="material-symbols-outlined" style="font-size:15px;">science</span>
+            </a>`);
         }
         if (d.evidence_url && d.evidence_url !== d.bonding_test_url) {
-            badges.push(`<a href="${d.evidence_url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:10px;font-weight:700;text-decoration:none;" title="Buka Foto Bukti"><span class="material-symbols-outlined" style="font-size:12px;">image</span>Foto</a>`);
+            badges.push(`<a href="${d.evidence_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;text-decoration:none;transition:all 0.15s;"
+                title="Buka Foto Bukti"
+                onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                <span class="material-symbols-outlined" style="font-size:15px;">image</span>
+            </a>`);
         }
         const filesHtml = badges.length > 0
-            ? `<div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;">${badges.join('')}</div>`
+            ? `<div style="display:inline-flex;gap:5px;justify-content:center;align-items:center;flex-direction:row;">${badges.join('')}</div>`
             : `<span style="color:rgba(255,255,255,0.25);font-size:11px;">—</span>`;
 
         const actionHtml = `
