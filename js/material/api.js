@@ -245,7 +245,7 @@ export async function apiGetInspectionLogs({
 } = {}) {
     let query = supabase
         .from('material_inspections')
-        .select('*', { count: 'exact' })
+        .select('*, material_master_data(*)', { count: 'exact' })
         .order('inspection_date', { ascending: false });
 
     if (startDate) {
@@ -279,16 +279,54 @@ export async function apiGetInspectionLogs({
     const { data, error, count } = await query;
     if (error) throw new Error(error.message);
 
+    // Fallback enrichment jika ada record lama yang belum ter-link foreign key
+    const unlinkedRows = (data || []).filter(d => !d.material_master_data && d.po_no);
+    let masterMap = {};
+    if (unlinkedRows.length > 0) {
+        const poList = [...new Set(unlinkedRows.map(d => d.po_no))];
+        try {
+            const { data: mdList } = await supabase
+                .from('material_master_data')
+                .select('id, po_number, material_name, material_description, uom, product_code, model_name, bucket, supplier, supplier_name, receive_date, batch_size')
+                .in('po_number', poList);
+
+            if (mdList && mdList.length > 0) {
+                mdList.forEach(m => {
+                    masterMap[`${m.po_number}_${m.material_name || ''}`] = m;
+                    if (!masterMap[m.po_number]) masterMap[m.po_number] = m;
+                });
+            }
+        } catch (e) {
+            console.warn('Fallback master data lookup warning:', e);
+        }
+    }
+
     return {
-        data: (data || []).map(d => ({
-            ...d,
-            po_number:        d.po_no || d.po_number || '',
-            qty_inspect:      (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
-            qty_fail:         Number(d.no_qty) || 0,
-            result_status:    (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
-            vendor_name:      d.material_name || '',
-            inspection_date:  d.inspection_date ? new Date(d.inspection_date) : null,
-        })),
+        data: (data || []).map(d => {
+            const md = d.material_master_data || masterMap[`${d.po_no}_${d.material_name || ''}`] || masterMap[d.po_no] || {};
+            return {
+                ...d,
+                po_number:        d.po_no || d.po_number || md.po_number || '',
+                po_no:            d.po_no || d.po_number || md.po_number || '',
+                material_name:    d.material_name || md.material_name || '',
+                item_description: d.item_description || md.material_description || '',
+                uom:              d.uom || md.uom || '',
+                style:            d.style || md.product_code || md.style || '',
+                product_code:     d.style || md.product_code || md.style || '',
+                model_shoe:       d.model_shoe || md.model_name || md.shoe_model || '',
+                model_name:       d.model_shoe || md.model_name || md.shoe_model || '',
+                shoe_model:       d.model_shoe || md.model_name || md.shoe_model || '',
+                bucket:           d.bucket || md.bucket || '',
+                supplier_name:    d.supplier_name || md.supplier_name || md.supplier || '',
+                vendor_name:      d.supplier_name || md.supplier_name || md.supplier || d.material_name || '',
+                receive_date:     d.receive_date || md.receive_date || '',
+                qty_receive:      Number(d.qty_receive) || Number(md.batch_size) || 0,
+                qty_inspect:      (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
+                qty_fail:         Number(d.no_qty) || 0,
+                result_status:    (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
+                inspection_date:  d.inspection_date ? new Date(d.inspection_date) : null,
+            };
+        }),
         total: count || 0,
         page,
         limit,
