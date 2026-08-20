@@ -822,19 +822,28 @@ function normalizeRow(row) {
     inspections.forEach(insp => {
         const ok = Number(insp.ok) || 0;
         const noQ = Number(insp.no_qty) || 0;
-        checkedQty += (ok + noQ);
-        if (ok > 0 || noQ > 0 || (insp.status || '').toLowerCase() === 'done' || (insp.status || '').toLowerCase() === 'pass') {
+        const total = ok + noQ;
+        checkedQty += total;
+
+        // 1. Raw Material is DONE if qty inspected > 0 or evidence photo is present
+        if (total > 0 || (insp.evidence_url && String(insp.evidence_url).trim() !== '')) {
             rawDone = true;
         }
-        if (insp.color_check_status || insp.packaging_status || (insp.roll_inspection_flag && insp.roll_inspection_flag !== 'No') || (insp.inspection_type && insp.inspection_type.toLowerCase().includes('laminating'))) {
+
+        // 2. Laminating is DONE ONLY if color_check_status OR packaging_status is filled with 'YES' / 'NO'
+        const colorStatus = String(insp.color_check_status || '').trim().toUpperCase();
+        const pkgStatus = String(insp.packaging_status || '').trim().toUpperCase();
+        if (colorStatus === 'YES' || colorStatus === 'NO' || pkgStatus === 'YES' || pkgStatus === 'NO') {
             lamDone = true;
         }
-        if ((insp.bonding_test_url && insp.bonding_test_url.trim() !== '') || (insp.inspection_type && insp.inspection_type.toLowerCase().includes('bonding'))) {
+
+        // 3. Bonding Test is DONE ONLY if valid bonding_test_url is present
+        if (insp.bonding_test_url && String(insp.bonding_test_url).trim() !== '') {
             bondDone = true;
         }
     });
 
-    // Fallback jika status master data sudah done dari batch pass all
+    // Fallback jika status master data sudah done dari batch pass all (tanpa inspeksi manual)
     if ((row.status || '').toLowerCase() === 'done' && !rawDone && !lamDone && !bondDone) {
         rawDone = true;
     }
