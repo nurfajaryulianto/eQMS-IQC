@@ -529,19 +529,19 @@ function updateModelPerformanceChart(data, sortOrder) {
 
 function updateNcvsFttChart(data, sortOrder) {
     const ctx = document.getElementById('ncvsFttChart').getContext('2d');
-    const compStats = {};
+    const vendorStats = {};
 
     data.forEach(item => {
-        const comp = item.Component || 'Unknown';
-        if (!compStats[comp]) {
-            compStats[comp] = { totalInspect: 0, totalPass: 0 };
+        const vendor = item.Vendor || 'Unknown';
+        if (!vendorStats[vendor]) {
+            vendorStats[vendor] = { totalInspect: 0, totalPass: 0 };
         }
-        compStats[comp].totalInspect += item.Qty_Inspect;
-        compStats[comp].totalPass += item.Pass;
+        vendorStats[vendor].totalInspect += item.Qty_Inspect;
+        vendorStats[vendor].totalPass += item.Pass;
     });
 
-    const entries = Object.entries(compStats).map(([comp, stats]) => ({
-        component: comp,
+    const entries = Object.entries(vendorStats).map(([vendor, stats]) => ({
+        vendor,
         ftt: stats.totalInspect > 0 ? (stats.totalPass / stats.totalInspect) * 100 : 0
     }));
 
@@ -552,7 +552,7 @@ function updateNcvsFttChart(data, sortOrder) {
     }
 
     const topEntries = entries.slice(0, 10);
-    const labels = topEntries.map(e => e.component);
+    const labels = topEntries.map(e => e.vendor);
     const values = topEntries.map(e => e.ftt.toFixed(1));
 
     renderChart(ctx, 'bar', {
