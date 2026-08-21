@@ -68,7 +68,7 @@ export function exportMasterDataToExcel(data) {
     const normalized = data.map(r => ({
         ...r,
         planned_qty:   r.planned_qty  || r.batch_size || 0,
-        supplier_name: r.supplier_name || r.vendor_name || r.supplier || '',
+        supplier_name: (r.supplier_name && String(r.supplier_name).trim() !== '') ? String(r.supplier_name).trim() : (r.supplier || r.vendor_name || ''),
         product_code:  r.product_code || r.style || '',
         model_name:    r.model_name || r.model_shoe || '',
         receive_date:  r.receive_date ? String(r.receive_date).split('T')[0] : '',
@@ -111,12 +111,16 @@ export function exportInspectionLogToExcel(data) {
         const noQty = Number(r.no_qty) || 0;
         const total = ok + noQty;
         const passRate = total > 0 ? ((ok / total) * 100).toFixed(1) + '%' : '100%';
+        const supName = (r.supplier_name && String(r.supplier_name).trim() !== '') ? String(r.supplier_name).trim() : (r.supplier || r.vendor_name || '');
+        const matDesc = r.material_description || r.item_description || r.material_name || '';
 
         return {
             ...r,
             no: idx + 1,
             po_no: r.po_no || r.po_number || '',
-            supplier_name: r.supplier_name || r.vendor_name || r.supplier || '',
+            material_name: matDesc,
+            item_description: r.item_description || r.material_description || '',
+            supplier_name: supName,
             style: r.style || r.product_code || '',
             model_shoe: r.model_shoe || r.model_name || r.shoe_model || '',
             pass_rate: passRate,

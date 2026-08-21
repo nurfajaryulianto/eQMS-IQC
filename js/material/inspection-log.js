@@ -216,10 +216,12 @@ function renderInspectionLog(data) {
         const T  = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         const TD = `padding:8px 6px;${T}`;
 
+        const matDescDisplay = d.material_description || d.item_description || d.material_name || '—';
+
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
             <td style="${TD}color:rgba(255,255,255,0.5);font-size:11px;" title="${dateFmt}">${dateFmt}</td>
             <td style="${TD}font-weight:700;color:#fff;font-size:11px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
-            <td style="${TD}color:#34d399;font-weight:600;font-size:11px;" title="${esc(d.material_name||'')}">${esc(d.material_name || '—')}</td>
+            <td style="${TD}color:#34d399;font-weight:600;font-size:11px;" title="${esc(matDescDisplay)}">${esc(matDescDisplay)}</td>
             <td style="${TD}">${typeBadge(d.inspection_type)}</td>
             <td style="${TD}color:rgba(255,255,255,0.9);font-size:11px;cursor:default;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:11px;">${ok.toLocaleString('id-ID')}</td>

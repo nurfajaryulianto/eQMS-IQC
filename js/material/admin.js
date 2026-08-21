@@ -154,10 +154,11 @@ window.renderMasterTable = function () {
         const deleteBtn = d.status === 'pending'
             ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
             : '';
+        const vendorName = (d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : (d.supplier || d.vendor_name || '—');
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
             <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
-            <td class="truncate" title="${esc(d.vendor_name || d.supplier_name || d.supplier)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(d.vendor_name || d.supplier_name || d.supplier)}</td>
+            <td class="truncate" title="${esc(vendorName)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(vendorName)}</td>
             <td class="truncate" style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
             <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty || d.batch_size || 0).toLocaleString('id-ID')}</td>
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
@@ -244,7 +245,7 @@ window.editMasterRow = function (id) {
     document.getElementById('edit-master-po').value = row.po_number || '';
     document.getElementById('edit-master-status').value = row.status || 'pending';
     document.getElementById('edit-master-matname').value = row.material_name || '';
-    document.getElementById('edit-master-vendor').value = row.vendor_name || row.supplier_name || row.supplier || '';
+    document.getElementById('edit-master-vendor').value = (row.supplier_name && String(row.supplier_name).trim() !== '') ? String(row.supplier_name).trim() : (row.supplier || row.vendor_name || '');
     document.getElementById('edit-master-mattype').value = row.material_type || '';
     document.getElementById('edit-master-planned').value = row.planned_qty || row.batch_size || 0;
     document.getElementById('edit-master-uom').value = row.uom || '';
@@ -507,11 +508,16 @@ window.confirmUpload = async function () {
                 } else {
                     existingMap[key] = true;
                     inserted++;
+                    const supName = (row['Supplier Name'] || row.supplier_name || '').trim();
+                    const sup = (row['Supplier'] || row.supplier || '').trim();
                     allMasterData.push({
                         po_number: po,
                         receive_date: recDate,
                         material_name: row['Material Name'] || row.material_name || '',
-                        vendor_name: row['Supplier'] || row.vendor_name || '',
+                        material_description: row['Material Description'] || row.material_description || '',
+                        vendor_name: supName || sup || '',
+                        supplier_name: supName || sup || '',
+                        supplier: sup,
                         uom: row['UOM'] || row.uom || '',
                         planned_qty: Number(row['Batch Size'] || row.planned_qty) || 0,
                         status: 'pending'
@@ -1471,7 +1477,7 @@ window.renderLeaderMonitorLog = function () {
             <td style="padding:12px 14px;font-weight:700;color:white;">${esc(item.inspector_nik || '—')}</td>
             <td style="padding:12px 14px;">
                 <div style="font-weight:700;color:white;margin-bottom:2px;">PO: ${esc(item.po_no || item.po_number || '—')}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.5);">${esc(item.material_name || '—')}</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.5);">${esc(item.material_description || item.item_description || item.material_name || '—')}</div>
             </td>
             <td style="padding:12px 14px;text-align:right;font-weight:600;color:white;">${inspect.toLocaleString('id-ID')}</td>
             <td style="padding:12px 14px;text-align:right;font-weight:600;color:${fail > 0 ? '#f87171' : 'rgba(255,255,255,0.7)'};">${fail.toLocaleString('id-ID')}</td>

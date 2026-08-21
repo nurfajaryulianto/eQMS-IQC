@@ -304,27 +304,35 @@ export async function apiGetInspectionLogs({
     return {
         data: (data || []).map(d => {
             const md = d.material_master_data || masterMap[`${d.po_no}_${d.material_name || ''}`] || masterMap[d.po_no] || {};
+            const supName = (md.supplier_name && String(md.supplier_name).trim() !== '') ? String(md.supplier_name).trim() : ((d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : '');
+            const sup = (md.supplier && String(md.supplier).trim() !== '') ? String(md.supplier).trim() : ((d.supplier && String(d.supplier).trim() !== '') ? String(d.supplier).trim() : '');
+            const vendorName = supName || sup || '';
+            const matDesc = md.material_description || d.item_description || d.material_description || '';
+            const matName = md.material_name || d.material_name || '';
+
             return {
                 ...d,
-                po_number:        d.po_no || d.po_number || md.po_number || '',
-                po_no:            d.po_no || d.po_number || md.po_number || '',
-                material_name:    d.material_name || md.material_name || '',
-                item_description: d.item_description || md.material_description || '',
-                uom:              d.uom || md.uom || '',
-                style:            d.style || md.product_code || md.style || '',
-                product_code:     d.style || md.product_code || md.style || '',
-                model_shoe:       d.model_shoe || md.model_name || md.shoe_model || '',
-                model_name:       d.model_shoe || md.model_name || md.shoe_model || '',
-                shoe_model:       d.model_shoe || md.model_name || md.shoe_model || '',
-                bucket:           d.bucket || md.bucket || '',
-                supplier_name:    d.supplier_name || md.supplier_name || md.supplier || '',
-                vendor_name:      d.supplier_name || md.supplier_name || md.supplier || d.material_name || '',
-                receive_date:     d.receive_date || md.receive_date || '',
-                qty_receive:      Number(d.qty_receive) || Number(md.batch_size) || 0,
-                qty_inspect:      (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
-                qty_fail:         Number(d.no_qty) || 0,
-                result_status:    (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
-                inspection_date:  d.inspection_date ? new Date(d.inspection_date) : null,
+                po_number:            d.po_no || d.po_number || md.po_number || '',
+                po_no:                d.po_no || d.po_number || md.po_number || '',
+                material_name:        matName,
+                material_description: matDesc,
+                item_description:     matDesc,
+                uom:                  d.uom || md.uom || '',
+                style:                d.style || md.product_code || md.style || '',
+                product_code:         d.style || md.product_code || md.style || '',
+                model_shoe:           d.model_shoe || md.model_name || md.shoe_model || '',
+                model_name:           d.model_shoe || md.model_name || md.shoe_model || '',
+                shoe_model:           d.model_shoe || md.model_name || md.shoe_model || '',
+                bucket:               d.bucket || md.bucket || '',
+                supplier_name:        vendorName,
+                vendor_name:          vendorName,
+                supplier:             sup,
+                receive_date:         d.receive_date || md.receive_date || '',
+                qty_receive:          Number(d.qty_receive) || Number(md.batch_size) || 0,
+                qty_inspect:          (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
+                qty_fail:             Number(d.no_qty) || 0,
+                result_status:        (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
+                inspection_date:      d.inspection_date ? new Date(d.inspection_date) : null,
             };
         }),
         total: count || 0,
@@ -890,14 +898,22 @@ function normalizeRow(row) {
     const isPartial = rawDone || lamDone || bondDone || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress';
     const computedStatus = isAllDone ? 'done' : (isPartial ? 'in-progress' : (row.status || 'pending').toLowerCase());
 
+    const supName = (row.supplier_name && String(row.supplier_name).trim() !== '') ? String(row.supplier_name).trim() : '';
+    const sup = (row.supplier && String(row.supplier).trim() !== '') ? String(row.supplier).trim() : '';
+    const vendorName = supName || sup || '';
+    const matDesc = row.material_description || row.item_description || '';
+
     return {
         id:                   row.id,
         row_idx:              row.id,  // alias agar kompatibel dengan kode lama
         po_number:            row.po_number || '',
         material_name:        row.material_name || '',
-        item_description:     row.material_description || '',
+        material_description: matDesc,
+        item_description:     matDesc,
         uom:                  row.uom || '',
-        vendor_name:          row.supplier_name || row.supplier || '',
+        vendor_name:          vendorName,
+        supplier_name:        vendorName,
+        supplier:             sup,
         style:                row.product_code || '',
         model_shoe:           row.model_name || '',
         planned_qty:          Number(row.batch_size) || 0,
@@ -909,8 +925,6 @@ function normalizeRow(row) {
         raw_done:             rawDone,
         laminating_done:      lamDone,
         bonding_done:         bondDone,
-        supplier:             row.supplier || '',
-        supplier_name:        row.supplier_name || '',
         po_area:              row.po_area || '',
         bucket:               row.bucket || '',
         shipment_number:      row.shipment_number || '',
