@@ -1260,7 +1260,7 @@ window.loadSubcontInspectionLog = async function() {
         }
 
         // Query Supabase subcont_defect_logs (Sheet 2)
-        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false });
+        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).order('id', { ascending: false });
         if (dateStart) qDef = qDef.gte('date', dateStart);
         if (dateEnd) qDef = qDef.lte('date', dateEnd);
         if (vendorVal !== 'all') qDef = qDef.ilike('vendor', `%${vendorVal}%`);
