@@ -72,8 +72,44 @@ export async function apiGetMasterData({
         res = fb;
     }
 
+    const masterRows = res.data || [];
+
+    // Fallback: jika ada master data yang material_inspections-nya kosong, cari berdasarkan po_number
+    const unlinkedMaster = masterRows.filter(m => !m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0));
+    if (unlinkedMaster.length > 0) {
+        const poList = [...new Set(unlinkedMaster.map(m => m.po_number).filter(Boolean))];
+        if (poList.length > 0) {
+            try {
+                const { data: inspList } = await supabase
+                    .from('material_inspections')
+                    .select('*')
+                    .in('po_no', poList);
+                if (inspList && inspList.length > 0) {
+                    const inspMap = {};
+                    inspList.forEach(insp => {
+                        const key = `${insp.po_no}_${insp.material_name || ''}`;
+                        if (!inspMap[key]) inspMap[key] = [];
+                        inspMap[key].push(insp);
+                        if (!inspMap[insp.po_no]) inspMap[insp.po_no] = [];
+                        inspMap[insp.po_no].push(insp);
+                    });
+                    masterRows.forEach(m => {
+                        if (!m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0)) {
+                            const found = inspMap[`${m.po_number}_${m.material_name || ''}`] || inspMap[m.po_number];
+                            if (found && found.length > 0) {
+                                m.material_inspections = found;
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Fallback inspection lookup warning:', e);
+            }
+        }
+    }
+
     return {
-        data: (res.data || []).map(normalizeRow),
+        data: masterRows.map(normalizeRow),
         total: res.count || 0,
         page,
         limit,
@@ -892,10 +928,12 @@ function normalizeRow(row) {
     // Fallback jika status master data sudah done dari batch pass all (tanpa inspeksi manual)
     if ((row.status || '').toLowerCase() === 'done' && !rawDone && !lamDone && !bondDone) {
         rawDone = true;
+        lamDone = true;
+        bondDone = true;
     }
 
-    const isAllDone = rawDone && lamDone && bondDone;
-    const isPartial = rawDone || lamDone || bondDone || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress';
+    const isAllDone = (rawDone && lamDone && bondDone) || (row.status || '').toLowerCase() === 'done';
+    const isPartial = (rawDone || lamDone || bondDone || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress') && !isAllDone;
     const computedStatus = isAllDone ? 'done' : (isPartial ? 'in-progress' : (row.status || 'pending').toLowerCase());
 
     const supName = (row.supplier_name && String(row.supplier_name).trim() !== '') ? String(row.supplier_name).trim() : '';

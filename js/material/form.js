@@ -738,17 +738,19 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const isAllDone = Boolean(po.raw_done && po.laminating_done && po.bonding_done);
+        const isAllDone = Boolean(po.raw_done && po.laminating_done && po.bonding_done) || po.status === 'done';
         const hasPending = Boolean(!po.raw_done || !po.laminating_done || !po.bonding_done);
-        const isPartial = Boolean(po.raw_done || po.laminating_done || po.bonding_done) && !isAllDone;
+        const isPartial = (Boolean(po.raw_done || po.laminating_done || po.bonding_done) || po.status === 'in-progress') && !isAllDone;
 
         let matchStatus = true;
         if (status === 'pending') {
-            matchStatus = po.status === 'pending' || hasPending;
+            matchStatus = hasPending || po.status === 'pending';
         } else if (status === 'in-progress') {
-            matchStatus = po.status === 'in-progress' || po.status === 'in progress' || isPartial;
+            matchStatus = isPartial || po.status === 'in-progress';
         } else if (status === 'done') {
-            matchStatus = po.status === 'done' || isAllDone;
+            matchStatus = isAllDone || po.status === 'done';
+        } else if (status === 'all') {
+            matchStatus = true;
         }
 
         let matchDate = true;
@@ -1121,20 +1123,21 @@ async function submitInspection() {
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan!`, 'success');
             const curPoNum = selectedPO.po_number;
             const curPoId = selectedPO.id;
-            const curTab = currentInspectionType;
             await fetchMasterData();
 
             const updatedPO = allPOData.find(p => (curPoId && p.id === curPoId) || p.po_number === curPoNum);
             if (updatedPO) {
-                const cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
-                if (cardEl) {
-                    await selectPO(updatedPO, cardEl);
-                    switchInspectionTab(curTab);
-                } else {
-                    resetForm();
+                let cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                if (!cardEl) {
+                    // Jika tersembunyi karena filter status, kembalikan filter ke 'all' agar card tetap terlihat
+                    const statusFilterEl = document.getElementById('status-filter');
+                    if (statusFilterEl && statusFilterEl.value !== 'all') {
+                        statusFilterEl.value = 'all';
+                        filterPOList();
+                        cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                    }
                 }
-            } else {
-                resetForm();
+                await selectPO(updatedPO, cardEl || document.createElement('div'));
             }
         } else {
             throw new Error(result.message || 'Gagal menyimpan data.');
