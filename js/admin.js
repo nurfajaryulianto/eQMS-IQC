@@ -323,6 +323,160 @@ function switchAdminTab(tab) {
     }
 }
 
+// ─── ADMIN PAGINATION HELPERS & STATES ───────────────────────
+let adminDefectsPage = 1;
+let adminDefectsPageSize = 10;
+
+let adminVendorsPage = 1;
+let adminVendorsPageSize = 10;
+
+let adminComponentsPage = 1;
+let adminComponentsPageSize = 10;
+
+let adminProcessesPage = 1;
+let adminProcessesPageSize = 10;
+
+let adminUsersPage = 1;
+let adminUsersPageSize = 10;
+
+let adminModelsPage = 1;
+let adminModelsPageSize = 15;
+
+window.setAdminDefectsPage = function(page) {
+    adminDefectsPage = page;
+    renderDefectsTab();
+};
+window.setAdminDefectsPageSize = function(size) {
+    adminDefectsPageSize = parseInt(size, 10) || 10;
+    adminDefectsPage = 1;
+    renderDefectsTab();
+};
+
+window.setAdminVendorsPage = function(page) {
+    adminVendorsPage = page;
+    renderVendorsTab();
+};
+window.setAdminVendorsPageSize = function(size) {
+    adminVendorsPageSize = parseInt(size, 10) || 10;
+    adminVendorsPage = 1;
+    renderVendorsTab();
+};
+
+window.setAdminComponentsPage = function(page) {
+    adminComponentsPage = page;
+    renderComponentsTab();
+};
+window.setAdminComponentsPageSize = function(size) {
+    adminComponentsPageSize = parseInt(size, 10) || 10;
+    adminComponentsPage = 1;
+    renderComponentsTab();
+};
+
+window.setAdminProcessesPage = function(page) {
+    adminProcessesPage = page;
+    renderProcessesTab();
+};
+window.setAdminProcessesPageSize = function(size) {
+    adminProcessesPageSize = parseInt(size, 10) || 10;
+    adminProcessesPage = 1;
+    renderProcessesTab();
+};
+
+window.setAdminUsersPage = function(page) {
+    adminUsersPage = page;
+    renderUsersTab();
+};
+window.setAdminUsersPageSize = function(size) {
+    adminUsersPageSize = parseInt(size, 10) || 10;
+    adminUsersPage = 1;
+    renderUsersTab();
+};
+
+window.setAdminModelsPage = function(page) {
+    adminModelsPage = page;
+    renderModelsTable();
+};
+window.setAdminModelsPageSize = function(size) {
+    adminModelsPageSize = parseInt(size, 10) || 15;
+    adminModelsPage = 1;
+    renderModelsTable();
+};
+
+function renderPaginationControls(containerId, currentPage, pageSize, totalItems, onPageChangeName, onPageSizeChangeName, allowedPageSizes = [10, 15, 25, 50, 100]) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!totalItems || totalItems <= 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startItem = (safePage - 1) * pageSize + 1;
+    const endItem = Math.min(safePage * pageSize, totalItems);
+
+    let pageNumbers = [];
+    if (totalPages <= 7) {
+        for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+    } else {
+        if (safePage <= 4) {
+            pageNumbers = [1, 2, 3, 4, 5, '...', totalPages];
+        } else if (safePage >= totalPages - 3) {
+            pageNumbers = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        } else {
+            pageNumbers = [1, '...', safePage - 1, safePage, safePage + 1, '...', totalPages];
+        }
+    }
+
+    const buttonsHtml = pageNumbers.map(p => {
+        if (p === '...') {
+            return `<span class="px-2 py-1 text-slate-400">...</span>`;
+        }
+        const isActive = p === safePage;
+        return `
+            <button type="button" onclick="${onPageChangeName}(${p})" 
+                class="min-w-[28px] h-7 px-2 flex items-center justify-center rounded text-xs font-semibold transition-colors cursor-pointer ${
+                    isActive 
+                        ? 'bg-blue-600 text-white shadow-xs' 
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                }">
+                ${p}
+            </button>
+        `;
+    }).join('');
+
+    const sizeOptions = allowedPageSizes.map(sz => `<option value="${sz}" ${pageSize === sz ? 'selected' : ''}>${sz}</option>`).join('');
+
+    container.innerHTML = `
+        <div class="flex items-center gap-3 text-slate-500 text-xs">
+            <span>Menampilkan <strong class="text-slate-800 font-semibold">${startItem} - ${endItem}</strong> dari <strong class="text-slate-800 font-semibold">${totalItems}</strong> data</span>
+            <div class="flex items-center gap-1.5 ml-2">
+                <span>Per halaman:</span>
+                <select onchange="${onPageSizeChangeName}(this.value)" class="py-1 px-2 border border-slate-200 rounded bg-white text-slate-700 font-medium text-xs focus:outline-blue-500 cursor-pointer">
+                    ${sizeOptions}
+                </select>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+            <button type="button" onclick="${onPageChangeName}(${safePage - 1})" ${safePage <= 1 ? 'disabled' : ''} 
+                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
+                Prev
+            </button>
+            
+            <div class="flex items-center gap-1">
+                ${buttonsHtml}
+            </div>
+
+            <button type="button" onclick="${onPageChangeName}(${safePage + 1})" ${safePage >= totalPages ? 'disabled' : ''} 
+                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
+                Next
+            </button>
+        </div>
+    `;
+}
+
 // ─── DEFECTS TAB ─────────────────────────────────────────────
 
 function renderDefectsTab() {
@@ -333,7 +487,13 @@ function renderDefectsTab() {
     const countEl = document.getElementById('admin-defects-count');
     if (countEl) countEl.textContent = `${defects.length} defects`;
 
-    tbody.innerHTML = defects.map(d => `
+    const totalPages = Math.ceil(defects.length / adminDefectsPageSize) || 1;
+    if (adminDefectsPage > totalPages) adminDefectsPage = totalPages;
+
+    const startIdx = (adminDefectsPage - 1) * adminDefectsPageSize;
+    const pagedDefects = defects.slice(startIdx, startIdx + adminDefectsPageSize);
+
+    tbody.innerHTML = pagedDefects.map(d => `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-medium text-slate-800 text-sm">${escHtml(d.label)}</td>
             <td class="px-4 py-2.5 font-mono text-xs text-slate-500">${escHtml(d.name)}</td>
@@ -347,6 +507,8 @@ function renderDefectsTab() {
                 </div>
             </td>
         </tr>`).join('');
+
+    renderPaginationControls('admin-defects-pagination', adminDefectsPage, adminDefectsPageSize, defects.length, 'window.setAdminDefectsPage', 'window.setAdminDefectsPageSize');
 }
 
 function categoryBadge(cat) {
@@ -427,7 +589,13 @@ function renderUsersTab() {
     const countEl = document.getElementById('admin-users-count');
     if (countEl) countEl.textContent = `${users.length} users`;
 
-    tbody.innerHTML = users.map(u => {
+    const totalPages = Math.ceil(users.length / adminUsersPageSize) || 1;
+    if (adminUsersPage > totalPages) adminUsersPage = totalPages;
+
+    const startIdx = (adminUsersPage - 1) * adminUsersPageSize;
+    const pagedUsers = users.slice(startIdx, startIdx + adminUsersPageSize);
+
+    tbody.innerHTML = pagedUsers.map(u => {
         const hasAuth = Boolean(u.auth_user_id);
         const authBadge = hasAuth
             ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">\u2713 Can Login</span>'
@@ -449,6 +617,8 @@ function renderUsersTab() {
             </td>
         </tr>`;
     }).join('');
+
+    renderPaginationControls('admin-users-pagination', adminUsersPage, adminUsersPageSize, users.length, 'window.setAdminUsersPage', 'window.setAdminUsersPageSize');
 }
 
 function roleBadge(role) {
@@ -558,7 +728,14 @@ function renderVendorsTab() {
     if (!tbody) return;
     const countEl = document.getElementById('admin-vendors-count');
     if (countEl) countEl.textContent = `${vendors.length} vendors`;
-    tbody.innerHTML = vendors.map(v => {
+
+    const totalPages = Math.ceil(vendors.length / adminVendorsPageSize) || 1;
+    if (adminVendorsPage > totalPages) adminVendorsPage = totalPages;
+
+    const startIdx = (adminVendorsPage - 1) * adminVendorsPageSize;
+    const pagedVendors = vendors.slice(startIdx, startIdx + adminVendorsPageSize);
+
+    tbody.innerHTML = pagedVendors.map(v => {
         const typeBadge = v.material_type === 'upper'
             ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">Upper</span>'
             : v.material_type === 'bottom'
@@ -576,6 +753,8 @@ function renderVendorsTab() {
             </td>
         </tr>`;
     }).join('');
+
+    renderPaginationControls('admin-vendors-pagination', adminVendorsPage, adminVendorsPageSize, vendors.length, 'window.setAdminVendorsPage', 'window.setAdminVendorsPageSize');
 }
 
 function handleVendorSubmit(e) {
@@ -649,7 +828,14 @@ function renderComponentsTab() {
     if (!tbody) return;
     const countEl = document.getElementById('admin-components-count');
     if (countEl) countEl.textContent = `${components.length} components`;
-    tbody.innerHTML = components.map(c => {
+
+    const totalPages = Math.ceil(components.length / adminComponentsPageSize) || 1;
+    if (adminComponentsPage > totalPages) adminComponentsPage = totalPages;
+
+    const startIdx = (adminComponentsPage - 1) * adminComponentsPageSize;
+    const pagedComponents = components.slice(startIdx, startIdx + adminComponentsPageSize);
+
+    tbody.innerHTML = pagedComponents.map(c => {
         const vendor = vendors.find(v => v.id === c.vendor_id);
         return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
@@ -663,6 +849,8 @@ function renderComponentsTab() {
             </td>
         </tr>`;
     }).join('');
+
+    renderPaginationControls('admin-components-pagination', adminComponentsPage, adminComponentsPageSize, components.length, 'window.setAdminComponentsPage', 'window.setAdminComponentsPageSize');
 }
 
 function handleComponentSubmit(e) {
@@ -838,7 +1026,14 @@ function renderProcessesTab() {
     if (!tbody) return;
     const countEl = document.getElementById('admin-processes-count');
     if (countEl) countEl.textContent = `${processes.length} processes`;
-    tbody.innerHTML = processes.map(p => {
+
+    const totalPages = Math.ceil(processes.length / adminProcessesPageSize) || 1;
+    if (adminProcessesPage > totalPages) adminProcessesPage = totalPages;
+
+    const startIdx = (adminProcessesPage - 1) * adminProcessesPageSize;
+    const pagedProcesses = processes.slice(startIdx, startIdx + adminProcessesPageSize);
+
+    tbody.innerHTML = pagedProcesses.map(p => {
         const matType = p.material_type ? p.material_type.toUpperCase() : 'ALL';
         return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
@@ -852,6 +1047,8 @@ function renderProcessesTab() {
             </td>
         </tr>`;
     }).join('');
+
+    renderPaginationControls('admin-processes-pagination', adminProcessesPage, adminProcessesPageSize, processes.length, 'window.setAdminProcessesPage', 'window.setAdminProcessesPageSize');
 }
 
 function handleProcessSubmit(e) {
@@ -944,10 +1141,17 @@ function renderModelsTable() {
         tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-slate-400 italic">${
             query ? 'Tidak ada model yang sesuai pencarian.' : 'Belum ada model. Tambahkan di bawah.'
         }</td></tr>`;
+        renderPaginationControls('admin-models-pagination', 1, adminModelsPageSize, 0, 'window.setAdminModelsPage', 'window.setAdminModelsPageSize');
         return;
     }
 
-    tbody.innerHTML = filtered.map(m => `
+    const totalPages = Math.ceil(filtered.length / adminModelsPageSize) || 1;
+    if (adminModelsPage > totalPages) adminModelsPage = totalPages;
+
+    const startIdx = (adminModelsPage - 1) * adminModelsPageSize;
+    const pagedModels = filtered.slice(startIdx, startIdx + adminModelsPageSize);
+
+    tbody.innerHTML = pagedModels.map(m => `
         <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
             <td class="px-4 py-2.5 text-xs font-mono font-semibold text-blue-700">${escHtml(m.style_number)}</td>
             <td class="px-4 py-2.5 text-xs text-slate-700">${escHtml(m.model_name)}</td>
@@ -959,6 +1163,8 @@ function renderModelsTable() {
             </td>
         </tr>
     `).join('');
+
+    renderPaginationControls('admin-models-pagination', adminModelsPage, adminModelsPageSize, filtered.length, 'window.setAdminModelsPage', 'window.setAdminModelsPageSize');
 
     // Expose handlers to global scope for inline onclick
     window.__adminEditModel = async (id) => {
@@ -1136,81 +1342,7 @@ window.setDefectsPageSize = function(size) {
     renderSubcontLogDefects(currentSubcontLogDefects);
 };
 
-function renderPaginationControls(containerId, currentPage, pageSize, totalItems, onPageChangeName, onPageSizeChangeName) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
 
-    if (!totalItems || totalItems <= 0) {
-        container.innerHTML = '';
-        return;
-    }
-
-    const totalPages = Math.ceil(totalItems / pageSize) || 1;
-    const safePage = Math.min(Math.max(1, currentPage), totalPages);
-    const startItem = (safePage - 1) * pageSize + 1;
-    const endItem = Math.min(safePage * pageSize, totalItems);
-
-    let pageNumbers = [];
-    if (totalPages <= 7) {
-        for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
-    } else {
-        if (safePage <= 4) {
-            pageNumbers = [1, 2, 3, 4, 5, '...', totalPages];
-        } else if (safePage >= totalPages - 3) {
-            pageNumbers = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-        } else {
-            pageNumbers = [1, '...', safePage - 1, safePage, safePage + 1, '...', totalPages];
-        }
-    }
-
-    const buttonsHtml = pageNumbers.map(p => {
-        if (p === '...') {
-            return `<span class="px-2 py-1 text-slate-400">...</span>`;
-        }
-        const isActive = p === safePage;
-        return `
-            <button onclick="${onPageChangeName}(${p})" 
-                class="min-w-[28px] h-7 px-2 flex items-center justify-center rounded text-xs font-semibold transition-colors cursor-pointer ${
-                    isActive 
-                        ? 'bg-emerald-600 text-white shadow-xs' 
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }">
-                ${p}
-            </button>
-        `;
-    }).join('');
-
-    container.innerHTML = `
-        <div class="flex items-center gap-3 text-slate-500 text-xs">
-            <span>Menampilkan <strong class="text-slate-800 font-semibold">${startItem} - ${endItem}</strong> dari <strong class="text-slate-800 font-semibold">${totalItems}</strong> data</span>
-            <div class="flex items-center gap-1.5 ml-2">
-                <span>Per halaman:</span>
-                <select onchange="${onPageSizeChangeName}(this.value)" class="py-1 px-2 border border-slate-200 rounded bg-white text-slate-700 font-medium text-xs focus:outline-emerald-500 cursor-pointer">
-                    <option value="15" ${pageSize === 15 ? 'selected' : ''}>15</option>
-                    <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
-                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
-                    <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-1">
-            <button onclick="${onPageChangeName}(${safePage - 1})" ${safePage <= 1 ? 'disabled' : ''} 
-                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
-                Prev
-            </button>
-            
-            <div class="flex items-center gap-1">
-                ${buttonsHtml}
-            </div>
-
-            <button onclick="${onPageChangeName}(${safePage + 1})" ${safePage >= totalPages ? 'disabled' : ''} 
-                class="px-2.5 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold transition-colors cursor-pointer">
-                Next
-            </button>
-        </div>
-    `;
-}
 
 window.switchSubcontLogSubtab = function(tab) {
     const btnSessions = document.getElementById('subcont-log-tab-sessions');
@@ -1427,7 +1559,7 @@ function renderSubcontLogDefects(defects) {
     renderPaginationControls('subcont-defects-pagination', defectsCurrentPage, defectsPageSize, defects.length, 'window.setDefectsPage', 'window.setDefectsPageSize');
 }
 
-window.showSubcontSessionDetail = function(rawSessionId) {
+window.showSubcontSessionDetail = async function(rawSessionId) {
     const sessionId = decodeURIComponent(rawSessionId);
     const session = currentSubcontLogSessions.find(s => s.session_id === sessionId);
     if (!session) return;
@@ -1443,6 +1575,8 @@ window.showSubcontSessionDetail = function(rawSessionId) {
     if (title) title.textContent = `${session.model || 'Model'} (${session.style_number || '-'})`;
     if (subtitle) subtitle.textContent = `Vendor: ${session.vendor || '-'} | Sesi: ${session.session_id || '-'} | Auditor: ${session.user_login || '-'}`;
 
+    const qtyDefect = Number(session.qty_defect) || 0;
+
     if (grid) {
         grid.innerHTML = `
             <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800">${session.date || '-'}</span></div>
@@ -1450,14 +1584,36 @@ window.showSubcontSessionDetail = function(rawSessionId) {
             <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800">${(Number(session.qty_incoming) || 0).toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Inspect</span><span class="font-bold text-slate-800">${(Number(session.qty_inspect) || 0).toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Pass</span><span class="font-bold text-emerald-600">${(Number(session.qty_pass) || 0).toLocaleString()}</span></div>
-            <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600">${(Number(session.qty_defect) || 0).toLocaleString()}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600">${qtyDefect.toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">FTT Rate</span><span class="font-bold text-emerald-700">${session.ftt ? (Number(session.ftt) * 100).toFixed(1) + '%' : '-'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800">${session.status || 'Done'}</span></div>
         `;
     }
 
-    // Filter defect detail for this session
-    const sessionDefects = currentSubcontLogDefects.filter(d => d.session_id === sessionId);
+    if (modal) modal.classList.remove('hidden');
+
+    // 1. Ambil dari memory jika ada
+    let sessionDefects = (currentSubcontLogDefects || []).filter(d => d.session_id === sessionId);
+
+    // 2. Jika tidak ada di memory tapi qtyDefect > 0, fetch live langsung dari Supabase subcont_defect_logs
+    if (sessionDefects.length === 0 && qtyDefect > 0) {
+        if (defectsTbody) {
+            defectsTbody.innerHTML = '<tr><td colspan="3" class="py-3 text-center text-slate-400"><span class="inline-block animate-spin mr-2">⟳</span>Memuat rincian defect...</td></tr>';
+        }
+        try {
+            const { data, error } = await supabase
+                .from('subcont_defect_logs')
+                .select('*')
+                .eq('session_id', sessionId);
+            if (!error && data && data.length > 0) {
+                sessionDefects = data;
+            }
+        } catch (e) {
+            console.warn('Gagal fetch live defects:', e);
+        }
+    }
+
+    // 3. Render tabel rincian defect
     if (defectsTbody) {
         if (sessionDefects.length > 0) {
             defectsTbody.innerHTML = sessionDefects.map(d => `
@@ -1467,6 +1623,14 @@ window.showSubcontSessionDetail = function(rawSessionId) {
                     <td class="py-2 px-3 text-right font-mono font-bold">${Number(d.count) || 0}</td>
                 </tr>
             `).join('');
+        } else if (qtyDefect > 0) {
+            defectsTbody.innerHTML = `
+                <tr>
+                    <td class="py-2 px-3 font-medium text-slate-700">${session.component || 'Komponen'}</td>
+                    <td class="py-2 px-3 font-bold text-rose-600">DEFECT (Summary)</td>
+                    <td class="py-2 px-3 text-right font-mono font-bold">${qtyDefect}</td>
+                </tr>
+            `;
         } else {
             defectsTbody.innerHTML = '<tr><td colspan="3" class="py-3 text-center text-slate-400 italic">Tidak ada rincian defect untuk sesi ini (Pass All).</td></tr>';
         }
@@ -1480,8 +1644,6 @@ window.showSubcontSessionDetail = function(rawSessionId) {
     } else if (evidenceBox) {
         evidenceBox.classList.add('hidden');
     }
-
-    if (modal) modal.classList.remove('hidden');
 };
 
 window.exportSubcontInspectionLog = function() {
