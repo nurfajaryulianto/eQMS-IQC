@@ -94,26 +94,47 @@ def main():
     sessions_csv = fetch_csv(0)
     print(f"Total raw session rows in spreadsheet: {len(sessions_csv)}")
 
-    session_rows = []
-    seen_sessions = set()
-
+    # Group rows by SessionID to correctly aggregate all components in a session
+    session_map = {}
     for r in sessions_csv:
         sess_id = (r.get('SessionID') or r.get('SessionId') or '').strip()
-        if not sess_id or sess_id in seen_sessions:
+        if not sess_id:
             continue
-        seen_sessions.add(sess_id)
+        if sess_id not in session_map:
+            session_map[sess_id] = []
+        session_map[sess_id].append(r)
 
-        qty_in = parse_int(r.get('Qty Incoming'))
-        qty_insp = parse_int(r.get('Qty Inspect'))
-        qty_pass = parse_int(r.get('Qty Pass'))
-        qty_def = parse_int(r.get('Qty Defect'))
-        ftt = (qty_pass / qty_insp) if qty_insp > 0 else 0.0
-        redo_rate = (qty_def / qty_insp) if qty_insp > 0 else 0.0
+    session_rows = []
+    for sess_id, rows in session_map.items():
+        first_r = rows[0]
+        
+        components = []
+        processes = []
+        tot_in = 0
+        tot_insp = 0
+        tot_pass = 0
+        tot_def = 0
 
-        ts = parse_timestamp(r.get('timeStamp'))
-        date_inc = parse_date(r.get('Date'))
-        tgl_insp = parse_date(r.get('TanggalInspection') or r.get('TanggalInsp') or r.get('Date'))
-        bucket = parse_date(r.get('Bucket'))
+        for r in rows:
+            comp = (r.get('Component') or '').strip()
+            proc = (r.get('Process') or '').strip()
+            if comp and comp not in components:
+                components.append(comp)
+            if proc and proc not in processes:
+                processes.append(proc)
+            
+            tot_in += parse_int(r.get('Qty Incoming'))
+            tot_insp += parse_int(r.get('Qty Inspect'))
+            tot_pass += parse_int(r.get('Qty Pass'))
+            tot_def += parse_int(r.get('Qty Defect'))
+
+        ftt = (tot_pass / tot_insp) if tot_insp > 0 else 0.0
+        redo_rate = (tot_def / tot_insp) if tot_insp > 0 else 0.0
+
+        ts = parse_timestamp(first_r.get('timeStamp'))
+        date_inc = parse_date(first_r.get('Date'))
+        tgl_insp = parse_date(first_r.get('TanggalInspection') or first_r.get('TanggalInsp') or first_r.get('Date'))
+        bucket = parse_date(first_r.get('Bucket'))
 
         session_rows.append({
             "session_id": sess_id,
@@ -121,26 +142,26 @@ def main():
             "date": date_inc,
             "tanggal_insp": tgl_insp,
             "bucket": bucket,
-            "material_type": (r.get('Material Type') or '').strip(),
-            "user_login": (r.get('User Login') or '').strip(),
-            "vendor": (r.get('Vendor') or '').strip(),
-            "component": (r.get('Component') or '').strip(),
-            "process": (r.get('Process') or '').strip(),
-            "style_number": (r.get('Style Number') or '').strip(),
-            "model": (r.get('Model') or '').strip(),
-            "qty_incoming": qty_in,
-            "qty_inspect": qty_insp,
-            "qty_pass": qty_pass,
-            "qty_defect": qty_def,
+            "material_type": (first_r.get('Material Type') or '').strip(),
+            "user_login": (first_r.get('User Login') or '').strip(),
+            "vendor": (first_r.get('Vendor') or '').strip(),
+            "component": ', '.join(components) if components else (first_r.get('Component') or '').strip(),
+            "process": ', '.join(processes) if processes else (first_r.get('Process') or '').strip(),
+            "style_number": (first_r.get('Style Number') or '').strip(),
+            "model": (first_r.get('Model') or '').strip(),
+            "qty_incoming": tot_in,
+            "qty_inspect": tot_insp,
+            "qty_pass": tot_pass,
+            "qty_defect": tot_def,
             "ftt": round(ftt, 4),
             "redo_rate": round(redo_rate, 4),
-            "approved_by": (r.get('ApprovedByLeader') or r.get('ApprovedBy') or '').strip(),
-            "evidence_url": (r.get('EvidenceUrl') or '').strip(),
-            "status": (r.get('Status') or 'Done').strip(),
+            "approved_by": (first_r.get('ApprovedByLeader') or first_r.get('ApprovedBy') or '').strip(),
+            "evidence_url": (first_r.get('EvidenceUrl') or '').strip(),
+            "status": (first_r.get('Status') or 'Done').strip(),
             "updated_at": ts
         })
 
-    print(f"Prepared {len(session_rows)} unique session records to upsert into 'subcont_inspections'.")
+    print(f"Prepared {len(session_rows)} aggregated session records to upsert into 'subcont_inspections'.")
     saved_sessions = supabase_post("subcont_inspections", session_rows, on_conflict="session_id")
     print(f"-> Successfully saved {saved_sessions} sessions into 'subcont_inspections'.\n")
 
@@ -161,10 +182,11 @@ def main():
     except Exception as e:
         print(f"Notice on clearing defect logs: {e}")
 
+    valid_session_ids = set(session_map.keys())
     defect_rows = []
     for r in defects_csv:
         sess_id = (r.get('SessionId') or r.get('SessionID') or '').strip()
-        if not sess_id or sess_id not in seen_sessions:
+        if not sess_id or sess_id not in valid_session_ids:
             continue
         
         cnt = parse_int(r.get('Count'))

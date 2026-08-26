@@ -381,7 +381,7 @@ const fttDataLabelsPlugin = {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillStyle = '#38bdf8';
-                
+
                 const yPos = Math.max(point.y - 6, 14);
                 ctx.fillText(text, point.x, yPos);
             });
@@ -703,12 +703,12 @@ function updateInspectionTable(data) {
     }
 }
 
-window.dashTableGoPage = function(p) {
+window.dashTableGoPage = function (p) {
     dashTablePage = p;
     if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
 };
 
-window.dashTableSetLimit = function(lim) {
+window.dashTableSetLimit = function (lim) {
     dashTableLimit = parseInt(lim, 10) || 25;
     dashTablePage = 1;
     if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
@@ -727,7 +727,7 @@ function parseDateString(str) {
 export async function initLeaderMonitor() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
+
     const startEl = document.getElementById('leader-monitor-start');
     const endEl = document.getElementById('leader-monitor-end');
     if (startEl && !startEl.value) startEl.value = todayStr;
@@ -818,7 +818,7 @@ function renderLeaderMonitor() {
         }
 
         const approvedText = item.ApprovedByLeader || '<span class="text-slate-400 font-normal italic">—</span>';
-        
+
         let evidenceLink = '<span class="text-slate-400 italic">—</span>';
         if (item.EvidenceUrl) {
             evidenceLink = `<a href="${item.EvidenceUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">
@@ -872,11 +872,11 @@ function renderLeaderMonitor() {
     }).join('');
 }
 
-window.approveSubcontLeader = async function(id) {
+window.approveSubcontLeader = async function (id) {
     let sessionUser = {};
     try {
         sessionUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    } catch (_) {}
+    } catch (_) { }
 
     let leaderName = (sessionUser.displayName || sessionUser.name || sessionUser.nik || '').trim();
     if (!leaderName || leaderName.toUpperCase().includes('OPERATOR')) {
