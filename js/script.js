@@ -986,48 +986,55 @@ async function saveData() {
             }
         }
 
-        const sessId = dataToSend.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
-        const headerRow = {
-            session_id: sessId,
-            timestamp: dataToSend.timestamp || new Date().toISOString(),
-            date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
-            material_type: dataToSend.materialType || '',
-            user_login: dataToSend.auditor || '',
-            vendor: dataToSend.vendor || '',
-            component: dataToSend.component || '',
-            process: dataToSend.process || '',
-            style_number: dataToSend.styleNumber || '',
-            model: dataToSend.modelName || '',
-            qty_incoming: Number(dataToSend.qtyIncoming) || 0,
-            qty_inspect: Number(dataToSend.qtyInspect) || 0,
-            qty_pass: Number(dataToSend.pass) || 0,
-            qty_defect: Number(dataToSend.defect) || 0,
-            ftt: Number(dataToSend.ftt) || 0,
-            redo_rate: Number(dataToSend.redoRate) || 0,
-            tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
-            bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
-            approved_by: dataToSend.approvedByLeader || '',
-            evidence_url: evidenceUrl,
-            status: dataToSend.status || 'Done',
-            updated_at: new Date().toISOString()
-        };
+        const baseSessId = dataToSend.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+        const isMultiItem = Array.isArray(dataToSend.items) && dataToSend.items.length > 1;
 
-        const { error: insErr } = await supabase.from('subcont_inspections').upsert(headerRow, { onConflict: 'session_id' });
-        if (insErr) throw new Error(insErr.message);
+        const sessionRowsToInsert = [];
+        const defectRowsToInsert = [];
 
-        // Simpan defect details
         if (Array.isArray(dataToSend.items) && dataToSend.items.length > 0) {
-            await supabase.from('subcont_defect_logs').delete().eq('session_id', sessId);
-            const dRows = [];
-            dataToSend.items.forEach(it => {
+            dataToSend.items.forEach((it, idx) => {
+                const itemSessId = isMultiItem ? `${baseSessId}-${idx + 1}` : baseSessId;
+                const qIn = Number(it.qtyIncoming) || 0;
+                const qInsp = Number(it.qtyInspect) || 0;
+                const qPass = Number(it.pass) || 0;
+                const qDef = Number(it.defect) || 0;
+                const itemFtt = qInsp > 0 ? (qPass / qInsp) : 0;
+                const itemRedo = qInsp > 0 ? (qDef / qInsp) : 0;
+
+                sessionRowsToInsert.push({
+                    session_id: itemSessId,
+                    timestamp: dataToSend.timestamp || new Date().toISOString(),
+                    date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
+                    material_type: dataToSend.materialType || '',
+                    user_login: dataToSend.auditor || '',
+                    vendor: dataToSend.vendor || '',
+                    component: it.component || dataToSend.component || '',
+                    process: it.process || dataToSend.process || '',
+                    style_number: dataToSend.styleNumber || '',
+                    model: dataToSend.modelName || '',
+                    qty_incoming: qIn,
+                    qty_inspect: qInsp,
+                    qty_pass: qPass,
+                    qty_defect: qDef,
+                    ftt: Number(itemFtt.toFixed(4)),
+                    redo_rate: Number(itemRedo.toFixed(4)),
+                    tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+                    bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
+                    approved_by: dataToSend.approvedByLeader || '',
+                    evidence_url: evidenceUrl,
+                    status: dataToSend.status || 'Done',
+                    updated_at: new Date().toISOString()
+                });
+
                 if (Array.isArray(it.defects) && it.defects.length > 0) {
                     it.defects.forEach(d => {
                         const cnt = Number(d.count || d.qty || 1);
                         const defectName = d.type || d.defectType || d.issue_finding || d.name || '';
                         if (cnt > 0 && defectName) {
-                            dRows.push({
-                                session_id: sessId,
-                                date: headerRow.tanggal_insp,
+                            defectRowsToInsert.push({
+                                session_id: itemSessId,
+                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
                                 vendor: dataToSend.vendor || '',
                                 component: it.component || '',
                                 issue_finding: defectName,
@@ -1035,51 +1042,57 @@ async function saveData() {
                             });
                         }
                     });
-                } else if (Number(it.defect) > 0) {
-                    // Fallback jika tidak ada breakdown detail tapi ada defect
-                    dRows.push({
-                        session_id: sessId,
-                        date: headerRow.tanggal_insp,
+                } else if (qDef > 0) {
+                    defectRowsToInsert.push({
+                        session_id: itemSessId,
+                        date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
                         vendor: dataToSend.vendor || '',
                         component: it.component || '',
                         issue_finding: 'DEFECT GENERAL',
-                        count: Number(it.defect)
+                        count: qDef
                     });
                 }
             });
+        } else {
+            sessionRowsToInsert.push({
+                session_id: baseSessId,
+                timestamp: dataToSend.timestamp || new Date().toISOString(),
+                date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
+                material_type: dataToSend.materialType || '',
+                user_login: dataToSend.auditor || '',
+                vendor: dataToSend.vendor || '',
+                component: dataToSend.component || '',
+                process: dataToSend.process || '',
+                style_number: dataToSend.styleNumber || '',
+                model: dataToSend.modelName || '',
+                qty_incoming: Number(dataToSend.qtyIncoming) || 0,
+                qty_inspect: Number(dataToSend.qtyInspect) || 0,
+                qty_pass: Number(dataToSend.pass) || 0,
+                qty_defect: Number(dataToSend.defect) || 0,
+                ftt: Number(dataToSend.ftt) || 0,
+                redo_rate: Number(dataToSend.redoRate) || 0,
+                tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+                bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
+                approved_by: dataToSend.approvedByLeader || '',
+                evidence_url: evidenceUrl,
+                status: dataToSend.status || 'Done',
+                updated_at: new Date().toISOString()
+            });
+        }
 
-            // Fallback jika items ada defect tapi belum terformat di it.defects
-            if (dRows.length === 0 && Number(dataToSend.defect) > 0) {
-                for (const [type, posObj] of Object.entries(defectCounts || {})) {
-                    let cnt = 0;
-                    if (typeof posObj === 'object' && posObj !== null) {
-                        for (const grp of Object.values(posObj)) {
-                            if (typeof grp === 'object' && grp !== null) {
-                                cnt += Number(grp.defect || 0);
-                            } else {
-                                cnt += Number(grp || 0);
-                            }
-                        }
-                    } else {
-                        cnt = Number(posObj || 0);
-                    }
-                    if (cnt > 0) {
-                        dRows.push({
-                            session_id: sessId,
-                            date: headerRow.tanggal_insp,
-                            vendor: dataToSend.vendor || '',
-                            component: dataToSend.component || '',
-                            issue_finding: type,
-                            count: cnt
-                        });
-                    }
-                }
-            }
+        // Upsert all component rows
+        for (const row of sessionRowsToInsert) {
+            const { error: insErr } = await supabase.from('subcont_inspections').upsert(row, { onConflict: 'session_id' });
+            if (insErr) throw new Error(insErr.message);
+        }
 
-            if (dRows.length > 0) {
-                const { error: defErr } = await supabase.from('subcont_defect_logs').insert(dRows);
-                if (defErr) console.error('Insert defect logs error:', defErr);
+        // Simpan defect details
+        if (defectRowsToInsert.length > 0) {
+            for (const row of sessionRowsToInsert) {
+                await supabase.from('subcont_defect_logs').delete().eq('session_id', row.session_id);
             }
+            const { error: defErr } = await supabase.from('subcont_defect_logs').insert(defectRowsToInsert);
+            if (defErr) console.warn('Gagal insert defect logs:', defErr.message);
         }
 
         await showAlert('Data inspeksi berhasil disimpan!', 'success', 'Tersimpan!');
