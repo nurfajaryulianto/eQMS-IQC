@@ -456,6 +456,7 @@ CREATE TABLE IF NOT EXISTS public.subcont_inspections (
   timestamp           TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   date                DATE,                      -- Tanggal incoming material (Date)
   material_type       VARCHAR(100),              -- upper, bottom, dll.
+  inspection_location VARCHAR(50)   DEFAULT 'In-House', -- In-House atau In-Vendor
   user_login          TEXT,                      -- Nama auditor yang login
   auditor_nik         VARCHAR(50),               -- NIK auditor (opsional)
   vendor              TEXT,                      -- Nama vendor (M3M, dll)
@@ -478,6 +479,8 @@ CREATE TABLE IF NOT EXISTS public.subcont_inspections (
   created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.subcont_inspections ADD COLUMN IF NOT EXISTS inspection_location VARCHAR(50) DEFAULT 'In-House';
 
 -- Indexing untuk query cepat (<5ms)
 CREATE INDEX IF NOT EXISTS idx_subcont_insp_date        ON public.subcont_inspections(date DESC);

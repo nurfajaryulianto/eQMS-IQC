@@ -905,6 +905,15 @@
                                         </select>
                                     </div>
                                     <div>
+                                        <label for="inspection-location"
+                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Lokasi Inspeksi</label>
+                                        <select id="inspection-location"
+                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                            <option value="In-House" selected>In-House (Internal)</option>
+                                            <option value="In-Vendor">In-Vendor (Fasilitas Vendor)</option>
+                                        </select>
+                                    </div>
+                                    <div>
                                         <label for="tanggal-incoming"
                                             class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal
                                             Incoming</label>
@@ -2354,18 +2363,27 @@
                         <input type="text" id="edit-subcont-vendor" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
                     </div>
                     <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Lokasi Inspeksi</label>
+                        <select id="edit-subcont-location" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                            <option value="In-House">In-House</option>
+                            <option value="In-Vendor">In-Vendor</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
                         <label class="block font-semibold text-slate-600 mb-1">Status</label>
                         <select id="edit-subcont-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
                             <option value="Done">Done</option>
                             <option value="In-Progress">In-Progress</option>
                         </select>
                     </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Model</label>
                         <input type="text" id="edit-subcont-model" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
                     </div>
+                </div>
+                <div class="grid grid-cols-1 gap-3">
                     <div>
                         <label class="block font-semibold text-slate-600 mb-1">Style Number</label>
                         <input type="text" id="edit-subcont-style" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">

@@ -250,6 +250,8 @@ function resetAllFields() {
     editingSessionId = null;
     const mtSelectEl = document.getElementById("material-type");
     if (mtSelectEl) mtSelectEl.value = '';
+    const locSelectEl = document.getElementById("inspection-location");
+    if (locSelectEl) locSelectEl.value = 'In-House';
     selectedMaterialType = '';
     selectedVendor = '';
     inspectionItems = [];
@@ -882,6 +884,7 @@ async function saveData() {
         "pass": qtyInspectOutputs['pass'],
         "defect": qtyInspectOutputs['defect'],
         approvedByLeader: leaderSelect ? leaderSelect.value : '',
+        inspectionLocation: document.getElementById('inspection-location')?.value || 'In-House',
         status: document.getElementById('inspection-status')?.value || 'Done',
         file_data: fileData,
         file_name: fileName,
@@ -1007,6 +1010,7 @@ async function saveData() {
                     timestamp: dataToSend.timestamp || new Date().toISOString(),
                     date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
                     material_type: dataToSend.materialType || '',
+                    inspection_location: dataToSend.inspectionLocation || 'In-House',
                     user_login: dataToSend.auditor || '',
                     vendor: dataToSend.vendor || '',
                     component: it.component || dataToSend.component || '',
@@ -1059,6 +1063,7 @@ async function saveData() {
                 timestamp: dataToSend.timestamp || new Date().toISOString(),
                 date: dataToSend.tanggalIncoming ? dataToSend.tanggalIncoming.substring(0, 10) : null,
                 material_type: dataToSend.materialType || '',
+                inspection_location: dataToSend.inspectionLocation || 'In-House',
                 user_login: dataToSend.auditor || '',
                 vendor: dataToSend.vendor || '',
                 component: dataToSend.component || '',

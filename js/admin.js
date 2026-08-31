@@ -1578,15 +1578,20 @@ window.showSubcontSessionDetail = async function(rawSessionId) {
     const qtyDefect = Number(session.qty_defect) || 0;
 
     if (grid) {
+        const locationBadge = (session.inspection_location || 'In-House').toLowerCase() === 'in-vendor'
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700">In-Vendor</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-700">In-House</span>';
+
         grid.innerHTML = `
             <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800">${session.date || '-'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Tgl Inspeksi</span><span class="font-bold text-slate-800">${session.tanggal_insp || '-'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Lokasi Inspeksi</span>${locationBadge}</div>
+            <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800">${session.status || 'Done'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800">${(Number(session.qty_incoming) || 0).toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Inspect</span><span class="font-bold text-slate-800">${(Number(session.qty_inspect) || 0).toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Pass</span><span class="font-bold text-emerald-600">${(Number(session.qty_pass) || 0).toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Defect</span><span class="font-bold text-rose-600">${qtyDefect.toLocaleString()}</span></div>
             <div><span class="text-slate-400 block text-[10px]">FTT Rate</span><span class="font-bold text-emerald-700">${session.ftt ? (Number(session.ftt) * 100).toFixed(1) + '%' : '-'}</span></div>
-            <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800">${session.status || 'Done'}</span></div>
         `;
     }
 
@@ -1656,26 +1661,27 @@ window.exportSubcontInspectionLog = function() {
 
     // Sheet 1: Inspection_Sessions
     const sRows = (currentSubcontLogSessions || []).map(s => ({
-        'SessionID':     s.session_id || '',
-        'timeStamp':     s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
-        'Date':          s.date || '',
-        'Material Type': s.material_type || '',
-        'User Login':    s.user_login || '',
-        'Vendor':        s.vendor || '',
-        'Component':     s.component || '',
-        'Process':       s.process || '',
-        'Style Number':  s.style_number || '',
-        'Model':         s.model || '',
-        'Qty Incoming':  Number(s.qty_incoming) || 0,
-        'Qty Inspect':   Number(s.qty_inspect) || 0,
-        'Qty Pass':      Number(s.qty_pass) || 0,
-        'Qty Defect':    Number(s.qty_defect) || 0,
-        'FTT (%)':       s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
-        'TanggalInsp':   s.tanggal_insp || '',
-        'Bucket':        s.bucket || '',
-        'ApprovedBy':    s.approved_by || '',
-        'EvidenceUrl':   s.evidence_url || '',
-        'Status':        s.status || 'Done',
+        'SessionID':           s.session_id || '',
+        'timeStamp':           s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
+        'Date':                s.date || '',
+        'Material Type':       s.material_type || '',
+        'Inspection Location': s.inspection_location || 'In-House',
+        'User Login':          s.user_login || '',
+        'Vendor':              s.vendor || '',
+        'Component':           s.component || '',
+        'Process':             s.process || '',
+        'Style Number':        s.style_number || '',
+        'Model':               s.model || '',
+        'Qty Incoming':        Number(s.qty_incoming) || 0,
+        'Qty Inspect':         Number(s.qty_inspect) || 0,
+        'Qty Pass':            Number(s.qty_pass) || 0,
+        'Qty Defect':          Number(s.qty_defect) || 0,
+        'FTT (%)':             s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
+        'TanggalInsp':         s.tanggal_insp || '',
+        'Bucket':              s.bucket || '',
+        'ApprovedBy':          s.approved_by || '',
+        'EvidenceUrl':         s.evidence_url || '',
+        'Status':              s.status || 'Done',
     }));
     const ws1 = XLSX.utils.json_to_sheet(sRows);
     XLSX.utils.book_append_sheet(wb, ws1, 'Inspection_Sessions');
@@ -1716,6 +1722,9 @@ window.editSubcontSession = function(rawSessionId) {
 
     document.getElementById('edit-subcont-session-id').value = s.session_id;
     document.getElementById('edit-subcont-vendor').value = s.vendor || '';
+    if (document.getElementById('edit-subcont-location')) {
+        document.getElementById('edit-subcont-location').value = s.inspection_location || 'In-House';
+    }
     document.getElementById('edit-subcont-status').value = s.status || 'Done';
     document.getElementById('edit-subcont-model').value = s.model || '';
     document.getElementById('edit-subcont-style').value = s.style_number || '';
@@ -1745,6 +1754,7 @@ window.saveEditSubcontSession = async function(event) {
     if (!sessionId) return;
 
     const vendor = document.getElementById('edit-subcont-vendor').value.trim();
+    const inspection_location = document.getElementById('edit-subcont-location')?.value || 'In-House';
     const status = document.getElementById('edit-subcont-status').value;
     const model = document.getElementById('edit-subcont-model').value.trim();
     const style_number = document.getElementById('edit-subcont-style').value.trim();
@@ -1763,6 +1773,7 @@ window.saveEditSubcontSession = async function(event) {
             .from('subcont_inspections')
             .update({
                 vendor,
+                inspection_location,
                 status,
                 model,
                 style_number,
