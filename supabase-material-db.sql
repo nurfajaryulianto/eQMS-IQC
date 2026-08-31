@@ -480,7 +480,7 @@ CREATE TABLE IF NOT EXISTS public.subcont_inspections (
   updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE public.subcont_inspections ADD COLUMN IF NOT EXISTS inspection_location VARCHAR(50) DEFAULT 'In-House';
+ALTER TABLE public.subcont_inspections ADD COLUMN IF NOT EXISTS inspection_location VARCHAR(50) DEFAULT 'In-House Inspection';
 
 -- Indexing untuk query cepat (<5ms)
 CREATE INDEX IF NOT EXISTS idx_subcont_insp_date        ON public.subcont_inspections(date DESC);

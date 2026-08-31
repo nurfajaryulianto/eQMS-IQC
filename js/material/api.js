@@ -1337,7 +1337,7 @@ export function exportSubcontLogToMultiSheetExcel(sessions, defects, filenamePre
         'timeStamp':           s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
         'Date':                s.date || '',
         'Material Type':       s.material_type || '',
-        'Inspection Location': s.inspection_location || 'In-House',
+        'Inspection Location': (s.inspection_location || '').toLowerCase().includes('vendor') ? 'In-Vendor Inspection' : 'In-House Inspection',
         'User Login':          s.user_login || '',
         'Vendor':              s.vendor || '',
         'Component':           s.component || '',
