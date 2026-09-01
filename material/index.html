@@ -90,12 +90,12 @@
         /* Form Grid Layout */
         .form-grid-layout {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 420px;
+            grid-template-columns: minmax(0, 1fr) minmax(460px, 500px);
             gap: 24px;
             align-items: start;
             width: 100%;
         }
-        @media (max-width: 1024px) {
+        @media (max-width: 1100px) {
             .form-grid-layout {
                 grid-template-columns: 1fr;
             }
@@ -238,28 +238,127 @@
         .inspection-tab-btn {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
+            gap: 10px;
             padding: 10px 12px;
-            border-radius: 12px;
-            border: 1.5px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.04);
+            border-radius: 14px;
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
             color: rgba(255, 255, 255, 0.7);
-            font-size: 12px;
-            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: left;
+            position: relative;
+            user-select: none;
         }
         .inspection-tab-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: white;
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.18);
+            transform: translateY(-1px);
         }
+        .tab-icon-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.6);
+            transition: all 0.2s;
+        }
+        .tab-text-box {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+        .tab-step-label {
+            font-size: 9px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .tab-main-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tab-status-pill {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.6);
+            flex-shrink: 0;
+            margin-left: auto;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        /* Active states by tab */
         .inspection-tab-btn.active {
-            border-color: var(--emerald-light);
-            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.5);
+            background: rgba(16, 185, 129, 0.12);
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+        }
+        .inspection-tab-btn.active .tab-icon-box {
+            background: #10b981;
+            color: white;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+        }
+        .inspection-tab-btn.active .tab-main-label {
             color: #34d399;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+
+        #tab-check-rolling.active {
+            border-color: rgba(6, 182, 212, 0.5);
+            background: rgba(6, 182, 212, 0.12);
+            box-shadow: 0 4px 16px rgba(6, 182, 212, 0.15);
+        }
+        #tab-check-rolling.active .tab-icon-box {
+            background: #06b6d4;
+            color: white;
+            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.35);
+        }
+        #tab-check-rolling.active .tab-main-label {
+            color: #22d3ee;
+        }
+
+        #tab-check-laminating.active {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.12);
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);
+        }
+        #tab-check-laminating.active .tab-icon-box {
+            background: #f59e0b;
+            color: white;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+        }
+        #tab-check-laminating.active .tab-main-label {
+            color: #fbbf24;
+        }
+
+        #tab-check-bonding.active {
+            border-color: rgba(244, 63, 94, 0.5);
+            background: rgba(244, 63, 94, 0.12);
+            box-shadow: 0 4px 16px rgba(244, 63, 94, 0.15);
+        }
+        #tab-check-bonding.active .tab-icon-box {
+            background: #f43f5e;
+            color: white;
+            box-shadow: 0 2px 8px rgba(244, 63, 94, 0.35);
+        }
+        #tab-check-bonding.active .tab-main-label {
+            color: #fb7185;
         }
         .toggle-btn-group {
             display: grid;
@@ -519,34 +618,46 @@
                         <span class="material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">fact_check</span>
                         <span style="font-size: 14px; font-weight: 700; color: white;">Pilih Jenis Pengecekan</span>
                     </div>
-                    <div style="padding: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
-                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                <span class="material-symbols-outlined" style="font-size: 15px;">view_list</span>
-                                <span style="font-size: 12px;">Raw Material</span>
+                    <div style="padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')">
+                            <div class="tab-icon-box">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">inventory_2</span>
                             </div>
-                            <span id="badge-tab-raw" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <div class="tab-text-box">
+                                <span class="tab-step-label">Tahap 1</span>
+                                <span class="tab-main-label">Raw Material</span>
+                            </div>
+                            <span id="badge-tab-raw" class="tab-status-pill">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-rolling" class="inspection-tab-btn" onclick="switchInspectionTab('rolling')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                <span class="material-symbols-outlined" style="font-size: 15px;">autorenew</span>
-                                <span style="font-size: 12px;">Rolling Insp</span>
+                        <button type="button" id="tab-check-rolling" class="inspection-tab-btn" onclick="switchInspectionTab('rolling')">
+                            <div class="tab-icon-box">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">autorenew</span>
                             </div>
-                            <span id="badge-tab-rolling" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <div class="tab-text-box">
+                                <span class="tab-step-label">Tahap 2</span>
+                                <span class="tab-main-label">Rolling Insp</span>
+                            </div>
+                            <span id="badge-tab-rolling" class="tab-status-pill">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                <span class="material-symbols-outlined" style="font-size: 15px;">layers</span>
-                                <span style="font-size: 12px;">Laminating</span>
+                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')">
+                            <div class="tab-icon-box">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">layers</span>
                             </div>
-                            <span id="badge-tab-laminating" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <div class="tab-text-box">
+                                <span class="tab-step-label">Tahap 3</span>
+                                <span class="tab-main-label">Laminating</span>
+                            </div>
+                            <span id="badge-tab-laminating" class="tab-status-pill">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                <span class="material-symbols-outlined" style="font-size: 15px;">science</span>
-                                <span style="font-size: 12px;">Bonding Test</span>
+                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')">
+                            <div class="tab-icon-box">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">science</span>
                             </div>
-                            <span id="badge-tab-bonding" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <div class="tab-text-box">
+                                <span class="tab-step-label">Tahap 4</span>
+                                <span class="tab-main-label">Bonding Test</span>
+                            </div>
+                            <span id="badge-tab-bonding" class="tab-status-pill">Pending</span>
                         </button>
                     </div>
                 </div>
