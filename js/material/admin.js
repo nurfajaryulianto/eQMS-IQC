@@ -1149,19 +1149,29 @@ function renderUsersTable() {
             const tokens = rawAssign.split(/[,&/]+/).map(t => t.trim()).filter(Boolean);
             badgeHtml = tokens.map(tok => {
                 const upper = tok.toUpperCase();
+
+                // 1. Exact Inspection Type matches
                 if (upper === 'RAW MATERIAL' || upper === 'RAW') {
                     return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">inventory_2</span>Raw Material</span>`;
                 }
-                if (upper.includes('ROLLING')) {
+                if (upper === 'ROLLING INSPECTION' || upper === 'ROLLING INSP' || upper === 'ROLLING') {
                     return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">autorenew</span>Rolling</span>`;
                 }
-                if (upper.includes('LAMINATING') || upper === 'LAM') {
+                if (upper === 'LAMINATING' || upper === 'LAMINATING MATERIAL') {
                     return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">layers</span>Laminating</span>`;
                 }
-                if (upper.includes('BONDING')) {
+                if (upper === 'BONDING TEST' || upper === 'BONDING') {
                     return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(244,63,94,0.15);color:#fb7185;border:1px solid rgba(244,63,94,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">science</span>Bonding</span>`;
                 }
-                return `<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">${esc(tok)}</span>`;
+
+                // 2. Standard Material Categories
+                const isStandardCat = ['TEXTILE', 'SYNTHETIC', 'SYNTHETIC / PU', 'PU', 'LEATHER', 'ACCESSORIES', 'ALL'].includes(upper);
+                if (isStandardCat) {
+                    return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">${esc(tok)}</span>`;
+                }
+
+                // 3. Custom / Specific Material Items (e.g. "LAMINATING TEXTILE", "RM.TXT.001")
+                return `<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:rgba(148,163,184,0.12);color:#cbd5e1;border:1px solid rgba(148,163,184,0.25);white-space:nowrap;">${esc(tok)}</span>`;
             }).join('');
         }
 
@@ -1282,13 +1292,32 @@ window.editUser = function (nik) {
     if (rawAssign) {
         const tokens = rawAssign.split(/[,&/]+/).map(t => t.trim()).filter(Boolean);
         tokens.forEach(tok => {
+            const upper = tok.toUpperCase();
             let matched = false;
+
             document.querySelectorAll('.assign-chk-type, .assign-chk-cat').forEach(cb => {
-                if (cb.value.toUpperCase() === tok.toUpperCase()) {
+                const cbUpper = cb.value.toUpperCase();
+                if (cbUpper === upper) {
+                    cb.checked = true;
+                    matched = true;
+                } else if (cbUpper === 'SYNTHETIC' && (upper === 'SYNTHETIC / PU' || upper === 'PU')) {
+                    cb.checked = true;
+                    matched = true;
+                } else if (cbUpper === 'ROLLING INSP' && (upper === 'ROLLING INSPECTION' || upper === 'ROLLING')) {
+                    cb.checked = true;
+                    matched = true;
+                } else if (cbUpper === 'RAW MATERIAL' && upper === 'RAW') {
+                    cb.checked = true;
+                    matched = true;
+                } else if (cbUpper === 'BONDING TEST' && upper === 'BONDING') {
+                    cb.checked = true;
+                    matched = true;
+                } else if (cbUpper === 'ALL' && upper === 'ALL (GENERAL INSPECTOR)') {
                     cb.checked = true;
                     matched = true;
                 }
             });
+
             if (!matched) customTokens.push(tok);
         });
     }
