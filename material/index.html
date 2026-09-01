@@ -519,27 +519,34 @@
                         <span class="material-symbols-outlined" style="font-size: 18px; color: rgba(255,255,255,0.45);">fact_check</span>
                         <span style="font-size: 14px; font-weight: 700; color: white;">Pilih Jenis Pengecekan</span>
                     </div>
-                    <div style="padding: 12px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                <span class="material-symbols-outlined" style="font-size: 16px;">view_list</span>
-                                <span>Raw Material</span>
+                    <div style="padding: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                        <button type="button" id="tab-check-raw" class="inspection-tab-btn active" onclick="switchInspectionTab('raw')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-symbols-outlined" style="font-size: 15px;">view_list</span>
+                                <span style="font-size: 12px;">Raw Material</span>
                             </div>
-                            <span id="badge-tab-raw" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <span id="badge-tab-raw" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                <span class="material-symbols-outlined" style="font-size: 16px;">layers</span>
-                                <span>Laminating</span>
+                        <button type="button" id="tab-check-rolling" class="inspection-tab-btn" onclick="switchInspectionTab('rolling')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-symbols-outlined" style="font-size: 15px;">autorenew</span>
+                                <span style="font-size: 12px;">Rolling Insp</span>
                             </div>
-                            <span id="badge-tab-laminating" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <span id="badge-tab-rolling" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
-                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')" style="flex-direction: column; gap: 4px; padding: 10px 6px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
-                                <span class="material-symbols-outlined" style="font-size: 16px;">science</span>
-                                <span>Bonding Test</span>
+                        <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-symbols-outlined" style="font-size: 15px;">layers</span>
+                                <span style="font-size: 12px;">Laminating</span>
                             </div>
-                            <span id="badge-tab-bonding" style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                            <span id="badge-tab-laminating" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
+                        </button>
+                        <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')" style="flex-direction: column; gap: 4px; padding: 10px 4px; text-align: center;">
+                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                <span class="material-symbols-outlined" style="font-size: 15px;">science</span>
+                                <span style="font-size: 12px;">Bonding Test</span>
+                            </div>
+                            <span id="badge-tab-bonding" style="font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);">Pending</span>
                         </button>
                     </div>
                 </div>
@@ -555,7 +562,7 @@
                         <!-- DONE PO NOTICE BANNER -->
                         <div id="done-po-notice" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1.5px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 12px 14px; font-size: 12px; color: #fbbf24; gap: 8px; align-items: center;">
                             <span class="material-symbols-outlined" style="font-size: 18px; flex-shrink: 0;">lock</span>
-                            <span>Material berstatus <strong>Done</strong> tidak dapat diisi lagi untuk Raw/Laminating Material. Pilih tab <strong>Check Bonding Test</strong> untuk mengunggah pengujian bonding.</span>
+                            <span>Material berstatus <strong>Done</strong> tidak dapat diisi lagi. Pilih jenis pengecekan lainnya yang masih Pending.</span>
                         </div>
 
                         <!-- FORM SUB-CONTAINER 1: RAW MATERIAL -->
@@ -592,19 +599,58 @@
                                 </div>
                             </div>
 
-                            <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; padding: 12px 14px; margin-top: 2px;">
-                                <input type="checkbox" id="rolling-inspection" style="width: 18px; height: 18px; cursor: pointer; accent-color: #34d399; margin: 0;">
-                                <label for="rolling-inspection" style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); cursor: pointer; user-select: none;">
-                                    Rolling Inspection Method
-                                </label>
-                            </div>
-
                             <!-- Check Color -->
                             <div>
                                 <label for="check-color" style="display: block; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
                                     Check Color <span style="color: #ef4444;">*</span>
                                 </label>
                                 <input type="text" id="check-color" value="OK" placeholder="OK" class="styled-input" style="font-size: 13px; font-weight: 600;">
+                            </div>
+                        </div>
+
+                        <!-- FORM SUB-CONTAINER 2: ROLLING INSPECTION (RAW STAGE) -->
+                        <div id="form-rolling-inspection-body" style="display: none; flex-direction: column; gap: 14px;">
+                            <div style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 14px; padding: 14px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                    <span style="font-size: 12px; font-weight: 700; color: #22d3ee; display: flex; align-items: center; gap: 6px;">
+                                        <span class="material-symbols-outlined" style="font-size: 18px;">autorenew</span>
+                                        Pengecekan Rolling Material Mentah (Raw Stage)
+                                    </span>
+                                    <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3);">
+                                        Pre-Process Roll
+                                    </span>
+                                </div>
+                                <p style="font-size: 11px; color: rgba(255,255,255,0.5); margin: 0 0 10px;">
+                                    Pemeriksaan gulungan roll material tekstil / sintetis sebelum proses produksi/laminasi.
+                                </p>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                    <div>
+                                        <label for="rolling-inspect-status" style="display: block; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 4px;">
+                                            Status Roll Visual <span style="color: #ef4444;">*</span>
+                                        </label>
+                                        <select id="rolling-inspect-status" class="styled-input" style="font-size: 13px; cursor: pointer;">
+                                            <option value="OK">Roll OK (Sesuai Standar)</option>
+                                            <option value="DEFECT">Roll DEFECT / Cacat Fisik</option>
+                                            <option value="WRINKLE">Roll Kerut / Wrinkle</option>
+                                            <option value="SHADING">Roll Belang / Color Shading</option>
+                                            <option value="JOIN">Banyak Sambungan (Join Roll)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="rolling-inspect-percentage" style="display: block; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 4px;">
+                                            Roll Sample Percentage (%) <span style="color: #ef4444;">*</span>
+                                        </label>
+                                        <input type="text" id="rolling-inspect-percentage" value="10%" placeholder="Misal: 10%, 20%, 100%..." class="styled-input" style="font-size: 13px;">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="rolling-inspect-notes" style="display: block; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 4px;">
+                                        Detail Temuan / Catatan Rolling Check
+                                    </label>
+                                    <input type="text" id="rolling-inspect-notes" placeholder="Catatan nomor roll, meter/yard, atau detail temuan..." class="styled-input" style="font-size: 13px;">
+                                </div>
                             </div>
                         </div>
 

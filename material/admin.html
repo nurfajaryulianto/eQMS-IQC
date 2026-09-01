@@ -246,6 +246,32 @@
             transform: translateY(-1px);
         }
 
+        /* Assignment Checkbox Labels */
+        .assign-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .assign-checkbox-label:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+        .assign-checkbox-label:has(input:checked) {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.5);
+            color: #34d399;
+        }
+
         /* Table */
         /* Table */
         .data-table {
@@ -710,11 +736,28 @@
                         </div>
                     </div>
 
-                    <button id="passall-btn" onclick="confirmPassAll()" class="btn-gradient"
-                        style="padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
-                        <span class="material-symbols-outlined" style="font-size:18px;">done_all</span>
-                        Jalankan Pass
-                    </button>
+                    <!-- Pass All Reason & Execution -->
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;">
+                        <div style="flex:1;min-width:260px;">
+                            <label for="passall-reason" style="display:block;font-size:12px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:6px;">
+                                Alasan Pass All (Audit Trail & Log) <span style="color:#ef4444;">*</span>
+                            </label>
+                            <select id="passall-reason" class="styled-input" style="cursor:pointer;padding:10px 14px;border-radius:8px;width:100%;">
+                                <option value="Sertifikat CoA / Lab Test Vendor Valid">Sertifikat CoA / Lab Test Vendor Valid</option>
+                                <option value="Direct to Line (Urgent Production)">Direct to Line (Urgent Production)</option>
+                                <option value="Vendor Grade A (Certified Partner)">Vendor Grade A (Certified Partner)</option>
+                                <option value="Instruksi Leader / Manager QC">Instruksi Leader / Manager QC</option>
+                                <option value="Lainnya (Bypass Approval)">Lainnya (Bypass Approval)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:flex-end;">
+                            <button id="passall-btn" onclick="confirmPassAll()" class="btn-gradient"
+                                style="padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;height:44px;">
+                                <span class="material-symbols-outlined" style="font-size:18px;">done_all</span>
+                                Jalankan Pass
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -807,18 +850,63 @@
                                 </select>
                             </div>
 
-                            <!-- Material Assignment Input -->
-                            <div>
+                            <!-- Inspection Type & Material Assignment Checklists -->
+                            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px;">
+                                <label style="display:block; font-size:11px; font-weight:700; color:#34d399; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    1. Wewenang Jenis Inspeksi (4 Jenis)
+                                </label>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px;">
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-insp-type" value="Raw Material" class="assign-chk-type">
+                                        <span>Raw Material</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-insp-type" value="Rolling Inspection" class="assign-chk-type">
+                                        <span>Rolling Insp</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-insp-type" value="Laminating" class="assign-chk-type">
+                                        <span>Laminating</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-insp-type" value="Bonding Test" class="assign-chk-type">
+                                        <span>Bonding Test</span>
+                                    </label>
+                                </div>
+
+                                <label style="display:block; font-size:11px; font-weight:700; color:#38bdf8; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
+                                    2. Kategori Material (Pass All Mapping)
+                                </label>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-mat-cat" value="TEXTILE" class="assign-chk-cat">
+                                        <span>TEXTILE</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-mat-cat" value="SYNTHETIC" class="assign-chk-cat">
+                                        <span>SYNTHETIC / PU</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-mat-cat" value="LEATHER" class="assign-chk-cat">
+                                        <span>LEATHER</span>
+                                    </label>
+                                    <label class="assign-checkbox-label">
+                                        <input type="checkbox" name="assign-mat-cat" value="ACCESSORIES" class="assign-chk-cat">
+                                        <span>ACCESSORIES</span>
+                                    </label>
+                                    <label class="assign-checkbox-label" style="grid-column: span 2;">
+                                        <input type="checkbox" name="assign-mat-cat" value="ALL" class="assign-chk-cat">
+                                        <span>ALL (General Inspector)</span>
+                                    </label>
+                                </div>
+
                                 <label for="user-material-assignment"
-                                    style="display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">
-                                    Material Assignment
+                                    style="display:block; font-size:10px; font-weight:600; color:rgba(255,255,255,0.4); text-transform:uppercase; margin-top:8px; margin-bottom:4px;">
+                                    Kode / Custom Material (Opsional)
                                 </label>
                                 <input type="text" id="user-material-assignment" list="mat-type-suggestions"
-                                    class="styled-input" placeholder="Misal: LEATHER, TEXTILE, SYNTHETIC...">
+                                    class="styled-input" placeholder="Misal: RM.TXT.001, LTH-GRADE-A">
                                 <datalist id="mat-type-suggestions"></datalist>
-                                <p style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:4px;">Gunakan koma (,)
-                                    untuk menugaskan lebih dari 1 jenis/kode material (contoh: LEATHER, TEXTILE,
-                                    SYNTHETIC).</p>
                             </div>
 
                             <!-- Password Input -->
@@ -1013,7 +1101,8 @@
                             style="padding:7px 10px;font-size:12px;border-radius:8px;">
                             <option value="">Semua Jenis</option>
                             <option value="Raw Material">Raw Material</option>
-                            <option value="Laminating Material">Laminating Material</option>
+                            <option value="Rolling Inspection">Rolling Inspection</option>
+                            <option value="Laminating">Laminating</option>
                             <option value="Bonding Test">Bonding Test</option>
                         </select>
                     </div>

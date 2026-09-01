@@ -654,21 +654,65 @@ window.applyPassAllDateFilter = function () {
         return;
     }
 
-    listEl.innerHTML = filteredPending.map((d, i) => `
+    // Helper to find PIC inspector for preview
+    const findPicForPO = (po) => {
+        const matType = (po.material_type || '').toUpperCase().trim();
+        const matName = (po.material_name || '').toUpperCase().trim();
+        if (!allUsers || !allUsers.length) return 'Auto-assigned by System';
+
+        const inspectors = allUsers.filter(u => u.role === 'inspector');
+        if (!inspectors.length) return 'Admin Fallback';
+
+        // 1. Direct matType match in material_assignment
+        if (matType) {
+            const found = inspectors.find(u => (u.material_assignment || '').toUpperCase().includes(matType));
+            if (found) return found.name || found.display_name || found.nik;
+        }
+
+        // 2. Keyword match in material_name
+        if (matName.includes('TXT') || matName.includes('MESH')) {
+            const found = inspectors.find(u => (u.material_assignment || '').toUpperCase().includes('TEXTILE'));
+            if (found) return found.name || found.display_name || found.nik;
+        }
+        if (matName.includes('LTH') || matName.includes('LEATHER')) {
+            const found = inspectors.find(u => (u.material_assignment || '').toUpperCase().includes('LEATHER'));
+            if (found) return found.name || found.display_name || found.nik;
+        }
+        if (matName.includes('SYN') || matName.includes('PU')) {
+            const found = inspectors.find(u => (u.material_assignment || '').toUpperCase().includes('SYNTHETIC'));
+            if (found) return found.name || found.display_name || found.nik;
+        }
+
+        // 3. Fallback ALL
+        const allInsp = inspectors.find(u => (u.material_assignment || '').toUpperCase().includes('ALL'));
+        if (allInsp) return allInsp.name || allInsp.display_name || allInsp.nik;
+
+        return inspectors[0].name || inspectors[0].display_name || inspectors[0].nik;
+    };
+
+    listEl.innerHTML = filteredPending.map((d, i) => {
+        const picName = findPicForPO(d);
+        return `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
             <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" data-id="${d.id}" data-materialtype="${esc(d.material_type||'')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
-                    <div style="font-size:13px;font-weight:600;color:#ffffff;">
+                    <div style="font-size:13px;font-weight:600;color:#ffffff;display:flex;align-items:center;gap:8px;">
                         ${esc(d.po_number)} 
-                        <span style="font-size:11px;font-weight:normal;color:rgba(255,255,255,0.4);margin-left:6px;">(${esc(d.receive_date || 'No Date')})</span>
+                        <span style="font-size:11px;font-weight:normal;color:rgba(255,255,255,0.4);">(${esc(d.receive_date || 'No Date')})</span>
+                        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);">
+                            PIC: ${esc(picName)}
+                        </span>
                     </div>
-                    <div style="font-size:12px;color:rgba(255, 255, 255, 0.7);"><span style="color:#34d399;font-weight:600;">${esc(d.material_name)}</span> — ${esc(d.vendor_name)}</div>
+                    <div style="font-size:12px;color:rgba(255, 255, 255, 0.7);margin-top:2px;">
+                        <span style="color:#34d399;font-weight:600;">${esc(d.material_name)}</span> — ${esc(d.vendor_name)}
+                    </div>
                 </div>
                 <span style="font-size:12px;color:rgba(255, 255, 255, 0.7);white-space:nowrap;margin-left:12px;font-weight:600;">${Number(d.planned_qty).toLocaleString('id-ID')} ${esc(d.uom)}</span>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Reset select all checkbox to checked
     const masterCheckbox = document.getElementById('passall-select-all');
@@ -724,13 +768,14 @@ window.confirmPassAll = async function () {
         }));
 
     const targetIds = selectedItems.map(item => item.id).filter(id => id != null);
+    const reason = document.getElementById('passall-reason')?.value || 'Sertifikat CoA / Lab Test Vendor Valid';
 
     if (!targetIds.length) {
         showToast('Tidak ada item yang dipilih untuk di-pass.', 'info');
         return;
     }
 
-    if (!confirm(`Apakah Anda yakin ingin menandai ${targetIds.length} item pilihan sebagai PASS? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menandai ${targetIds.length} item pilihan sebagai PASS?\nAlasan: ${reason}\nTindakan ini tidak dapat dibatalkan.`)) return;
 
     setLoading(true, `Memproses ${targetIds.length} item...`);
 
@@ -751,7 +796,8 @@ window.confirmPassAll = async function () {
         const result = await apiPassAll(
             targetIds,
             currentUser?.nik || 'admin',
-            currentUser?.name || 'Admin Material'
+            currentUser?.name || 'Admin Material',
+            reason
         );
 
         setLoading(false);
@@ -1097,13 +1143,25 @@ function renderUsersTable() {
             roleLabel = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">Inspector</span>`;
         }
 
-        const matAssign = u.material_assignment || u.material_type || '—';
+        const rawAssign = (u.material_assignment || u.material_type || '').trim();
+        let badgeHtml = '—';
+        if (rawAssign) {
+            const tokens = rawAssign.split(',').map(t => t.trim()).filter(Boolean);
+            badgeHtml = tokens.map(tok => {
+                const upper = tok.toUpperCase();
+                if (upper === 'RAW MATERIAL') return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);margin:2px;">Raw</span>`;
+                if (upper.includes('ROLLING')) return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.3);margin:2px;">Rolling</span>`;
+                if (upper === 'LAMINATING') return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);margin:2px;">Laminating</span>`;
+                if (upper.includes('BONDING')) return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(244,63,94,0.15);color:#fb7185;border:1px solid rgba(244,63,94,0.3);margin:2px;">Bonding</span>`;
+                return `<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);margin:2px;">${esc(tok)}</span>`;
+            }).join(' ');
+        }
 
         return `<tr>
             <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.85);">${esc(u.name)}</td>
             <td style="padding:12px 14px;">${roleLabel}</td>
-            <td style="padding:12px 14px;font-weight:600;color:#34d399;">${esc(matAssign)}</td>
+            <td style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:2px;">${badgeHtml}</td>
             <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(dateStr)}</td>
             <td style="padding:12px 14px;text-align:center;">
                 <div style="display:flex;gap:12px;justify-content:center;">
@@ -1120,12 +1178,26 @@ window.handleUserSubmit = async function (e) {
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
-    const assignInput = document.getElementById('user-material-assignment');
+    const customAssignInput = document.getElementById('user-material-assignment');
 
     const nik = nikInput.value.trim();
     const name = nameInput.value.trim();
     const role = roleInput.value;
-    const matAssignment = assignInput ? assignInput.value.trim() : '';
+
+    // Gather selected checkboxes for inspection types & material categories
+    const selectedTypes = Array.from(document.querySelectorAll('.assign-chk-type:checked')).map(cb => cb.value);
+    const selectedCats = Array.from(document.querySelectorAll('.assign-chk-cat:checked')).map(cb => cb.value);
+    const customVal = customAssignInput ? customAssignInput.value.trim() : '';
+
+    const allAssignments = [...selectedTypes, ...selectedCats];
+    if (customVal) {
+        customVal.split(',').forEach(t => {
+            const trimmed = t.trim();
+            if (trimmed && !allAssignments.includes(trimmed)) allAssignments.push(trimmed);
+        });
+    }
+
+    const matAssignment = allAssignments.join(', ');
 
     if (!nik || !name || !role) {
         showToast('NIK, Nama, dan Role wajib diisi.', 'error');
@@ -1149,7 +1221,14 @@ window.handleUserSubmit = async function (e) {
             }
             showToast('User berhasil disimpan (simulasi)!', 'success');
         } else {
-            await apiSaveUser({ nik, name, role, password: document.getElementById('user-password')?.value?.trim() || '123456', isNew: !editingUserNik });
+            await apiSaveUser({
+                nik,
+                name,
+                role,
+                material_assignment: matAssignment,
+                password: document.getElementById('user-password')?.value?.trim() || '123456',
+                isNew: !editingUserNik
+            });
             showToast(`User ${nik} berhasil disimpan!`, 'success');
         }
         resetUserForm();
@@ -1174,14 +1253,35 @@ window.editUser = function (nik) {
     const nikInput = document.getElementById('user-nik');
     const nameInput = document.getElementById('user-name');
     const roleInput = document.getElementById('user-role');
-    const assignInput = document.getElementById('user-material-assignment');
+    const customAssignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
 
     if (nikInput) { nikInput.value = editingUserNik; nikInput.disabled = true; }
     if (nameInput) nameInput.value = user.name || '';
     if (roleInput) roleInput.value = String(user.role || 'inspector').trim().toLowerCase();
-    if (assignInput) assignInput.value = user.material_assignment || user.material_type || '';
+
+    // Reset all checkboxes first
+    document.querySelectorAll('.assign-chk-type, .assign-chk-cat').forEach(cb => { cb.checked = false; });
+
+    const rawAssign = (user.material_assignment || user.material_type || '').trim();
+    const customTokens = [];
+
+    if (rawAssign) {
+        const tokens = rawAssign.split(',').map(t => t.trim()).filter(Boolean);
+        tokens.forEach(tok => {
+            let matched = false;
+            document.querySelectorAll('.assign-chk-type, .assign-chk-cat').forEach(cb => {
+                if (cb.value.toUpperCase() === tok.toUpperCase()) {
+                    cb.checked = true;
+                    matched = true;
+                }
+            });
+            if (!matched) customTokens.push(tok);
+        });
+    }
+
+    if (customAssignInput) customAssignInput.value = customTokens.join(', ');
     if (formTitle) formTitle.textContent = 'Edit Pengguna: ' + user.nik;
     if (cancelBtn) cancelBtn.style.display = 'block';
 
@@ -1225,12 +1325,15 @@ window.resetUserForm = function () {
     if (form) form.reset();
 
     const nikInput = document.getElementById('user-nik');
-    const assignInput = document.getElementById('user-material-assignment');
+    const customAssignInput = document.getElementById('user-material-assignment');
     const formTitle = document.getElementById('user-form-title');
     const cancelBtn = document.getElementById('btn-cancel-user-edit');
 
+    // Uncheck all checkboxes
+    document.querySelectorAll('.assign-chk-type, .assign-chk-cat').forEach(cb => { cb.checked = false; });
+
     if (nikInput) nikInput.disabled = false;
-    if (assignInput) assignInput.value = '';
+    if (customAssignInput) customAssignInput.value = '';
     if (formTitle) formTitle.textContent = 'Tambah Pengguna Baru';
     if (cancelBtn) cancelBtn.style.display = 'none';
 };

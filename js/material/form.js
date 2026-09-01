@@ -19,14 +19,16 @@ let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
 
 window.updateTabBadges = function (po) {
     const badgeRaw = document.getElementById('badge-tab-raw');
+    const badgeRolling = document.getElementById('badge-tab-rolling');
     const badgeLam = document.getElementById('badge-tab-laminating');
     const badgeBond = document.getElementById('badge-tab-bonding');
     const tabRaw = document.getElementById('tab-check-raw');
+    const tabRolling = document.getElementById('tab-check-rolling');
     const tabLam = document.getElementById('tab-check-laminating');
     const tabBond = document.getElementById('tab-check-bonding');
 
     if (!po) {
-        [badgeRaw, badgeLam, badgeBond].forEach(b => {
+        [badgeRaw, badgeRolling, badgeLam, badgeBond].forEach(b => {
             if (b) {
                 b.textContent = 'Pending';
                 b.style.background = 'rgba(255,255,255,0.08)';
@@ -51,13 +53,28 @@ window.updateTabBadges = function (po) {
         }
     }
 
+    if (badgeRolling) {
+        if (po.rolling_done) {
+            badgeRolling.textContent = '✓ Selesai';
+            badgeRolling.style.background = 'rgba(6, 182, 212, 0.25)';
+            badgeRolling.style.color = '#22d3ee';
+            badgeRolling.style.border = '1px solid rgba(6, 182, 212, 0.4)';
+            if (tabRolling) tabRolling.style.borderColor = 'rgba(6, 182, 212, 0.3)';
+        } else {
+            badgeRolling.textContent = 'Pending';
+            badgeRolling.style.background = 'rgba(255,255,255,0.08)';
+            badgeRolling.style.color = 'rgba(255,255,255,0.6)';
+            badgeRolling.style.border = 'none';
+        }
+    }
+
     if (badgeLam) {
         if (po.laminating_done) {
             badgeLam.textContent = '✓ Selesai';
-            badgeLam.style.background = 'rgba(16, 185, 129, 0.25)';
-            badgeLam.style.color = '#34d399';
-            badgeLam.style.border = '1px solid rgba(16, 185, 129, 0.4)';
-            if (tabLam) tabLam.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            badgeLam.style.background = 'rgba(245, 158, 11, 0.25)';
+            badgeLam.style.color = '#fbbf24';
+            badgeLam.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+            if (tabLam) tabLam.style.borderColor = 'rgba(245, 158, 11, 0.3)';
         } else {
             badgeLam.textContent = 'Pending';
             badgeLam.style.background = 'rgba(255,255,255,0.08)';
@@ -69,10 +86,10 @@ window.updateTabBadges = function (po) {
     if (badgeBond) {
         if (po.bonding_done) {
             badgeBond.textContent = '✓ Selesai';
-            badgeBond.style.background = 'rgba(16, 185, 129, 0.25)';
-            badgeBond.style.color = '#34d399';
-            badgeBond.style.border = '1px solid rgba(16, 185, 129, 0.4)';
-            if (tabBond) tabBond.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+            badgeBond.style.background = 'rgba(244, 63, 94, 0.25)';
+            badgeBond.style.color = '#fb7185';
+            badgeBond.style.border = '1px solid rgba(244, 63, 94, 0.4)';
+            if (tabBond) tabBond.style.borderColor = 'rgba(244, 63, 94, 0.3)';
         } else {
             badgeBond.textContent = 'Pending';
             badgeBond.style.background = 'rgba(255,255,255,0.08)';
@@ -85,9 +102,11 @@ window.updateTabBadges = function (po) {
 window.switchInspectionTab = function (type) {
     currentInspectionType = type;
     const tabRaw = document.getElementById('tab-check-raw');
+    const tabRolling = document.getElementById('tab-check-rolling');
     const tabLam = document.getElementById('tab-check-laminating');
     const tabBond = document.getElementById('tab-check-bonding');
     const bodyRaw = document.getElementById('form-raw-material-body');
+    const bodyRolling = document.getElementById('form-rolling-inspection-body');
     const bodyLam = document.getElementById('form-laminating-material-body');
     const bodyBond = document.getElementById('form-bonding-test-body');
     const commonFields = document.getElementById('common-fields-body');
@@ -96,11 +115,13 @@ window.switchInspectionTab = function (type) {
     const submitBtn = document.getElementById('submit-btn');
 
     const isRawDone = selectedPO && selectedPO.raw_done;
+    const isRollingDone = selectedPO && selectedPO.rolling_done;
     const isLamDone = selectedPO && selectedPO.laminating_done;
     const isBondDone = selectedPO && selectedPO.bonding_done;
 
-    [tabRaw, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
+    [tabRaw, tabRolling, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
     if (bodyRaw) bodyRaw.style.display = 'none';
+    if (bodyRolling) bodyRolling.style.display = 'none';
     if (bodyLam) bodyLam.style.display = 'none';
     if (bodyBond) bodyBond.style.display = 'none';
 
@@ -113,7 +134,7 @@ window.switchInspectionTab = function (type) {
         if (isRawDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Pilih jenis pengecekan lainnya yang masih Pending.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
             }
             if (bodyRaw) { bodyRaw.style.opacity = '0.35'; bodyRaw.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
@@ -134,6 +155,36 @@ window.switchInspectionTab = function (type) {
                 submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
             }
         }
+    } else if (type === 'rolling') {
+        if (tabRolling) tabRolling.classList.add('active');
+        if (bodyRolling) bodyRolling.style.display = 'flex';
+        if (commonFields) commonFields.style.display = 'flex';
+        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Rolling Inspection (Raw)';
+
+        if (isRollingDone) {
+            if (doneNotice) {
+                doneNotice.style.display = 'flex';
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pemeriksaan <strong>Rolling Inspection (Raw)</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
+            }
+            if (bodyRolling) { bodyRolling.style.opacity = '0.35'; bodyRolling.style.pointerEvents = 'none'; }
+            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.4';
+                submitBtn.style.pointerEvents = 'none';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
+            }
+        } else {
+            if (doneNotice) doneNotice.style.display = 'none';
+            if (bodyRolling) { bodyRolling.style.opacity = '1'; bodyRolling.style.pointerEvents = 'auto'; }
+            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.pointerEvents = 'auto';
+                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
+            }
+        }
     } else if (type === 'laminating') {
         if (tabLam) tabLam.classList.add('active');
         if (bodyLam) bodyLam.style.display = 'flex';
@@ -143,7 +194,7 @@ window.switchInspectionTab = function (type) {
         if (isLamDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Pilih jenis pengecekan lainnya yang masih Pending.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
             }
             if (bodyLam) { bodyLam.style.opacity = '0.35'; bodyLam.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
@@ -173,7 +224,7 @@ window.switchInspectionTab = function (type) {
         if (isBondDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini telah <strong>Selesai (Done)</strong> dan dikunci. Berkas sudah tersimpan di Google Drive.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini telah <strong>Selesai (Done)</strong>.</span>`;
             }
             if (bodyBond) { bodyBond.style.opacity = '0.35'; bodyBond.style.pointerEvents = 'none'; }
             if (submitBtn) {
@@ -517,8 +568,8 @@ function renderPOList(data) {
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
 
-        const isAllDone = po.raw_done && po.laminating_done && po.bonding_done;
-        const isPartial = (po.raw_done || po.laminating_done || po.bonding_done) && !isAllDone;
+        const isAllDone = po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done;
+        const isPartial = (po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done) && !isAllDone;
         const badgeClass = isAllDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
         const badgeText = isAllDone ? 'Done' : (isPartial ? 'In-Progress' : 'Pending');
 
@@ -542,6 +593,7 @@ function renderPOList(data) {
             </div>
             <div style="display:flex; gap:5px; flex-wrap:wrap; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06);">
                 ${tagBadge(po.raw_done, 'Raw')}
+                ${tagBadge(po.rolling_done, 'Rolling')}
                 ${tagBadge(po.laminating_done, 'Laminating')}
                 ${tagBadge(po.bonding_done, 'Bonding')}
             </div>
@@ -864,6 +916,11 @@ window.openValidationDialog = function () {
         }
         if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
         if (fail > inspect) errors.push(`Qty Fail (${fail}) tidak boleh melebihi Qty Inspect (${inspect}).`);
+    } else if (currentInspectionType === 'rolling') {
+        const rollStatus = document.getElementById('rolling-inspect-status')?.value;
+        const rollPct = document.getElementById('rolling-inspect-percentage')?.value.trim();
+        if (!rollStatus) errors.push('Pilih Status Roll Visual.');
+        if (!rollPct) errors.push('Isi Roll Sample Percentage (%).');
     } else if (currentInspectionType === 'laminating') {
         if (lamPackagingChoice === 'NO') {
             const reason = document.getElementById('lam-packaging-reason')?.value.trim();
@@ -906,8 +963,10 @@ window.openValidationDialog = function () {
     } else {
         errorsEl.style.display = 'none';
         const isRaw = currentInspectionType === 'raw';
+        const isRolling = currentInspectionType === 'rolling';
         const isBonding = currentInspectionType === 'bonding';
         let inspectTypeLabel = 'Check Raw Material';
+        if (isRolling) inspectTypeLabel = 'Rolling Inspection (Raw Stage)';
         if (currentInspectionType === 'laminating') inspectTypeLabel = 'Check Laminating Material';
         if (isBonding) inspectTypeLabel = 'Check Bonding Test';
 
@@ -925,14 +984,21 @@ window.openValidationDialog = function () {
         if (isRaw) {
             const pass = inspect - fail;
             const passRate = ((pass / inspect) * 100).toFixed(1);
-            const rolling = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
             const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
             summaryHtml += `
                 ${summaryRow('Qty Inspect', inspect.toLocaleString('id-ID'))}
                 ${summaryRow('Qty Fail', fail.toLocaleString('id-ID'))}
                 ${summaryRow('Qty Pass', `${pass.toLocaleString('id-ID')} (${passRate}%)`)}
                 ${summaryRow('Check Color', checkColor)}
-                ${summaryRow('Rolling Method', rolling)}
+            `;
+        } else if (isRolling) {
+            const rollStatus = document.getElementById('rolling-inspect-status')?.value || 'OK';
+            const rollPct = document.getElementById('rolling-inspect-percentage')?.value.trim() || '10%';
+            const rollNotes = document.getElementById('rolling-inspect-notes')?.value.trim() || '—';
+            summaryHtml += `
+                ${summaryRow('Status Roll Visual', rollStatus)}
+                ${summaryRow('Sample Percentage', rollPct)}
+                ${summaryRow('Catatan Rolling', rollNotes)}
             `;
         } else if (isBonding) {
             const bondingFileEl = document.getElementById('bonding-file');
@@ -1004,18 +1070,22 @@ async function submitInspection() {
     if (loadingTxt) loadingTxt.textContent = 'Menyimpan data...';
 
     const isBonding = currentInspectionType === 'bonding';
-    const isRaw = currentInspectionType === 'raw';
+    const isRolling = currentInspectionType === 'rolling';
     const isLam = currentInspectionType === 'laminating';
+    const isRaw = currentInspectionType === 'raw';
 
     let inspectTypeStr = 'Raw Material';
-    if (isLam) inspectTypeStr = 'Laminating Material';
-    if (isBonding) inspectTypeStr = 'Bonding Test';
+    if (isRolling) inspectTypeStr = 'Rolling Inspection';
+    else if (isLam) inspectTypeStr = 'Laminating';
+    else if (isBonding) inspectTypeStr = 'Bonding Test';
 
     const inspect = isRaw ? (parseInt(document.getElementById('qty-inspect')?.value, 10) || 0) : 0;
     const fail = isRaw ? (parseInt(document.getElementById('qty-fail')?.value, 10) || 0) : 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
     const bondingNotes = isBonding ? (document.getElementById('bonding-notes')?.value.trim() || '') : '';
-    const rollingChecked = document.getElementById('rolling-inspection')?.checked ? 'Yes' : 'No';
+    const rollStatus = document.getElementById('rolling-inspect-status')?.value || 'OK';
+    const rollPctVal = document.getElementById('rolling-inspect-percentage')?.value.trim() || '10%';
+    const rollNotes = document.getElementById('rolling-inspect-notes')?.value.trim() || '';
     const inspectorName = currentUser?.name || currentUser?.nik || '';
     const checkColor = document.getElementById('check-color')?.value.trim() || 'OK';
     const leaderSelect = document.getElementById('approved-by-leader');
@@ -1101,15 +1171,15 @@ async function submitInspection() {
             inspection_type:          inspectTypeStr,
             qty_inspect:              inspect,
             qty_fail:                 fail,
-            defect_notes:             isBonding ? bondingNotes : notes,
-            rolling_inspection:       isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
+            defect_notes:             isRolling ? (rollNotes || notes) : (isBonding ? bondingNotes : notes),
+            rolling_inspection:       isRolling ? 'Yes' : (isBonding ? 'No' : lamRollChk),
             check_color:              isRaw ? checkColor : (isBonding ? 'N/A' : lamColorRes),
-            color_check_status:       isRaw ? '' : (isBonding ? '' : lamColorChoice),
+            color_check_status:       isRaw ? '' : (isBonding ? '' : (isRolling ? rollStatus : lamColorChoice)),
             color_check_result:       isRaw ? checkColor : (isBonding ? '' : lamColorRes),
-            packaging_status:         isRaw ? '' : (isBonding ? '' : lamPackagingChoice),
+            packaging_status:         isRaw ? '' : (isBonding ? '' : (isRolling ? '' : lamPackagingChoice)),
             packaging_reject_reason:  isBonding ? '' : lamPkgReason,
-            roll_inspection_flag:     isRaw ? rollingChecked : (isBonding ? 'No' : lamRollChk),
-            roll_inspection_percentage: isRaw ? '' : (isBonding ? '' : lamRollPct),
+            roll_inspection_flag:     isRolling ? rollStatus : (isBonding ? 'No' : lamRollChk),
+            roll_inspection_percentage: isRolling ? rollPctVal : (isBonding ? '' : lamRollPct),
             approved_by_leader:       isBonding ? '' : (leaderSelect ? leaderSelect.value : ''),
             file_data:                fileData,
             file_name:                fileName,

@@ -454,13 +454,14 @@ export async function apiConsolidateDuplicateInspections() {
 
 /**
  * Submit satu hasil inspeksi.
- * Seluruh tipe inspeksi (Raw Material, Laminating, Bonding) disatukan ke baris yang sama per Master Data.
+ * Seluruh tipe inspeksi (Raw Material, Laminating, Bonding, Rolling) disatukan ke baris yang sama per Master Data.
  */
 export async function apiSubmitInspection(payload) {
     let evidenceUrl = payload.evidence_url || '';
     const isBonding = (payload.inspection_type || '').toLowerCase().includes('bonding');
     const isLam = (payload.inspection_type || '').toLowerCase().includes('laminating');
-    const isRaw = (payload.inspection_type || '').toLowerCase().includes('raw') || (!isBonding && !isLam);
+    const isRolling = (payload.inspection_type || '').toLowerCase().includes('rolling');
+    const isRaw = (payload.inspection_type || '').toLowerCase().includes('raw') || (!isBonding && !isLam && !isRolling);
 
     // Upload file evidence/bonding ke Google Drive jika ada
     if (payload.file_data && payload.file_name) {
@@ -523,6 +524,7 @@ export async function apiSubmitInspection(payload) {
             inspector_nik: payload.inspector_nik || existing.inspector_nik,
             approved_by_leader: payload.approved_by_leader || existing.approved_by_leader || '',
             ...(isRaw && evidenceUrl ? { evidence_url: evidenceUrl } : {}),
+            ...(isRolling && evidenceUrl ? { evidence_url: evidenceUrl } : {}),
             ...(bUrl ? { bonding_test_url: bUrl } : {}),
             ...(payload.color_check_status ? { color_check_status: payload.color_check_status } : {}),
             ...(payload.color_check_result ? { color_check_result: payload.color_check_result } : {}),
@@ -539,17 +541,17 @@ export async function apiSubmitInspection(payload) {
 
         if (error) throw new Error(error.message);
 
-        const hasRaw = (isRaw && ((Number(payload.qty_inspect) || 0) > 0 || ok > 0 || noQ > 0)) || (existing && (Number(existing.ok) > 0 || Number(existing.no_qty) > 0 || (existing.inspection_type || '').toLowerCase().includes('raw')));
-        const hasLam = Boolean(patch.color_check_status || (existing && (existing.color_check_status || existing.packaging_status)));
-        const hasBond = Boolean(patch.bonding_test_url || (existing && existing.bonding_test_url));
-        const allCompleted = hasRaw && hasLam && hasBond;
-        const newMdStatus = allCompleted ? 'done' : 'in-progress';
-
         // Update status master data
         if (payload.master_data_id) {
+            const mdPatch = {};
+            if (isRaw) mdPatch.raw_done = true;
+            if (isRolling) mdPatch.rolling_done = true;
+            if (isLam) mdPatch.laminating_done = true;
+            if (isBonding) mdPatch.bonding_done = true;
+
             await supabase
                 .from('material_master_data')
-                .update({ status: newMdStatus })
+                .update(mdPatch)
                 .eq('id', payload.master_data_id);
         }
 
@@ -557,6 +559,11 @@ export async function apiSubmitInspection(payload) {
     }
 
     // INSERT BARIS PERTAMA
+    let inspectTypeStr = payload.inspection_type || 'Raw Material';
+    if (isRolling) inspectTypeStr = 'Rolling Inspection';
+    else if (isLam) inspectTypeStr = 'Laminating';
+    else if (isBonding) inspectTypeStr = 'Bonding Test';
+
     const row = {
         inspection_id:            inspectionId,
         master_data_id:           payload.master_data_id || null,
@@ -571,15 +578,15 @@ export async function apiSubmitInspection(payload) {
         inspection_date:          payload.inspection_date || new Date().toISOString(),
         inspector_nik:            payload.inspector_nik || payload.inspector_name || '',
         defect_notes:             payload.defect_notes || payload.bonding_notes || '',
-        rolling_inspection:       payload.rolling_inspection || 'No',
+        rolling_inspection:       isRolling ? 'Yes' : (payload.rolling_inspection || 'No'),
         approved_by_leader:       payload.approved_by_leader || '',
-        evidence_url:             isRaw ? evidenceUrl : '',
-        inspection_type:          payload.inspection_type || 'Raw Material',
+        evidence_url:             (isRaw || isRolling) ? evidenceUrl : '',
+        inspection_type:          inspectTypeStr,
         color_check_status:       payload.color_check_status || '',
         color_check_result:       payload.color_check_result || '',
         packaging_status:         payload.packaging_status || '',
         packaging_reject_reason:  payload.packaging_reject_reason || '',
-        roll_inspection_flag:     payload.roll_inspection_flag || '',
+        roll_inspection_flag:     payload.roll_inspection_flag || (isRolling ? 'Yes' : ''),
         roll_inspection_percentage: payload.roll_inspection_percentage || '',
         bonding_test_url:         bUrl,
         input_type:               'manual',
@@ -588,16 +595,16 @@ export async function apiSubmitInspection(payload) {
     const { error } = await supabase.from('material_inspections').insert(row);
     if (error) throw new Error(error.message);
 
-    const hasRaw = (isRaw && ((Number(payload.qty_inspect) || 0) > 0 || ok > 0 || noQ > 0));
-    const hasLam = Boolean(row.color_check_status || row.packaging_status);
-    const hasBond = Boolean(row.bonding_test_url);
-    const allCompleted = hasRaw && hasLam && hasBond;
-    const newMdStatus = allCompleted ? 'done' : 'in-progress';
-
     if (payload.master_data_id) {
+        const mdPatch = {};
+        if (isRaw) mdPatch.raw_done = true;
+        if (isRolling) mdPatch.rolling_done = true;
+        if (isLam) mdPatch.laminating_done = true;
+        if (isBonding) mdPatch.bonding_done = true;
+
         await supabase
             .from('material_master_data')
-            .update({ status: newMdStatus })
+            .update(mdPatch)
             .eq('id', payload.master_data_id);
     }
 
@@ -685,12 +692,14 @@ export async function apiDeleteInspection(id) {
  * @param {number[]} rowIds     - array ID dari material_master_data
  * @param {string}  adminNik
  * @param {string}  adminName
+ * @param {string}  reason
  */
-export async function apiPassAll(rowIds, adminNik, adminName) {
+export async function apiPassAll(rowIds, adminNik, adminName, reason = '') {
     const { data, error } = await supabase.rpc('fn_pass_all_materials', {
         target_ids: rowIds,
         admin_nik:  adminNik,
         admin_name: adminName,
+        p_reason:   reason || 'Sertifikat CoA / Lab Test Vendor Valid',
     });
     if (error) throw new Error(error.message);
     return data;

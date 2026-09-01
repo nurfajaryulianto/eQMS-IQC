@@ -168,13 +168,32 @@ function renderInspectionLog(data) {
         const statusColor = d.status === 'done' ? '#34d399' : d.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
 
         const typeBadge = (type) => {
-            const typeColors = {
-                'Raw Material': '#60a5fa', 'Laminating Material': '#a78bfa',
-                'Bonding Test': '#f97316', 'LEATHER': '#10b981', 'TEXTILE': '#a78bfa',
-                'SYNTHETIC': '#f59e0b', 'RUBBER': '#f87171', 'PACKAGING': '#34d399',
-            };
-            const c = typeColors[type] || '#94a3b8';
-            return `<span style="font-size:10px;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">` + esc(type || '—') + `</span>`;
+            const rawType = (type || '').trim();
+            const upper = rawType.toUpperCase();
+            let c = '#94a3b8';
+            let label = rawType || '—';
+
+            if (upper.includes('RAW')) {
+                c = '#10b981';
+                label = 'Raw Material';
+            } else if (upper.includes('ROLLING')) {
+                c = '#06b6d4';
+                label = 'Rolling Inspection';
+            } else if (upper.includes('LAMINATING') || upper.includes('LAM')) {
+                c = '#f59e0b';
+                label = 'Laminating';
+            } else if (upper.includes('BONDING')) {
+                c = '#f43f5e';
+                label = 'Bonding Test';
+            } else {
+                const typeColors = {
+                    'LEATHER': '#10b981', 'TEXTILE': '#a78bfa',
+                    'SYNTHETIC': '#f59e0b', 'RUBBER': '#f87171', 'PACKAGING': '#34d399',
+                };
+                c = typeColors[upper] || '#94a3b8';
+            }
+
+            return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">` + esc(label) + `</span>`;
         };
 
         const badges = [];
@@ -218,12 +237,23 @@ function renderInspectionLog(data) {
 
         const matDescDisplay = d.material_description || d.item_description || d.material_name || '—';
 
+        let adminPassAllBadge = '';
+        if (d.executed_by) {
+            const reasonText = d.pass_reason ? `Alasan Pass All: ${d.pass_reason}` : 'Pass All Admin Bypass';
+            adminPassAllBadge = `<div style="font-size:9px;color:#c084fc;font-weight:600;margin-top:2px;display:flex;align-items:center;gap:3px;" title="${esc(reasonText)}">
+                <span class="material-symbols-outlined" style="font-size:11px;">verified_user</span>Pass All by ${esc(d.executed_by)}
+            </div>`;
+        }
+
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
             <td style="${TD}color:rgba(255,255,255,0.5);font-size:11px;" title="${dateFmt}">${dateFmt}</td>
             <td style="${TD}font-weight:700;color:#fff;font-size:11px;" title="${esc(d.po_no || d.po_number || '')}">${esc(d.po_no || d.po_number || '—')}</td>
             <td style="${TD}color:#34d399;font-weight:600;font-size:11px;" title="${esc(matDescDisplay)}">${esc(matDescDisplay)}</td>
             <td style="${TD}">${typeBadge(d.inspection_type)}</td>
-            <td style="${TD}color:rgba(255,255,255,0.9);font-size:11px;cursor:default;" title="${esc(inspTitle)}">${esc(inspDisplay)}</td>
+            <td style="${TD}color:rgba(255,255,255,0.9);font-size:11px;cursor:default;" title="${esc(inspTitle)}">
+                <div style="overflow:hidden;text-overflow:ellipsis;">${esc(inspDisplay)}</div>
+                ${adminPassAllBadge}
+            </td>
             <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:11px;">${ok.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:11px;">${noQty.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;color:#94a3b8;font-size:11px;">${passRate}</td>

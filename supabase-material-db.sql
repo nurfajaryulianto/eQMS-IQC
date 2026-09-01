@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS public.material_inspections (
   roll_inspection_percentage VARCHAR(50),
   bonding_test_url         TEXT,
   input_type               VARCHAR(50) DEFAULT 'manual',
+  executed_by              VARCHAR(255),
+  pass_reason              TEXT,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -198,7 +200,8 @@ CREATE TRIGGER trg_sync_md_status
 CREATE OR REPLACE FUNCTION fn_pass_all_materials(
   target_ids  BIGINT[],
   admin_nik   TEXT,
-  admin_name  TEXT
+  admin_name  TEXT,
+  p_reason    TEXT DEFAULT ''
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -209,7 +212,10 @@ DECLARE
   v_insp_nik   TEXT;
   v_insp_name  TEXT;
   v_mat_type   TEXT;
+  v_eff_reason TEXT;
 BEGIN
+  v_eff_reason := COALESCE(NULLIF(TRIM(p_reason), ''), 'Pass All by Admin');
+
   FOREACH v_id IN ARRAY target_ids LOOP
     SELECT * INTO v_row FROM public.material_master_data WHERE id = v_id;
     IF NOT FOUND THEN CONTINUE; END IF;
@@ -240,16 +246,7 @@ BEGIN
       LIMIT 1;
     END IF;
 
-    -- 3. Fallback: check wildcard 'ALL' in material_assignments
-    IF v_insp_nik IS NULL OR v_insp_nik = '' THEN
-      SELECT inspector_nik, inspector_name INTO v_insp_nik, v_insp_name
-      FROM public.material_assignments
-      WHERE UPPER(TRIM(material_type)) = 'ALL'
-        AND inspector_nik IS NOT NULL AND TRIM(inspector_nik) <> ''
-      LIMIT 1;
-    END IF;
-
-    -- 4. Fallback: lookup from public.material_users (or app_users fallback)
+    -- 3. Fallback: lookup from public.material_users by material_assignment
     IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_mat_type <> '' THEN
       SELECT nik, display_name INTO v_insp_nik, v_insp_name
       FROM public.material_users
@@ -257,6 +254,17 @@ BEGIN
         AND (UPPER(material_assignment) LIKE '%' || v_mat_type || '%' OR UPPER(material_assignment) = 'ALL')
       ORDER BY id ASC
       LIMIT 1;
+    END IF;
+
+    -- 4. Fallback: match keyword from material_name against material_users
+    IF (v_insp_nik IS NULL OR v_insp_nik = '') AND v_row.material_name IS NOT NULL THEN
+      IF UPPER(v_row.material_name) LIKE '%TXT%' OR UPPER(v_row.material_name) LIKE '%MESH%' THEN
+        SELECT nik, display_name INTO v_insp_nik, v_insp_name FROM public.material_users WHERE LOWER(role) = 'inspector' AND UPPER(material_assignment) LIKE '%TEXTILE%' ORDER BY id ASC LIMIT 1;
+      ELSIF UPPER(v_row.material_name) LIKE '%LTH%' OR UPPER(v_row.material_name) LIKE '%LEATHER%' THEN
+        SELECT nik, display_name INTO v_insp_nik, v_insp_name FROM public.material_users WHERE LOWER(role) = 'inspector' AND UPPER(material_assignment) LIKE '%LEATHER%' ORDER BY id ASC LIMIT 1;
+      ELSIF UPPER(v_row.material_name) LIKE '%SYN%' OR UPPER(v_row.material_name) LIKE '%PU%' THEN
+        SELECT nik, display_name INTO v_insp_nik, v_insp_name FROM public.material_users WHERE LOWER(role) = 'inspector' AND UPPER(material_assignment) LIKE '%SYNTHETIC%' ORDER BY id ASC LIMIT 1;
+      END IF;
     END IF;
 
     -- 5. Fallback: pick ANY first available inspector from public.material_users
@@ -280,17 +288,24 @@ BEGIN
       inspection_id, master_data_id, po_no, material_name,
       qty_receive, ok, no_qty,
       receive_date, status, inspection_date,
-      inspector_nik, inspection_type, input_type, created_at
+      inspector_nik, inspection_type, input_type,
+      executed_by, pass_reason, created_at
     ) VALUES (
       v_insp_id, v_id, v_row.po_number, v_row.material_name,
       v_row.batch_size, v_row.batch_size, 0,
       v_row.receive_date, 'done', NOW(),
-      v_insp_nik, COALESCE(NULLIF(v_row.material_type, ''), 'Raw Material'), 'batch_pass_all', NOW()
+      v_insp_nik, COALESCE(NULLIF(v_row.material_type, ''), 'Raw Material'), 'batch_pass_all',
+      admin_name, v_eff_reason, NOW()
     );
 
-    -- Update master data status directly to done
+    -- Update master data status and mark all 4 inspection flags to done
     UPDATE public.material_master_data
-    SET status = 'done'
+    SET status = 'done',
+        raw_done = TRUE,
+        rolling_done = TRUE,
+        laminating_done = TRUE,
+        bonding_done = TRUE,
+        updated_at = NOW()
     WHERE id = v_id;
 
     v_count := v_count + 1;
@@ -571,4 +586,9 @@ CREATE POLICY "subcont_storage_select" ON storage.objects
 CREATE POLICY "subcont_storage_insert" ON storage.objects
   FOR INSERT TO authenticated, anon
   WITH CHECK (bucket_id = 'subcont-evidence');
+
+-- ─── 10. MIGRATION ALTER COLUMNS (4 Types & Pass All Traceability) ───
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS rolling_done BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS executed_by VARCHAR(255);
+ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS pass_reason TEXT;
 
