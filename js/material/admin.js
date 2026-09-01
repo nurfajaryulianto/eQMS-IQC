@@ -1144,27 +1144,39 @@ function renderUsersTable() {
         }
 
         const rawAssign = (u.material_assignment || u.material_type || '').trim();
-        let badgeHtml = '—';
+        let badgeHtml = '<span style="color:rgba(255,255,255,0.35);font-size:12px;">—</span>';
         if (rawAssign) {
-            const tokens = rawAssign.split(',').map(t => t.trim()).filter(Boolean);
+            const tokens = rawAssign.split(/[,&/]+/).map(t => t.trim()).filter(Boolean);
             badgeHtml = tokens.map(tok => {
                 const upper = tok.toUpperCase();
-                if (upper === 'RAW MATERIAL') return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);margin:2px;">Raw</span>`;
-                if (upper.includes('ROLLING')) return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.3);margin:2px;">Rolling</span>`;
-                if (upper === 'LAMINATING') return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);margin:2px;">Laminating</span>`;
-                if (upper.includes('BONDING')) return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(244,63,94,0.15);color:#fb7185;border:1px solid rgba(244,63,94,0.3);margin:2px;">Bonding</span>`;
-                return `<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);margin:2px;">${esc(tok)}</span>`;
-            }).join(' ');
+                if (upper === 'RAW MATERIAL' || upper === 'RAW') {
+                    return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">inventory_2</span>Raw Material</span>`;
+                }
+                if (upper.includes('ROLLING')) {
+                    return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">autorenew</span>Rolling</span>`;
+                }
+                if (upper.includes('LAMINATING') || upper === 'LAM') {
+                    return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">layers</span>Laminating</span>`;
+                }
+                if (upper.includes('BONDING')) {
+                    return `<span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(244,63,94,0.15);color:#fb7185;border:1px solid rgba(244,63,94,0.3);white-space:nowrap;display:inline-flex;align-items:center;gap:3px;"><span class="material-symbols-outlined" style="font-size:11px;">science</span>Bonding</span>`;
+                }
+                return `<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">${esc(tok)}</span>`;
+            }).join('');
         }
 
         return `<tr>
-            <td style="padding:12px 14px;font-weight:700;color:white;">${esc(u.nik)}</td>
-            <td style="padding:12px 14px;color:rgba(255,255,255,0.85);">${esc(u.name)}</td>
-            <td style="padding:12px 14px;">${roleLabel}</td>
-            <td style="padding:12px 14px;display:flex;flex-wrap:wrap;gap:2px;">${badgeHtml}</td>
-            <td style="padding:12px 14px;color:rgba(255,255,255,0.5);">${esc(dateStr)}</td>
-            <td style="padding:12px 14px;text-align:center;">
-                <div style="display:flex;gap:12px;justify-content:center;">
+            <td style="padding:12px 14px;font-weight:700;color:white;vertical-align:middle;white-space:nowrap;">${esc(u.nik)}</td>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.85);vertical-align:middle;font-weight:600;">${esc(u.name)}</td>
+            <td style="padding:12px 14px;vertical-align:middle;white-space:nowrap;">${roleLabel}</td>
+            <td style="padding:12px 14px;vertical-align:middle;">
+                <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                    ${badgeHtml}
+                </div>
+            </td>
+            <td style="padding:12px 14px;color:rgba(255,255,255,0.5);vertical-align:middle;white-space:nowrap;font-size:12px;">${esc(dateStr)}</td>
+            <td style="padding:12px 14px;text-align:center;vertical-align:middle;white-space:nowrap;">
+                <div style="display:flex;gap:8px;justify-content:center;align-items:center;">
                     <button onclick="window.editUser('${u.nik}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#60a5fa;border-color:rgba(96,165,250,0.3);">Edit</button>
                     <button onclick="window.deleteUser('${u.nik}')" class="btn-secondary" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;color:#f87171;border-color:rgba(248,113,113,0.3);">Delete</button>
                 </div>
@@ -1191,7 +1203,7 @@ window.handleUserSubmit = async function (e) {
 
     const allAssignments = [...selectedTypes, ...selectedCats];
     if (customVal) {
-        customVal.split(',').forEach(t => {
+        customVal.split(/[,&/]+/).forEach(t => {
             const trimmed = t.trim();
             if (trimmed && !allAssignments.includes(trimmed)) allAssignments.push(trimmed);
         });
@@ -1268,7 +1280,7 @@ window.editUser = function (nik) {
     const customTokens = [];
 
     if (rawAssign) {
-        const tokens = rawAssign.split(',').map(t => t.trim()).filter(Boolean);
+        const tokens = rawAssign.split(/[,&/]+/).map(t => t.trim()).filter(Boolean);
         tokens.forEach(tok => {
             let matched = false;
             document.querySelectorAll('.assign-chk-type, .assign-chk-cat').forEach(cb => {
