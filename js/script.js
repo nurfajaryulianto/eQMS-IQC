@@ -51,6 +51,8 @@ let tanggalIncomingInput;
 let vendorSelect;
 let selectedVendor = '';
 let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
+let currentUser = null;
+let currentUserRole = ROLES.INSPECTOR;
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -1183,7 +1185,12 @@ async function saveData() {
         // Upsert all component rows
         for (const row of sessionRowsToInsert) {
             const { error: insErr } = await supabase.from('subcont_inspections').upsert(row, { onConflict: 'session_id' });
-            if (insErr) throw new Error(insErr.message);
+            if (insErr) {
+                if (insErr.message && insErr.message.includes('invalid input syntax for type date')) {
+                    throw new Error("Tipe kolom 'bucket' di database Supabase masih DATE. Jalankan SQL berikut di Supabase SQL Editor agar bisa menyimpan >1 tanggal:\n\nALTER TABLE public.subcont_inspections ALTER COLUMN bucket TYPE TEXT USING bucket::TEXT;");
+                }
+                throw new Error(insErr.message);
+            }
         }
 
         // Simpan defect details
@@ -1201,7 +1208,8 @@ async function saveData() {
         if (typeof window.loadSubcontInspectionLog === 'function') window.loadSubcontInspectionLog();
     } catch (error) {
         console.error("Error saat mengirim data:", error);
-        await showAlert('Terjadi kesalahan saat menyimpan data. Periksa koneksi internet.', 'error');
+        const errMsg = error.message || 'Terjadi kesalahan saat menyimpan data. Periksa koneksi internet.';
+        await showAlert(errMsg, 'error', 'Gagal Menyimpan Data');
     } finally {
         if (loadingOverlay) {
             loadingOverlay.classList.remove('visible');
@@ -1685,6 +1693,7 @@ async function initApp() {
 
     // Tampilkan nama user yang sedang login di header
     const user = await getUser();
+    currentUser = user;
     const userDisplayEl = document.getElementById('user-display');
     if (userDisplayEl && user) {
         const displayName = user.user_metadata?.display_name || user.user_metadata?.nik || 'User';
@@ -1693,6 +1702,7 @@ async function initApp() {
 
     // Sembunyikan tombol statistik untuk inspector (hanya supervisor/manager/admin)
     const userRole = user?.user_metadata?.role || ROLES.INSPECTOR;
+    currentUserRole = userRole;
     const statisticBtn = document.querySelector('.statistic-button');
     if (statisticBtn && userRole === ROLES.INSPECTOR) {
         statisticBtn.style.display = 'none';
@@ -2209,8 +2219,14 @@ function populateFilterOptions() {
 
         // Set default to current user only on first initialization
         if (!filterOptionsInitialized) {
-            const userDisplayName = window.__eqmsDisplayName || '';
-            const matched = auditors.find(a => a.trim().toLowerCase() === userDisplayName.trim().toLowerCase());
+            const uMeta = currentUser?.user_metadata || {};
+            const userDisplayName = (uMeta.display_name || uMeta.name || window.__eqmsDisplayName || '').trim().toLowerCase();
+            const userNik = (uMeta.nik || '').trim().toLowerCase();
+            const matched = auditors.find(a => {
+                const audLower = a.trim().toLowerCase();
+                return (userDisplayName && (audLower === userDisplayName || audLower.includes(userDisplayName))) ||
+                       (userNik && (audLower === userNik || audLower.includes(userNik)));
+            });
             if (matched) {
                 auditorSelect.value = matched;
             } else {
@@ -2244,6 +2260,30 @@ function populateFilterOptions() {
     }
 
     filterOptionsInitialized = true;
+}
+
+/** Check if the current user has permission to edit an in-progress session */
+function canUserEditSession(session, user) {
+    if (!session) return false;
+    const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
+    // Admin dan Supervisor berwenang mengedit semua sesi
+    if (role === ROLES.ADMIN || role === ROLES.SUPERVISOR) {
+        return true;
+    }
+
+    const sessionAuditor = String(session.auditor || '').trim().toLowerCase();
+    if (!sessionAuditor) return false;
+
+    const uMeta = user?.user_metadata || {};
+    const candidates = [
+        uMeta.display_name,
+        uMeta.name,
+        uMeta.nik,
+        user?.email,
+        window.__eqmsDisplayName
+    ].filter(Boolean).map(c => String(c).trim().toLowerCase());
+
+    return candidates.some(c => c === sessionAuditor || sessionAuditor.includes(c) || c.includes(sessionAuditor));
 }
 
 /** Render inspection results gallery with status filter grouped by style/model */
@@ -2519,14 +2559,25 @@ function renderInspectionResultTable(sessions) {
             const isDone = targetObj && (targetObj.status || '').toLowerCase() === 'done';
 
             if (!isDone && activeInProgSession) {
-                actionHTML = `
-                                                <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
-                                                        title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
-                                                        class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
-                                                    <span class="material-symbols-outlined text-[12px]">edit</span>
-                                                    <span>Edit</span>
-                                                </button>
-                                            `;
+                const canEdit = canUserEditSession(targetObj, currentUser);
+                if (canEdit) {
+                    actionHTML = `
+                        <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
+                                title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
+                                class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                            <span class="material-symbols-outlined text-[12px]">edit</span>
+                            <span>Edit</span>
+                        </button>
+                    `;
+                } else {
+                    const auditorName = targetObj?.auditor || 'Auditor lain';
+                    actionHTML = `
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 rounded text-[9px] font-medium" title="Sesi In-Progress milik ${auditorName} (Hanya dapat diedit oleh pemilik)">
+                            <span class="material-symbols-outlined text-[11px] text-slate-500">lock</span>
+                            <span>In-Prog</span>
+                        </span>
+                    `;
+                }
             } else {
                 actionHTML = `<span class="text-[9px] text-slate-500 font-bold">Done</span>`;
             }
@@ -2570,6 +2621,12 @@ window.continueInProgressSession = function (sessionId) {
     const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
     if (!session) {
         showAlert('Data sesi tidak ditemukan.', 'error');
+        return;
+    }
+
+    if (!canUserEditSession(session, currentUser)) {
+        const ownerName = session.auditor || 'auditor lain';
+        showAlert(`Akses ditolak: Sesi ini milik ${ownerName}. Anda hanya berwenang mengedit sesi milik Anda sendiri.`, 'error', 'Wewenang Terbatas');
         return;
     }
 
