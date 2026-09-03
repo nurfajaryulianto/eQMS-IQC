@@ -145,18 +145,10 @@ window.setBucketDates = function(val, skipSave = false) {
 function initBucketComponent() {
     const todayStr = new Date().toISOString().split('T')[0];
     const bucketDatePicker = document.getElementById('bucket-date-picker');
-    const btnAddBucket = document.getElementById('btn-add-bucket-date');
     if (bucketDatePicker) {
         if (!bucketDatePicker.value) bucketDatePicker.value = todayStr;
         bucketDatePicker.onchange = () => {
             if (bucketDatePicker.value) {
-                window.addBucketDate(bucketDatePicker.value);
-            }
-        };
-    }
-    if (btnAddBucket) {
-        btnAddBucket.onclick = () => {
-            if (bucketDatePicker && bucketDatePicker.value) {
                 window.addBucketDate(bucketDatePicker.value);
             }
         };
@@ -1933,18 +1925,10 @@ async function initApp() {
         tanggalInspectionInput.value = todayStr;
     }
     const bucketDatePicker = document.getElementById('bucket-date-picker');
-    const btnAddBucket = document.getElementById('btn-add-bucket-date');
     if (bucketDatePicker) {
         bucketDatePicker.value = todayStr;
         bucketDatePicker.addEventListener('change', () => {
             if (bucketDatePicker.value) {
-                window.addBucketDate(bucketDatePicker.value);
-            }
-        });
-    }
-    if (btnAddBucket) {
-        btnAddBucket.addEventListener('click', () => {
-            if (bucketDatePicker && bucketDatePicker.value) {
                 window.addBucketDate(bucketDatePicker.value);
             }
         });
