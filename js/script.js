@@ -62,6 +62,112 @@ const STORAGE_KEYS = {
     QTY_SAMPLE_SET: 'qtySampleSet'
 };
 
+// ─── Multi-Date Bucket State & Helpers ─────────────────────────
+let selectedBucketDates = [];
+
+function renderBucketTags() {
+    const container = document.getElementById('bucket-tags-container');
+    const hiddenInput = document.getElementById('tanggal-bucket');
+    if (!container) return;
+
+    if (!selectedBucketDates.length) {
+        container.innerHTML = '<span style="font-size:12px;color:#94a3b8;font-style:italic;padding:2px 4px;">Belum ada tanggal bucket dipilih</span>';
+        if (hiddenInput) hiddenInput.value = '';
+        return;
+    }
+
+    container.innerHTML = selectedBucketDates.map(dateStr => {
+        const safeDate = String(dateStr).replace(/'/g, "\\'");
+        return `
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                <span>${dateStr}</span>
+                <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
+                    <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
+                </button>
+            </span>
+        `;
+    }).join('');
+
+    const joinedStr = selectedBucketDates.join(', ');
+    if (hiddenInput) hiddenInput.value = joinedStr;
+    saveToLocalStorage();
+}
+
+window.addBucketDate = function(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return;
+    const cleanDate = dateStr.trim();
+    if (!cleanDate) return;
+
+    if (cleanDate.includes(',')) {
+        cleanDate.split(',').forEach(d => window.addBucketDate(d));
+        return;
+    }
+
+    if (!selectedBucketDates.includes(cleanDate)) {
+        selectedBucketDates.push(cleanDate);
+        selectedBucketDates.sort();
+        renderBucketTags();
+    }
+};
+
+window.removeBucketDate = function(dateStr) {
+    selectedBucketDates = selectedBucketDates.filter(d => d !== dateStr);
+    renderBucketTags();
+};
+
+window.setBucketDates = function(val) {
+    selectedBucketDates = [];
+    if (!val) {
+        renderBucketTags();
+        return;
+    }
+    if (Array.isArray(val)) {
+        val.forEach(d => {
+            if (d && typeof d === 'string' && !selectedBucketDates.includes(d.trim())) {
+                selectedBucketDates.push(d.trim());
+            }
+        });
+    } else if (typeof val === 'string') {
+        val.split(/[,]+/).forEach(d => {
+            const trimmed = d.trim();
+            if (trimmed && !selectedBucketDates.includes(trimmed)) {
+                selectedBucketDates.push(trimmed);
+            }
+        });
+    }
+    renderBucketTags();
+};
+
+function initBucketComponent() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const bucketDatePicker = document.getElementById('bucket-date-picker');
+    const btnAddBucket = document.getElementById('btn-add-bucket-date');
+    if (bucketDatePicker) {
+        if (!bucketDatePicker.value) bucketDatePicker.value = todayStr;
+        bucketDatePicker.onchange = () => {
+            if (bucketDatePicker.value) {
+                window.addBucketDate(bucketDatePicker.value);
+            }
+        };
+    }
+    if (btnAddBucket) {
+        btnAddBucket.onclick = () => {
+            if (bucketDatePicker && bucketDatePicker.value) {
+                window.addBucketDate(bucketDatePicker.value);
+            }
+        };
+    }
+    if (!selectedBucketDates.length) {
+        window.setBucketDates(todayStr);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBucketComponent);
+} else {
+    initBucketComponent();
+}
+
 // ─── Vendor Button-Selection ──────────────────────────
 // State: single selection for vendor
 let selectedVendor = '';
@@ -261,7 +367,9 @@ function resetAllFields() {
     const today = new Date().toISOString().split('T')[0];
     if (tanggalIncomingInput) tanggalIncomingInput.value = today;
     if (tanggalInspectionInput) tanggalInspectionInput.value = today;
-    if (tanggalBucketInput) tanggalBucketInput.value = today;
+    window.setBucketDates(today);
+    const bucketPickerEl = document.getElementById('bucket-date-picker');
+    if (bucketPickerEl) bucketPickerEl.value = today;
 
     // Reset texts
     if (styleNumberInput) styleNumberInput.value = '';
@@ -1024,7 +1132,7 @@ async function saveData() {
                     ftt: Number(itemFtt.toFixed(4)),
                     redo_rate: Number(itemRedo.toFixed(4)),
                     tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
-                    bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
+                    bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
                     approved_by: dataToSend.approvedByLeader || '',
                     evidence_url: evidenceUrl,
                     status: dataToSend.status || 'Done',
@@ -1077,7 +1185,7 @@ async function saveData() {
                 ftt: Number(dataToSend.ftt) || 0,
                 redo_rate: Number(dataToSend.redoRate) || 0,
                 tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
-                bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.substring(0, 10) : null,
+                bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
                 approved_by: dataToSend.approvedByLeader || '',
                 evidence_url: evidenceUrl,
                 status: dataToSend.status || 'Done',
@@ -1829,8 +1937,25 @@ async function initApp() {
     if (tanggalInspectionInput && !tanggalInspectionInput.value) {
         tanggalInspectionInput.value = todayStr;
     }
-    if (tanggalBucketInput && !tanggalBucketInput.value) {
-        tanggalBucketInput.value = todayStr;
+    const bucketDatePicker = document.getElementById('bucket-date-picker');
+    const btnAddBucket = document.getElementById('btn-add-bucket-date');
+    if (bucketDatePicker) {
+        bucketDatePicker.value = todayStr;
+        bucketDatePicker.addEventListener('change', () => {
+            if (bucketDatePicker.value) {
+                window.addBucketDate(bucketDatePicker.value);
+            }
+        });
+    }
+    if (btnAddBucket) {
+        btnAddBucket.addEventListener('click', () => {
+            if (bucketDatePicker && bucketDatePicker.value) {
+                window.addBucketDate(bucketDatePicker.value);
+            }
+        });
+    }
+    if (!selectedBucketDates.length) {
+        window.setBucketDates(todayStr);
     }
 
     if (modelNameInput) {
@@ -2490,8 +2615,10 @@ window.continueInProgressSession = function (sessionId) {
     if (tinEl && session.tanggalIncoming) tinEl.value = session.tanggalIncoming;
     const tinsEl = document.getElementById('tanggal-inspection');
     if (tinsEl && session.tanggalInspection) tinsEl.value = session.tanggalInspection;
-    const tbEl = document.getElementById('tanggal-bucket');
-    if (tbEl && session.tanggalBucket) tbEl.value = session.tanggalBucket;
+    const bVal = session.tanggalBucket || session.bucket || '';
+    if (bVal) {
+        window.setBucketDates(bVal);
+    }
     const styleEl = document.getElementById('style-number');
     if (styleEl && session.styleNumber) styleEl.value = session.styleNumber;
     const modelEl = document.getElementById('model-name');

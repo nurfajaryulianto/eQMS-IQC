@@ -1586,6 +1586,7 @@ window.showSubcontSessionDetail = async function(rawSessionId) {
         grid.innerHTML = `
             <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-800">${session.date || '-'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Tgl Inspeksi</span><span class="font-bold text-slate-800">${session.tanggal_insp || '-'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Bucket Date</span><span class="font-bold text-blue-700 font-mono text-xs">${session.bucket || '-'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Lokasi Inspeksi</span>${locationBadge}</div>
             <div><span class="text-slate-400 block text-[10px]">Status</span><span class="font-bold text-slate-800">${session.status || 'Done'}</span></div>
             <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-800">${(Number(session.qty_incoming) || 0).toLocaleString()}</span></div>
