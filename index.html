@@ -163,6 +163,17 @@
             display: none !important;
         }
 
+        /* Mobile bottom navigation spacing guarantee */
+        @media (max-width: 767px) {
+            .app-view {
+                padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)) !important;
+            }
+            .mobile-bottom-nav {
+                padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+                height: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
+            }
+        }
+
         /* Analytics loading overlay (scoped to analytics view) */
         #analytics-loading-overlay {
             display: none;
@@ -834,7 +845,7 @@
         <main class="flex-1 overflow-y-auto">
 
             <!-- ====== VIEW: DASHBOARD (Inspection Form) ====== -->
-            <div id="view-dashboard" class="app-view p-4 lg:p-6">
+            <div id="view-dashboard" class="app-view p-4 lg:p-6 pb-28 md:pb-6">
                 <div class="max-w-[1400px] mx-auto">
 
                     <!-- Top Metrics Row -->
@@ -1156,6 +1167,8 @@
                             </button>
                             <p class="save-progress-hint hidden text-center text-xs text-slate-500 mt-1">
                             </p>
+                            <!-- Mobile spacer to ensure Simpan Data is never obstructed by bottom navbar -->
+                            <div class="block md:hidden h-8 w-full"></div>
                         </div>
 
                     </div><!-- end grid -->
@@ -1165,7 +1178,7 @@
 
 
             <!-- ====== VIEW: ANALYTICS (Statistics Dashboard) ====== -->
-            <div id="view-analytics" class="app-view hidden p-4 lg:p-6" style="position:relative;">
+            <div id="view-analytics" class="app-view hidden p-4 lg:p-6 pb-28 md:pb-6" style="position:relative;">
                 <!-- Analytics loading overlay -->
                 <div id="analytics-loading-overlay">
                     <div class="spinner"></div>
@@ -1445,7 +1458,7 @@
         </div>
 
             <!-- ====== VIEW: INSPECTION RESULT ====== -->
-            <div id="view-inspection-result" class="app-view hidden p-4 lg:p-6 pb-20 md:pb-6">
+            <div id="view-inspection-result" class="app-view hidden p-4 lg:p-6 pb-28 md:pb-6">
                 <div class="max-w-[1400px] mx-auto flex flex-col gap-6">
                     <div class="flex items-center justify-between">
                         <div>
@@ -1523,7 +1536,7 @@
             </div>
 
             <!-- ====== VIEW: LEADER MONITOR ====== -->
-            <div id="view-leader-monitor" class="app-view hidden p-4 lg:p-6">
+            <div id="view-leader-monitor" class="app-view hidden p-4 lg:p-6 pb-28 md:pb-6">
                 <div class="max-w-[1200px] mx-auto flex flex-col gap-6">
                     <div class="flex items-center justify-between">
                         <div>
@@ -1600,7 +1613,7 @@
             </div>
 
             <!-- ====== VIEW: ADMIN ====== -->
-            <div id="view-admin" class="app-view hidden p-4 lg:p-6">
+            <div id="view-admin" class="app-view hidden p-4 lg:p-6 pb-28 md:pb-6">
                 <div class="max-w-[1100px] mx-auto">
                     <div class="mb-5">
                         <h2 class="text-xl font-bold text-slate-900">Admin Panel</h2>
@@ -2620,7 +2633,7 @@
     </div>
 
     <!-- ====== MOBILE BOTTOM NAVIGATION (Gestalt Principle) ====== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-1">
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-1 mobile-bottom-nav">
         <button onclick="showView('dashboard')" data-view="dashboard" class="mobile-nav-link active flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
             <span class="material-symbols-outlined text-[20px]">edit_document</span>
             <span class="text-[10px] font-semibold mt-0.5">Form</span>
