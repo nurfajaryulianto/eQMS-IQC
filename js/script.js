@@ -1495,6 +1495,7 @@ function openInspectionItemModal(index = null) {
 
     // Show Modal
     modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
 }
 
 function updateModalGradeState() {
@@ -1603,6 +1604,7 @@ window.handleModalDefectClick = function (defectType) {
 function closeInspectionItemModal() {
     const modal = document.getElementById('inspection-item-modal');
     if (modal) modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
     editingItemIndex = null;
 }
 

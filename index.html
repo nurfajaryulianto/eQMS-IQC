@@ -171,7 +171,23 @@
             .mobile-bottom-nav {
                 padding-bottom: env(safe-area-inset-bottom, 0px) !important;
                 height: calc(3.75rem + env(safe-area-inset-bottom, 0px)) !important;
+                z-index: 40 !important;
             }
+        }
+
+        /* Ensure all modal overlays are strictly above header and mobile bottom navbar */
+        #inspection-item-modal,
+        #subcont-session-detail-modal,
+        #subcont-session-edit-modal {
+            z-index: 100 !important;
+        }
+
+        /* Completely hide mobile bottom navbar whenever any modal is open */
+        body.modal-open .mobile-bottom-nav,
+        body:has(#inspection-item-modal:not(.hidden)) .mobile-bottom-nav,
+        body:has(#subcont-session-detail-modal:not(.hidden)) .mobile-bottom-nav,
+        body:has(#subcont-session-edit-modal:not(.hidden)) .mobile-bottom-nav {
+            display: none !important;
         }
 
         /* Analytics loading overlay (scoped to analytics view) */
@@ -2302,7 +2318,7 @@
     </div>
 
     <!-- MODAL DETAIL INSPEKSI SUBCONT -->
-    <div id="subcont-session-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
+    <div id="subcont-session-detail-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div>
@@ -2364,7 +2380,7 @@
     </div>
 
     <!-- MODAL EDIT INSPEKSI SUBCONT (Sheet 1 Session) -->
-    <div id="subcont-session-edit-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
+    <div id="subcont-session-edit-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs hidden p-4">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div class="flex items-center gap-2">
@@ -2522,8 +2538,8 @@
         };
     </script>
     <!-- ====== MODAL: ADD/EDIT INSPECTION ITEM ====== -->
-    <div id="inspection-item-modal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div id="inspection-item-modal" class="fixed inset-0 z-[100] hidden bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[86vh] sm:max-h-[90vh]">
             <!-- Header -->
             <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <h3 id="modal-item-title" class="text-base font-bold text-slate-900">Tambah Item Inspeksi</h3>
@@ -2630,7 +2646,7 @@
     </div>
 
     <!-- ====== MOBILE BOTTOM NAVIGATION (Gestalt Principle) ====== -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-1 mobile-bottom-nav">
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-lg flex items-center justify-around h-14 px-1 mobile-bottom-nav">
         <button onclick="showView('dashboard')" data-view="dashboard" class="mobile-nav-link active flex flex-col items-center justify-center flex-1 h-full text-slate-500 hover:text-blue-600 transition-colors cursor-pointer">
             <span class="material-symbols-outlined text-[20px]">edit_document</span>
             <span class="text-[10px] font-semibold mt-0.5">Form</span>
