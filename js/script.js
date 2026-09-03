@@ -49,6 +49,8 @@ let modelNameInput;
 let styleNumberInput;
 let tanggalIncomingInput;
 let vendorSelect;
+let selectedVendor = '';
+let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -65,7 +67,7 @@ const STORAGE_KEYS = {
 // ─── Multi-Date Bucket State & Helpers ─────────────────────────
 let selectedBucketDates = [];
 
-function renderBucketTags() {
+function renderBucketTags(skipSave = false) {
     const container = document.getElementById('bucket-tags-container');
     const hiddenInput = document.getElementById('tanggal-bucket');
     if (!container) return;
@@ -90,7 +92,9 @@ function renderBucketTags() {
 
     const joinedStr = selectedBucketDates.join(', ');
     if (hiddenInput) hiddenInput.value = joinedStr;
-    saveToLocalStorage();
+    if (!skipSave && typeof saveToLocalStorage === 'function') {
+        saveToLocalStorage();
+    }
 }
 
 window.addBucketDate = function(dateStr) {
@@ -115,10 +119,10 @@ window.removeBucketDate = function(dateStr) {
     renderBucketTags();
 };
 
-window.setBucketDates = function(val) {
+window.setBucketDates = function(val, skipSave = false) {
     selectedBucketDates = [];
     if (!val) {
-        renderBucketTags();
+        renderBucketTags(skipSave);
         return;
     }
     if (Array.isArray(val)) {
@@ -135,7 +139,7 @@ window.setBucketDates = function(val) {
             }
         });
     }
-    renderBucketTags();
+    renderBucketTags(skipSave);
 };
 
 function initBucketComponent() {
@@ -158,20 +162,11 @@ function initBucketComponent() {
         };
     }
     if (!selectedBucketDates.length) {
-        window.setBucketDates(todayStr);
+        window.setBucketDates(todayStr, true);
     }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initBucketComponent);
-} else {
-    initBucketComponent();
-}
-
 // ─── Vendor Button-Selection ──────────────────────────
-// State: single selection for vendor
-let selectedVendor = '';
-let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 
 const VENDOR_BTN_CLS = 'vendor-sel-btn';
 const COMPONENT_BTN_CLS = 'component-sel-btn';
@@ -454,9 +449,9 @@ function saveToLocalStorage() {
             tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
             tanggalInspection: tanggalInspectionInput ? tanggalInspectionInput.value : '',
             tanggalBucket: tanggalBucketInput ? tanggalBucketInput.value : '',
-            materialType: selectedMaterialType,
-            vendor: selectedVendor,
-            inspectionItems: inspectionItems
+            materialType: typeof selectedMaterialType !== 'undefined' ? selectedMaterialType : '',
+            vendor: typeof selectedVendor !== 'undefined' ? selectedVendor : '',
+            inspectionItems: typeof inspectionItems !== 'undefined' ? inspectionItems : []
         };
         localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
         localStorage.setItem(STORAGE_KEYS.DEFECT_COUNTS, JSON.stringify(defectCounts));
