@@ -948,11 +948,21 @@
                                             class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                     </div>
                                     <div>
-                                        <label for="tanggal-inspection"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal
-                                            Inspection</label>
-                                        <input type="date" id="tanggal-inspection"
-                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                            <label for="inspection-date-picker" style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">
+                                                Tanggal Inspection
+                                            </label>
+                                            <span style="font-size:11px;color:#94a3b8;font-weight:400;">Bisa > 1 tanggal</span>
+                                        </div>
+                                        <div style="margin-bottom:6px;">
+                                            <input type="date" id="inspection-date-picker"
+                                                style="width:100%;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;font-size:14px;padding:8px 12px;outline:none;"
+                                                title="Pilih tanggal untuk menambahkan ke daftar Tanggal Inspection">
+                                        </div>
+                                        <div id="inspection-tags-container" style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px;padding:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;align-items:center;">
+                                            <!-- Render tags -->
+                                        </div>
+                                        <input type="hidden" id="tanggal-inspection" name="tanggal-inspection">
                                     </div>
                                     <div>
                                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">

@@ -66,6 +66,84 @@ const STORAGE_KEYS = {
     QTY_SAMPLE_SET: 'qtySampleSet'
 };
 
+// ─── Multi-Date Inspection State & Helpers ─────────────────────
+let selectedInspectionDates = [];
+
+function renderInspectionTags(skipSave = false) {
+    const container = document.getElementById('inspection-tags-container');
+    const hiddenInput = document.getElementById('tanggal-inspection');
+    if (!container) return;
+
+    if (!selectedInspectionDates.length) {
+        container.innerHTML = '<span style="font-size:12px;color:#94a3b8;font-style:italic;padding:2px 4px;">Belum ada tanggal inspection dipilih</span>';
+        if (hiddenInput) hiddenInput.value = '';
+        return;
+    }
+
+    container.innerHTML = selectedInspectionDates.map(dateStr => {
+        const safeDate = String(dateStr).replace(/'/g, "\\'");
+        return `
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                <span>${dateStr}</span>
+                <button type="button" onclick="window.removeInspectionDate('${safeDate}')" style="color:#10b981;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
+                    <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
+                </button>
+            </span>
+        `;
+    }).join('');
+
+    const joinedStr = selectedInspectionDates.join(', ');
+    if (hiddenInput) hiddenInput.value = joinedStr;
+    if (!skipSave && typeof saveToLocalStorage === 'function') {
+        saveToLocalStorage();
+    }
+}
+
+window.addInspectionDate = function(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return;
+    const cleanDate = dateStr.trim();
+    if (!cleanDate) return;
+
+    if (cleanDate.includes(',')) {
+        cleanDate.split(',').forEach(d => window.addInspectionDate(d));
+        return;
+    }
+
+    if (!selectedInspectionDates.includes(cleanDate)) {
+        selectedInspectionDates.push(cleanDate);
+        selectedInspectionDates.sort();
+        renderInspectionTags();
+    }
+};
+
+window.removeInspectionDate = function(dateStr) {
+    selectedInspectionDates = selectedInspectionDates.filter(d => d !== dateStr);
+    renderInspectionTags();
+};
+
+window.setInspectionDates = function(val, skipSave = false) {
+    selectedInspectionDates = [];
+    if (!val) {
+        renderInspectionTags(skipSave);
+        return;
+    }
+    if (Array.isArray(val)) {
+        val.forEach(d => {
+            if (d && typeof d === 'string' && !selectedInspectionDates.includes(d.trim())) {
+                selectedInspectionDates.push(d.trim());
+            }
+        });
+    } else if (typeof val === 'string') {
+        val.split(/[,]+/).forEach(d => {
+            const trimmed = d.trim();
+            if (trimmed && !selectedInspectionDates.includes(trimmed)) {
+                selectedInspectionDates.push(trimmed);
+            }
+        });
+    }
+    renderInspectionTags(skipSave);
+};
+
 // ─── Multi-Date Bucket State & Helpers ─────────────────────────
 let selectedBucketDates = [];
 
@@ -355,7 +433,9 @@ function resetAllFields() {
     // Reset datepickers
     const today = new Date().toISOString().split('T')[0];
     if (tanggalIncomingInput) tanggalIncomingInput.value = today;
-    if (tanggalInspectionInput) tanggalInspectionInput.value = today;
+    window.setInspectionDates(today);
+    const inspPickerEl = document.getElementById('inspection-date-picker');
+    if (inspPickerEl) inspPickerEl.value = today;
     window.setBucketDates(today);
     const bucketPickerEl = document.getElementById('bucket-date-picker');
     if (bucketPickerEl) bucketPickerEl.value = today;
@@ -1120,7 +1200,7 @@ async function saveData() {
                     qty_defect: qDef,
                     ftt: Number(itemFtt.toFixed(4)),
                     redo_rate: Number(itemRedo.toFixed(4)),
-                    tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+                    tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
                     bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
                     approved_by: dataToSend.approvedByLeader || '',
                     evidence_url: evidenceUrl,
@@ -1135,7 +1215,7 @@ async function saveData() {
                         if (cnt > 0 && defectName) {
                             defectRowsToInsert.push({
                                 session_id: itemSessId,
-                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
                                 vendor: dataToSend.vendor || '',
                                 component: it.component || '',
                                 issue_finding: defectName,
@@ -1145,12 +1225,12 @@ async function saveData() {
                     });
                 } else if (qDef > 0) {
                     defectRowsToInsert.push({
-                        session_id: itemSessId,
-                        date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
-                        vendor: dataToSend.vendor || '',
-                        component: it.component || '',
-                        issue_finding: 'DEFECT GENERAL',
-                        count: qDef
+                                session_id: itemSessId,
+                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
+                                vendor: dataToSend.vendor || '',
+                                component: it.component || '',
+                                issue_finding: 'DEFECT GENERAL',
+                                count: qDef
                     });
                 }
             });
@@ -1173,7 +1253,7 @@ async function saveData() {
                 qty_defect: Number(dataToSend.defect) || 0,
                 ftt: Number(dataToSend.ftt) || 0,
                 redo_rate: Number(dataToSend.redoRate) || 0,
-                tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.substring(0, 10) : new Date().toISOString().substring(0, 10),
+                tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
                 bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
                 approved_by: dataToSend.approvedByLeader || '',
                 evidence_url: evidenceUrl,
@@ -1187,7 +1267,7 @@ async function saveData() {
             const { error: insErr } = await supabase.from('subcont_inspections').upsert(row, { onConflict: 'session_id' });
             if (insErr) {
                 if (insErr.message && insErr.message.includes('invalid input syntax for type date')) {
-                    throw new Error("Tipe kolom 'bucket' di database Supabase masih DATE. Jalankan SQL berikut di Supabase SQL Editor agar bisa menyimpan >1 tanggal:\n\nALTER TABLE public.subcont_inspections ALTER COLUMN bucket TYPE TEXT USING bucket::TEXT;");
+                    throw new Error("Tipe kolom 'tanggal_insp', 'bucket', atau 'date' di database Supabase masih DATE. Jalankan migration_inspection_date_type.sql di Supabase SQL Editor agar bisa menyimpan >1 tanggal:\n\nALTER TABLE public.subcont_inspections ALTER COLUMN tanggal_insp TYPE TEXT USING tanggal_insp::TEXT;\nALTER TABLE public.subcont_inspections ALTER COLUMN bucket TYPE TEXT USING bucket::TEXT;\nALTER TABLE public.subcont_defect_logs ALTER COLUMN date TYPE TEXT USING date::TEXT;");
                 }
                 throw new Error(insErr.message);
             }
@@ -1933,8 +2013,17 @@ async function initApp() {
     if (tanggalIncomingInput && !tanggalIncomingInput.value) {
         tanggalIncomingInput.value = todayStr;
     }
-    if (tanggalInspectionInput && !tanggalInspectionInput.value) {
-        tanggalInspectionInput.value = todayStr;
+    const inspectionDatePicker = document.getElementById('inspection-date-picker');
+    if (inspectionDatePicker) {
+        inspectionDatePicker.value = todayStr;
+        inspectionDatePicker.addEventListener('change', () => {
+            if (inspectionDatePicker.value) {
+                window.addInspectionDate(inspectionDatePicker.value);
+            }
+        });
+    }
+    if (!selectedInspectionDates.length) {
+        window.setInspectionDates(todayStr, true);
     }
     const bucketDatePicker = document.getElementById('bucket-date-picker');
     if (bucketDatePicker) {
@@ -2331,31 +2420,26 @@ function renderInspectionResultTable(sessions) {
         const matchesVendor = vendorFilter === 'all' ||
             (s.vendor || '').toLowerCase() === vendorFilter.toLowerCase();
 
-        let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
-        let cleanDate = '';
-        if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
-            const str = String(rawDate).trim();
-            if (str.includes('T')) {
-                cleanDate = str.split('T')[0];
-            } else if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-                cleanDate = str.slice(0, 10);
-            } else {
-                const parsed = new Date(str);
-                if (!isNaN(parsed.getTime())) {
-                    const y = parsed.getFullYear();
-                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-                    const d = String(parsed.getDate()).padStart(2, '0');
-                    cleanDate = `${y}-${m}-${d}`;
-                }
-            }
-        }
-
         let matchesDate = true;
-        if (dateStart && cleanDate) {
-            matchesDate = matchesDate && (cleanDate >= dateStart);
+        let sDates = [];
+        let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
+        if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
+            String(rawDate).split(/[,]+/).forEach(p => {
+                const trimmed = p.trim();
+                if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+                    sDates.push(trimmed.slice(0, 10));
+                } else if (trimmed) {
+                    const parsed = new Date(trimmed);
+                    if (!isNaN(parsed.getTime())) sDates.push(parsed.toISOString().slice(0, 10));
+                }
+            });
         }
-        if (dateEnd && cleanDate) {
-            matchesDate = matchesDate && (cleanDate <= dateEnd);
+        if (dateStart || dateEnd) {
+            if (!sDates.length) {
+                matchesDate = false;
+            } else {
+                matchesDate = sDates.some(d => (!dateStart || d >= dateStart) && (!dateEnd || d <= dateEnd));
+            }
         }
 
         return matchesSearch && matchesStatus && matchesDate && matchesAuditor && matchesVendor;
@@ -2401,24 +2485,19 @@ function renderInspectionResultTable(sessions) {
         if (s.status) g.statuses.add(s.status.toLowerCase().trim());
 
         let rawDate = s.tanggalInspection || s.tanggalIncoming || s.timestamp || '';
-        let cleanDate = '';
         if (rawDate && rawDate !== 'null' && rawDate !== 'undefined') {
-            const str = String(rawDate).trim();
-            if (str.includes('T')) {
-                cleanDate = str.split('T')[0];
-            } else if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-                cleanDate = str.slice(0, 10);
-            } else {
-                const parsed = new Date(str);
-                if (!isNaN(parsed.getTime())) {
-                    const y = parsed.getFullYear();
-                    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-                    const d = String(parsed.getDate()).padStart(2, '0');
-                    cleanDate = `${y}-${m}-${d}`;
+            String(rawDate).split(/[,]+/).forEach(p => {
+                const trimmed = p.trim();
+                if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+                    g.dates.add(trimmed.slice(0, 10));
+                } else if (trimmed) {
+                    const parsed = new Date(trimmed);
+                    if (!isNaN(parsed.getTime())) {
+                        g.dates.add(parsed.toISOString().slice(0, 10));
+                    }
                 }
-            }
+            });
         }
-        if (cleanDate) g.dates.add(cleanDate);
 
         if (s.items && s.items.length > 0) {
             s.items.forEach(it => {
@@ -2478,7 +2557,7 @@ function renderInspectionResultTable(sessions) {
         const dateArr = [...g.dates].sort();
         const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length - 1]}` : (dateArr[0] || '—');
 
-        // Aggregate items by component and process
+        // Aggregate items by component and process — prevent doubling incoming for same component lot across inspection days
         const itemAgg = {};
         g.items.forEach(it => {
             const itemKey = `${it.component}|${it.process}`;
@@ -2494,7 +2573,7 @@ function renderInspectionResultTable(sessions) {
                 };
             }
             const agg = itemAgg[itemKey];
-            agg.qtyIncoming += it.qtyIncoming;
+            agg.qtyIncoming = Math.max(agg.qtyIncoming, it.qtyIncoming);
             agg.qtyInspect += it.qtyInspect;
             agg.pass += it.pass;
             agg.defect += it.defect;
@@ -2653,6 +2732,9 @@ window.continueInProgressSession = function (sessionId) {
     if (tinEl && session.tanggalIncoming) tinEl.value = session.tanggalIncoming;
     const tinsEl = document.getElementById('tanggal-inspection');
     if (tinsEl && session.tanggalInspection) tinsEl.value = session.tanggalInspection;
+    if (session.tanggalInspection) {
+        window.setInspectionDates(session.tanggalInspection);
+    }
     const bVal = session.tanggalBucket || session.bucket || '';
     if (bVal) {
         window.setBucketDates(bVal);
