@@ -906,6 +906,9 @@
                                 <span class="material-symbols-outlined text-slate-500 text-[22px]">inventory_2</span>
                             </div>
                         </div>
+                    <!-- Draft Restore Banner -->
+                    <div id="draft-restore-banner" class="hidden mb-4 p-4 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-50 to-orange-50 text-slate-800 shadow-sm transition-all duration-200">
+                        <!-- Dynamic content injected by script.js -->
                     </div>
 
                     <!-- ── Main 3-Column Grid ── -->
@@ -993,18 +996,32 @@
                                             class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-700 text-sm px-3 py-2 focus:outline-none cursor-default">
                                     </div>
                                     <div>
-                                        <label for="style-number"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Style
-                                            Number</label>
-                                        <input type="text" id="style-number" placeholder="Style number diisi lengkap"
-                                            class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
-                                    </div>
-                                    <div>
-                                        <label for="model-name"
-                                            class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Model
-                                            Name</label>
-                                        <input type="text" id="model-name" placeholder="Enter model name" readonly
-                                            class="w-full rounded-md border border-slate-200 bg-slate-50 text-slate-900 text-sm px-3 py-2 focus:outline-none cursor-default">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                                            <label for="style-number-input" style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">
+                                                Style Number & Model
+                                            </label>
+                                            <span style="font-size:11px;color:#94a3b8;font-weight:400;">Bisa > 1 style</span>
+                                        </div>
+                                        <div style="display:flex;gap:6px;margin-bottom:6px;">
+                                            <div style="flex:1;position:relative;">
+                                                <input type="text" id="style-number-input" list="style-number-datalist" placeholder="Ketik Style Number (contoh: CW2288-111)..."
+                                                    style="width:100%;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;font-size:13px;padding:8px 12px;outline:none;"
+                                                    autocomplete="off">
+                                                <datalist id="style-number-datalist"></datalist>
+                                            </div>
+                                            <button type="button" id="btn-add-style"
+                                                style="background:#2563eb;color:#ffffff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;transition:background 0.15s;"
+                                                title="Tambahkan Style Number ke sesi">
+                                                <span class="material-symbols-outlined" style="font-size:16px;">add</span>
+                                                <span>Tambah</span>
+                                            </button>
+                                        </div>
+                                        <div id="style-model-preview" style="font-size:11px;color:#059669;margin-bottom:6px;min-height:16px;display:none;"></div>
+                                        <div id="style-tags-container" style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px;padding:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;align-items:center;">
+                                            <!-- Render tags -->
+                                        </div>
+                                        <input type="hidden" id="style-number" name="style-number">
+                                        <input type="hidden" id="model-name" name="model-name">
                                     </div>
                                     
                                     <!-- Status Inspeksi & Approved By Leader: desktop only; mobile version is in the mobile save card below -->

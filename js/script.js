@@ -5,7 +5,7 @@ import { supabase } from './db.js';
 const GAS_EVIDENCE_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 // --- IMPOR DATABASE DARI FILE TERPISAH ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap } from './admin.js';
+import { renderDefectButtons, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap, getStyleModels } from './admin.js';
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
@@ -238,6 +238,156 @@ function initBucketComponent() {
     }
 }
 
+// ─── Multi-Style & Model Component ─────────────────────
+let selectedStyles = []; // Array of { style: string, model: string }
+
+function renderStyleTags(skipSave = false) {
+    const container = document.getElementById('style-tags-container');
+    const hiddenStyle = document.getElementById('style-number');
+    const hiddenModel = document.getElementById('model-name');
+
+    if (container) {
+        if (!selectedStyles.length) {
+            container.innerHTML = '<span style="font-size:12px;color:#94a3b8;font-style:italic;">Belum ada style number dipilih</span>';
+        } else {
+            container.innerHTML = selectedStyles.map(item => `
+                <span style="display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;border:1px solid #7dd3fc;color:#0369a1;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:500;">
+                    <span style="font-weight:700;color:#0284c7;">${item.style}</span>
+                    <span style="color:#0369a1;font-size:11px;">(${item.model || '—'})</span>
+                    <button type="button" onclick="window.removeStyle('${item.style}')" style="background:transparent;border:none;color:#0284c7;cursor:pointer;font-weight:bold;font-size:14px;line-height:1;padding:0 2px;" title="Hapus">&times;</button>
+                </span>
+            `).join('');
+        }
+    }
+
+    const joinedStyles = selectedStyles.map(s => s.style).join(', ');
+    const joinedModels = selectedStyles.map(s => s.model || '—').join(', ');
+    if (hiddenStyle) hiddenStyle.value = joinedStyles;
+    if (hiddenModel) hiddenModel.value = joinedModels;
+
+    checkInfoCompleteAndLockButtons();
+    if (!skipSave && typeof saveToLocalStorage === 'function') {
+        saveToLocalStorage();
+    }
+}
+
+window.addStyle = function(styleStr, optModelStr) {
+    if (!styleStr || typeof styleStr !== 'string') return;
+    const clean = styleStr.trim();
+    if (!clean) return;
+
+    if (clean.includes(',')) {
+        clean.split(',').forEach(s => window.addStyle(s));
+        return;
+    }
+
+    const upperStyle = clean.toUpperCase();
+    if (selectedStyles.some(s => s.style === upperStyle)) {
+        return; // Sudah ada dalam daftar
+    }
+
+    let modelName = optModelStr ? optModelStr.trim() : '';
+    if (!modelName) {
+        const modelMap = getStyleModelDatabaseMap();
+        modelName = modelMap[upperStyle] || '—';
+    }
+
+    selectedStyles.push({ style: upperStyle, model: modelName });
+    renderStyleTags();
+
+    const inputEl = document.getElementById('style-number-input');
+    if (inputEl) inputEl.value = '';
+    const previewEl = document.getElementById('style-model-preview');
+    if (previewEl) {
+        previewEl.innerHTML = '';
+        previewEl.style.display = 'none';
+    }
+};
+
+window.removeStyle = function(styleStr) {
+    selectedStyles = selectedStyles.filter(s => s.style !== styleStr);
+    renderStyleTags();
+};
+
+window.setStyles = function(stylesVal, modelsVal, skipSave = false) {
+    selectedStyles = [];
+    if (!stylesVal) {
+        renderStyleTags(skipSave);
+        return;
+    }
+
+    const modelMap = getStyleModelDatabaseMap();
+
+    if (Array.isArray(stylesVal)) {
+        stylesVal.forEach(item => {
+            if (!item) return;
+            if (typeof item === 'object' && item.style) {
+                const upper = String(item.style).trim().toUpperCase();
+                const m = item.model || modelMap[upper] || '—';
+                if (!selectedStyles.some(s => s.style === upper)) {
+                    selectedStyles.push({ style: upper, model: m });
+                }
+            } else if (typeof item === 'string') {
+                const upper = item.trim().toUpperCase();
+                if (upper && !selectedStyles.some(s => s.style === upper)) {
+                    selectedStyles.push({ style: upper, model: modelMap[upper] || '—' });
+                }
+            }
+        });
+    } else if (typeof stylesVal === 'string') {
+        const sArr = stylesVal.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const mArr = (typeof modelsVal === 'string' ? modelsVal.split(',') : []).map(m => m.trim());
+        sArr.forEach((st, idx) => {
+            if (!selectedStyles.some(s => s.style === st)) {
+                const mName = (mArr[idx] && mArr[idx] !== '—') ? mArr[idx] : (modelMap[st] || '—');
+                selectedStyles.push({ style: st, model: mName });
+            }
+        });
+    }
+
+    renderStyleTags(skipSave);
+};
+
+function populateStyleDatalist() {
+    const datalist = document.getElementById('style-number-datalist');
+    if (!datalist) return;
+    try {
+        const models = getStyleModels();
+        if (Array.isArray(models) && models.length > 0) {
+            datalist.innerHTML = models.map(m => 
+                `<option value="${m.style_number}">${m.style_number} - ${m.model_name}</option>`
+            ).join('');
+        }
+    } catch (e) {
+        console.warn('Failed populating style datalist:', e);
+    }
+}
+
+function updateStyleInputPreview(val) {
+    const previewEl = document.getElementById('style-model-preview');
+    if (!previewEl) return;
+    const clean = (val || '').trim().toUpperCase();
+    if (!clean) {
+        previewEl.innerHTML = '';
+        previewEl.style.display = 'none';
+        return;
+    }
+    const modelMap = getStyleModelDatabaseMap();
+    const matchedModel = modelMap[clean];
+    if (matchedModel) {
+        previewEl.style.display = 'block';
+        previewEl.style.color = '#059669';
+        previewEl.innerHTML = `Model terdeteksi: <strong>${matchedModel}</strong>`;
+    } else if (clean.length >= 6) {
+        previewEl.style.display = 'block';
+        previewEl.style.color = '#d97706';
+        previewEl.innerHTML = `Model tidak terdaftar di database master (akan diset "—")`;
+    } else {
+        previewEl.innerHTML = '';
+        previewEl.style.display = 'none';
+    }
+}
+
 // ─── Vendor Button-Selection ──────────────────────────
 
 const VENDOR_BTN_CLS = 'vendor-sel-btn';
@@ -440,7 +590,15 @@ function resetAllFields() {
     const bucketPickerEl = document.getElementById('bucket-date-picker');
     if (bucketPickerEl) bucketPickerEl.value = today;
 
-    // Reset texts
+    // Reset texts & styles
+    window.setStyles([], '', true);
+    const styleInputEl = document.getElementById('style-number-input');
+    if (styleInputEl) styleInputEl.value = '';
+    const stylePreviewEl = document.getElementById('style-model-preview');
+    if (stylePreviewEl) {
+        stylePreviewEl.innerHTML = '';
+        stylePreviewEl.style.display = 'none';
+    }
     if (styleNumberInput) styleNumberInput.value = '';
     if (modelNameInput) modelNameInput.value = '';
 
@@ -485,7 +643,7 @@ function resetAllFields() {
 
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
-    saveToLocalStorage();
+    clearDraftStorage(true);
 }
 
 /**
@@ -493,9 +651,9 @@ function resetAllFields() {
  */
 function isInfoComplete() {
     const tanggal = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
-    const style = styleNumberInput ? styleNumberInput.value.trim() : '';
-    const model = modelNameInput ? modelNameInput.value.trim() : '';
-    return tanggal && selectedVendor && style && model && inspectionItems.length > 0;
+    const hasStyle = (selectedStyles && selectedStyles.length > 0) || (styleNumberInput && styleNumberInput.value.trim());
+    const hasModel = (selectedStyles && selectedStyles.length > 0) || (modelNameInput && modelNameInput.value.trim());
+    return tanggal && selectedVendor && hasStyle && hasModel && inspectionItems.length > 0;
 }
 
 /**
@@ -511,40 +669,246 @@ function checkInfoCompleteAndLockButtons() {
 }
 
 // ===========================================
-// 2. Fungsi localStorage Komprehensif (Modifikasi)
+// 2. Mekanisme LocalStorage Draf Inspeksi (Auto-Save & Restore)
 // ===========================================
 
-function saveToLocalStorage() {
+function getDraftStorageKey() {
+    const uMeta = currentUser?.user_metadata || {};
+    const nik = (uMeta.nik || uMeta.display_name || uMeta.email || 'anonymous').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    return `qms_subcont_draft_${nik}`;
+}
+
+function formatDraftTime(isoStr) {
     try {
-        const formData = {
-            auditor: auditorSelect ? auditorSelect.value : '',
-            modelName: document.getElementById("model-name") ? document.getElementById("model-name").value : '',
-            styleNumber: document.getElementById("style-number") ? document.getElementById("style-number").value : '',
-            tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
-            tanggalInspection: tanggalInspectionInput ? tanggalInspectionInput.value : '',
-            tanggalBucket: tanggalBucketInput ? tanggalBucketInput.value : '',
-            materialType: typeof selectedMaterialType !== 'undefined' ? selectedMaterialType : '',
-            vendor: typeof selectedVendor !== 'undefined' ? selectedVendor : '',
-            inspectionItems: typeof inspectionItems !== 'undefined' ? inspectionItems : []
-        };
-        localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(formData));
-        localStorage.setItem(STORAGE_KEYS.DEFECT_COUNTS, JSON.stringify(defectCounts));
-        localStorage.setItem(STORAGE_KEYS.QTY_OUTPUTS, JSON.stringify(qtyInspectOutputs));
-
-        const stateVariables = {
-            selectedDefects: selectedDefects,
-            currentInspectionPairs: currentInspectionPairs,
-            totalInspected: totalInspected,
-            reworkLog: reworkLog
-        };
-        localStorage.setItem(STORAGE_KEYS.STATE_VARIABLES, JSON.stringify(stateVariables));
-
-    } catch (error) {
-        console.error("Error saat menyimpan data ke localStorage:", error);
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '';
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return 'Baru saja';
+        if (diffMins < 60) return `${diffMins} menit lalu`;
+        const hours = String(d.getHours()).padStart(2, '0');
+        const mins = String(d.getMinutes()).padStart(2, '0');
+        return `Tersimpan jam ${hours}:${mins}`;
+    } catch {
+        return '';
     }
 }
 
-// loadFromLocalStorage dihapus — form selalu dimulai bersih setiap page load.
+function saveToLocalStorage() {
+    try {
+        const vendor = typeof selectedVendor !== 'undefined' ? selectedVendor : '';
+        const style = document.getElementById("style-number")?.value?.trim() || '';
+        const model = document.getElementById("model-name")?.value?.trim() || '';
+        const items = Array.isArray(inspectionItems) ? inspectionItems : [];
+
+        // If form is completely untouched / empty, don't store empty draft
+        if (!vendor && !style && !model && items.length === 0 && (!selectedStyles || selectedStyles.length === 0)) {
+            clearDraftStorage(false);
+            return;
+        }
+
+        const draftData = {
+            auditor: auditorSelect ? auditorSelect.value : '',
+            modelName: model,
+            styleNumber: style,
+            selectedStyles: Array.isArray(selectedStyles) ? [...selectedStyles] : [],
+            tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
+            tanggalInspection: tanggalInspectionInput ? tanggalInspectionInput.value : '',
+            selectedInspectionDates: Array.isArray(selectedInspectionDates) ? [...selectedInspectionDates] : [],
+            tanggalBucket: tanggalBucketInput ? tanggalBucketInput.value : '',
+            selectedBucketDates: Array.isArray(selectedBucketDates) ? [...selectedBucketDates] : [],
+            materialType: typeof selectedMaterialType !== 'undefined' ? selectedMaterialType : '',
+            vendor: vendor,
+            inspectionLocation: document.getElementById('inspection-location')?.value || 'In-House Inspection',
+            status: document.getElementById('inspection-status')?.value || 'Done',
+            approvedByLeader: document.getElementById('approved-by-leader')?.value || '',
+            editingSessionId: editingSessionId || null,
+            inspectionItems: items,
+            savedAt: new Date().toISOString()
+        };
+
+        const key = getDraftStorageKey();
+        localStorage.setItem(key, JSON.stringify(draftData));
+        localStorage.setItem(STORAGE_KEYS.FORM_DATA, JSON.stringify(draftData));
+    } catch (error) {
+        console.error("Error saat menyimpan data draf ke localStorage:", error);
+    }
+}
+
+function clearDraftStorage(hideBanner = true) {
+    try {
+        const key = getDraftStorageKey();
+        localStorage.removeItem(key);
+        localStorage.removeItem(STORAGE_KEYS.FORM_DATA);
+        localStorage.removeItem(STORAGE_KEYS.DEFECT_COUNTS);
+        localStorage.removeItem(STORAGE_KEYS.QTY_OUTPUTS);
+        localStorage.removeItem(STORAGE_KEYS.STATE_VARIABLES);
+        if (hideBanner) {
+            const banner = document.getElementById('draft-restore-banner');
+            if (banner) {
+                banner.innerHTML = '';
+                banner.classList.add('hidden');
+            }
+        }
+    } catch (e) {
+        console.error("Error clearing draft storage:", e);
+    }
+}
+
+function applyDraftToForm(draft) {
+    if (!draft) return;
+
+    editingSessionId = draft.editingSessionId || null;
+
+    if (draft.materialType) {
+        selectedMaterialType = draft.materialType;
+        const mtEl = document.getElementById('material-type');
+        if (mtEl) mtEl.value = selectedMaterialType;
+    }
+    renderVendorButtons();
+
+    if (draft.vendor) {
+        selectedVendor = draft.vendor;
+        refreshVendorButtons();
+        if (addItemBtn) addItemBtn.disabled = false;
+    }
+
+    if (draft.tanggalIncoming) {
+        const tinEl = document.getElementById('tanggal-incoming');
+        if (tinEl) tinEl.value = draft.tanggalIncoming;
+    }
+
+    if (Array.isArray(draft.selectedInspectionDates) && draft.selectedInspectionDates.length) {
+        window.setInspectionDates(draft.selectedInspectionDates, true);
+    } else if (draft.tanggalInspection) {
+        window.setInspectionDates(draft.tanggalInspection, true);
+    }
+
+    if (Array.isArray(draft.selectedBucketDates) && draft.selectedBucketDates.length) {
+        window.setBucketDates(draft.selectedBucketDates, true);
+    } else if (draft.tanggalBucket) {
+        window.setBucketDates(draft.tanggalBucket, true);
+    }
+
+    if (Array.isArray(draft.selectedStyles) && draft.selectedStyles.length > 0) {
+        window.setStyles(draft.selectedStyles, draft.modelName, true);
+    } else if (draft.styleNumber) {
+        window.setStyles(draft.styleNumber, draft.modelName, true);
+    } else {
+        window.setStyles([], '', true);
+    }
+
+    if (draft.inspectionLocation) {
+        const locEl = document.getElementById('inspection-location');
+        if (locEl) locEl.value = draft.inspectionLocation;
+    }
+
+    if (draft.status && typeof window.__syncInspectionStatusState === 'function') {
+        window.__syncInspectionStatusState(draft.status);
+    }
+
+    if (draft.approvedByLeader) {
+        const lEl = document.getElementById('approved-by-leader');
+        if (lEl) lEl.value = draft.approvedByLeader;
+        const lMob = document.getElementById('approved-by-leader-mobile');
+        if (lMob) lMob.value = draft.approvedByLeader;
+        const dCont = document.getElementById('evidence-upload-container');
+        if (dCont) dCont.classList.remove('hidden');
+        const mCont = document.getElementById('evidence-upload-container-mobile');
+        if (mCont) mCont.classList.remove('hidden');
+    }
+
+    if (Array.isArray(draft.inspectionItems) && draft.inspectionItems.length > 0) {
+        inspectionItems = draft.inspectionItems.map(it => ({
+            component: it.component,
+            process: it.process || '',
+            qtyIncoming: Number(it.qtyIncoming || 0),
+            qtyInspect: Number(it.qtyInspect || 0),
+            pass: Number(it.pass || 0),
+            defect: Number(it.defect || 0),
+            defects: Array.isArray(it.defects) ? [...it.defects] : []
+        }));
+    }
+
+    renderInspectedItems();
+    updateTotalQtyInspect();
+    checkInfoCompleteAndLockButtons();
+    updateSaveButtonState();
+}
+
+function checkAndRestoreDraft() {
+    try {
+        const key = getDraftStorageKey();
+        const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEYS.FORM_DATA);
+        if (!raw) return;
+
+        const draft = JSON.parse(raw);
+        if (!draft) return;
+
+        const hasItems = Array.isArray(draft.inspectionItems) && draft.inspectionItems.length > 0;
+        const hasContent = Boolean(draft.vendor || draft.styleNumber || draft.modelName || hasItems);
+        if (!hasContent) return;
+
+        // Auto-apply draft to form so inspector does not start from zero
+        applyDraftToForm(draft);
+
+        // Show draft notification banner
+        const banner = document.getElementById('draft-restore-banner');
+        if (banner) {
+            const timeStr = draft.savedAt ? formatDraftTime(draft.savedAt) : 'sesi sebelumnya';
+            const vendorName = draft.vendor || '—';
+            const modelName = draft.modelName || draft.styleNumber || '—';
+            const itemCount = draft.inspectionItems?.length || 0;
+
+            banner.innerHTML = `
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center flex-shrink-0">
+                            <span class="material-symbols-outlined text-xl">history</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Draf Tersimpan Dipulihkan</span>
+                                <span class="text-[11px] text-slate-500">${timeStr}</span>
+                            </div>
+                            <p class="text-xs text-slate-700 font-medium mt-0.5">
+                                <strong>${vendorName}</strong> • ${modelName} • <span class="text-emerald-700 font-semibold">${itemCount} item inspeksi</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 self-end sm:self-center">
+                        <button type="button" onclick="window.discardDraft()" class="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1">
+                            <span class="material-symbols-outlined text-sm">delete</span>
+                            Buang Draf
+                        </button>
+                    </div>
+                </div>
+            `;
+            banner.classList.remove('hidden');
+        }
+    } catch (e) {
+        console.error("Error checking and restoring draft:", e);
+    }
+}
+
+window.discardDraft = async function () {
+    const yes = await showConfirm('Draf inspeksi yang belum disimpan akan dibuang dan form dikosongkan.', 'Buang Draf?', 'Ya, Buang Draf', 'Batal');
+    if (yes) {
+        clearDraftStorage(true);
+        resetAllFields();
+        showAlert('Draf inspeksi berhasil dibuang.', 'info', 'Draf Dihapus');
+    }
+};
+
+window.restoreDraft = function () {
+    const key = getDraftStorageKey();
+    const raw = localStorage.getItem(key) || localStorage.getItem(STORAGE_KEYS.FORM_DATA);
+    if (raw) {
+        applyDraftToForm(JSON.parse(raw));
+        showAlert('Draf inspeksi berhasil dipulihkan.', 'success', 'Draf Dipulihkan');
+    }
+};
 
 function updateAllDisplays() {
     // Update counter grade
@@ -558,14 +922,9 @@ function updateAllDisplays() {
     updateTotalQtyInspect();
 }
 
-// updateButtonStatesFromLoadedData dihapus — tidak diperlukan karena form selalu fresh.
-
 function clearLocalStorageExceptQtySampleSet() {
     try {
-        localStorage.removeItem(STORAGE_KEYS.FORM_DATA);
-        localStorage.removeItem(STORAGE_KEYS.DEFECT_COUNTS);
-        localStorage.removeItem(STORAGE_KEYS.QTY_OUTPUTS);
-        localStorage.removeItem(STORAGE_KEYS.STATE_VARIABLES);
+        clearDraftStorage(true);
     } catch (error) {
         console.error("Error saat membersihkan localStorage:", error);
     }
@@ -574,6 +933,7 @@ function clearLocalStorageExceptQtySampleSet() {
 /** Hapus semua form storage termasuk qtySampleSet. Dipanggil saat refresh/logout. */
 function clearAllFormStorage() {
     try {
+        clearDraftStorage(true);
         Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
     } catch (error) {
         console.error("Error saat membersihkan semua form storage:", error);
@@ -1328,19 +1688,27 @@ function validateInputs() {
         showAlert('Harap tambahkan minimal 1 Item Inspeksi sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
-    if (!modelName || !styleNumber) {
+    if ((!selectedStyles || !selectedStyles.length) && !styleNumber) {
         showAlert('Harap isi Style Number dan Model Name sebelum menyimpan data.', 'warning', 'Data Tidak Lengkap');
         return false;
     }
 
     const styleNumberPattern = /^[a-zA-Z0-9]{6}-[a-zA-Z0-9]{3}$/;
-    if (!styleNumberPattern.test(styleNumber)) {
-        showAlert('Format Style Number tidak sesuai. Contoh: AH1567-100 atau 767688-001', 'warning', 'Format Tidak Valid');
-        styleNumberInput.classList.add('invalid-input');
-        return false;
-    } else {
-        styleNumberInput.classList.remove('invalid-input');
+    const stylesToCheck = (selectedStyles && selectedStyles.length > 0)
+        ? selectedStyles.map(s => s.style)
+        : styleNumber.split(',').map(s => s.trim()).filter(Boolean);
+
+    for (const st of stylesToCheck) {
+        if (!styleNumberPattern.test(st)) {
+            showAlert(`Format Style Number "${st}" tidak sesuai. Contoh: AH1567-100 atau 767688-001`, 'warning', 'Format Tidak Valid');
+            const styleInputEl = document.getElementById('style-number-input');
+            if (styleInputEl) styleInputEl.classList.add('invalid-input');
+            return false;
+        }
     }
+    const styleInputEl = document.getElementById('style-number-input');
+    if (styleInputEl) styleInputEl.classList.remove('invalid-input');
+    if (styleNumberInput) styleNumberInput.classList.remove('invalid-input');
     return true;
 }
 
@@ -1430,6 +1798,7 @@ function renderInspectedItems() {
                 renderInspectedItems();
                 updateTotalQtyInspect();
                 checkInfoCompleteAndLockButtons();
+                saveToLocalStorage();
             }
         });
 
@@ -1734,29 +2103,16 @@ function saveInspectionItem() {
     renderInspectedItems();
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
+    saveToLocalStorage();
 }
 
 // ===========================================
 // FUNGSI BARU: Auto-fill Model Name berdasarkan Style Number
 // ===========================================
 function autoFillModelName() {
-    if (!styleNumberInput || !modelNameInput) {
-        console.error("Elemen Style Number atau Model Name tidak ditemukan.");
-        return;
-    }
-
-    const enteredStyleNumber = styleNumberInput.value.trim().toUpperCase();
-
-    // Coba dari Supabase cache terlebih dahulu; fallback kosong jika tidak ada
-    const modelMap = getStyleModelDatabaseMap();
-    const matchedModel = modelMap[enteredStyleNumber];
-
-    if (matchedModel) {
-        modelNameInput.value = matchedModel;
-        modelNameInput.disabled = true;
-    } else {
-        modelNameInput.value = "";
-        modelNameInput.disabled = false;
+    const inputEl = document.getElementById('style-number-input');
+    if (inputEl && inputEl.value) {
+        updateStyleInputPreview(inputEl.value);
     }
     checkInfoCompleteAndLockButtons();
 }
@@ -1765,8 +2121,6 @@ function autoFillModelName() {
 // 16. Inisialisasi Aplikasi dan Event Listeners
 // ===========================================
 async function initApp() {
-    // Selalu mulai dengan state bersih — tidak memuat form data dari sesi sebelumnya
-    clearAllFormStorage();
     console.log("Menginisialisasi aplikasi...");
 
     // --- AUTH GUARD: Selalu aktif. Perangkat baru/tanpa sesi → redirect login ---
@@ -1865,6 +2219,8 @@ async function initApp() {
 
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
+    populateStyleDatalist();
+    renderStyleTags(true);
 
     // Populate Approved by Leader Select Options (Desktop and Mobile)
     const leaderSelect = document.getElementById('approved-by-leader');
@@ -1919,11 +2275,13 @@ async function initApp() {
     if (leaderSelect) {
         leaderSelect.addEventListener('change', () => {
             syncLeaderState(leaderSelect.value);
+            saveToLocalStorage();
         });
     }
     if (leaderSelectMobile) {
         leaderSelectMobile.addEventListener('change', () => {
             syncLeaderState(leaderSelectMobile.value);
+            saveToLocalStorage();
         });
     }
 
@@ -1939,10 +2297,16 @@ async function initApp() {
     window.__syncInspectionStatusState = syncInspectionStatusState;
 
     if (statusSelect) {
-        statusSelect.addEventListener('change', () => syncInspectionStatusState(statusSelect.value));
+        statusSelect.addEventListener('change', () => {
+            syncInspectionStatusState(statusSelect.value);
+            saveToLocalStorage();
+        });
     }
     if (statusSelectMobile) {
-        statusSelectMobile.addEventListener('change', () => syncInspectionStatusState(statusSelectMobile.value));
+        statusSelectMobile.addEventListener('change', () => {
+            syncInspectionStatusState(statusSelectMobile.value);
+            saveToLocalStorage();
+        });
     }
 
     // Show admin nav items for admin role
@@ -2053,12 +2417,50 @@ async function initApp() {
         });
     }
 
+    // Bind Multi-Style input & button
+    const styleInputBox = document.getElementById('style-number-input');
+    const btnAddStyle = document.getElementById('btn-add-style');
+
+    if (styleInputBox) {
+        styleInputBox.addEventListener('input', () => {
+            updateStyleInputPreview(styleInputBox.value);
+        });
+        styleInputBox.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (styleInputBox.value.trim()) {
+                    window.addStyle(styleInputBox.value);
+                }
+            }
+        });
+        styleInputBox.addEventListener('blur', () => {
+            if (styleInputBox.value.trim()) {
+                window.addStyle(styleInputBox.value);
+            }
+        });
+    }
+
+    if (btnAddStyle && styleInputBox) {
+        btnAddStyle.addEventListener('click', () => {
+            if (styleInputBox.value.trim()) {
+                window.addStyle(styleInputBox.value);
+            } else {
+                styleInputBox.focus();
+            }
+        });
+    }
+
     if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', () => {
         saveToLocalStorage();
         checkInfoCompleteAndLockButtons();
     });
     if (tanggalInspectionInput) tanggalInspectionInput.addEventListener('change', saveToLocalStorage);
     if (tanggalBucketInput) tanggalBucketInput.addEventListener('change', saveToLocalStorage);
+
+    const inspectionLocationInput = document.getElementById('inspection-location');
+    if (inspectionLocationInput) {
+        inspectionLocationInput.addEventListener('change', saveToLocalStorage);
+    }
 
     // Bind Add Item action
     if (addItemBtn) {
@@ -2171,6 +2573,9 @@ async function initApp() {
     renderInspectedItems();
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
+
+    // Pulihkan draf tersimpan dari localStorage jika ada
+    checkAndRestoreDraft();
 
     console.log("Aplikasi berhasil diinisialisasi.");
 }
@@ -2743,6 +3148,9 @@ window.continueInProgressSession = function (sessionId) {
     if (styleEl && session.styleNumber) styleEl.value = session.styleNumber;
     const modelEl = document.getElementById('model-name');
     if (modelEl && session.modelName) modelEl.value = session.modelName;
+    if (session.styleNumber) {
+        window.setStyles(session.styleNumber, session.modelName);
+    }
 
     if (typeof window.__syncInspectionStatusState === 'function') {
         window.__syncInspectionStatusState(session.status || 'In-Progress');
@@ -2775,6 +3183,7 @@ window.continueInProgressSession = function (sessionId) {
     renderInspectedItems();
     updateTotalQtyInspect();
     checkInfoCompleteAndLockButtons();
+    saveToLocalStorage();
 
     // Switch view to dashboard (Inspection Form)
     if (typeof window.showView === 'function') {
