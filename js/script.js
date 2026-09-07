@@ -53,6 +53,7 @@ let selectedVendor = '';
 let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 let currentUser = null;
 let currentUserRole = ROLES.INSPECTOR;
+let isRestoringDraft = false;
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -696,15 +697,35 @@ function formatDraftTime(isoStr) {
 }
 
 function saveToLocalStorage() {
+    if (isRestoringDraft) return;
     try {
         const vendor = typeof selectedVendor !== 'undefined' ? selectedVendor : '';
         const style = document.getElementById("style-number")?.value?.trim() || '';
         const model = document.getElementById("model-name")?.value?.trim() || '';
+        const styleInputBox = document.getElementById("style-number-input")?.value?.trim() || '';
         const items = Array.isArray(inspectionItems) ? inspectionItems : [];
+        const matType = typeof selectedMaterialType !== 'undefined' ? selectedMaterialType : '';
+        const incomingDate = tanggalIncomingInput ? tanggalIncomingInput.value : '';
+        const inspLocation = document.getElementById('inspection-location')?.value || '';
+        const leader = document.getElementById('approved-by-leader')?.value || '';
 
-        // If form is completely untouched / empty, don't store empty draft
-        if (!vendor && !style && !model && items.length === 0 && (!selectedStyles || selectedStyles.length === 0)) {
-            clearDraftStorage(false);
+        // Cek apakah ada konten apa pun yang sudah diisi user
+        const hasAnyContent = Boolean(
+            vendor ||
+            style ||
+            model ||
+            styleInputBox ||
+            (selectedStyles && selectedStyles.length > 0) ||
+            items.length > 0 ||
+            matType ||
+            (selectedInspectionDates && selectedInspectionDates.length > 1) ||
+            (selectedBucketDates && selectedBucketDates.length > 1) ||
+            leader ||
+            editingSessionId
+        );
+
+        // Jika form kosong belum diisi apa pun oleh user, jangan lakukan apa-apa (JANGAN hapus draf!)
+        if (!hasAnyContent) {
             return;
         }
 
@@ -712,17 +733,18 @@ function saveToLocalStorage() {
             auditor: auditorSelect ? auditorSelect.value : '',
             modelName: model,
             styleNumber: style,
+            styleInputBox: styleInputBox,
             selectedStyles: Array.isArray(selectedStyles) ? [...selectedStyles] : [],
-            tanggalIncoming: tanggalIncomingInput ? tanggalIncomingInput.value : '',
+            tanggalIncoming: incomingDate,
             tanggalInspection: tanggalInspectionInput ? tanggalInspectionInput.value : '',
             selectedInspectionDates: Array.isArray(selectedInspectionDates) ? [...selectedInspectionDates] : [],
             tanggalBucket: tanggalBucketInput ? tanggalBucketInput.value : '',
             selectedBucketDates: Array.isArray(selectedBucketDates) ? [...selectedBucketDates] : [],
-            materialType: typeof selectedMaterialType !== 'undefined' ? selectedMaterialType : '',
+            materialType: matType,
             vendor: vendor,
-            inspectionLocation: document.getElementById('inspection-location')?.value || 'In-House Inspection',
+            inspectionLocation: inspLocation || 'In-House Inspection',
             status: document.getElementById('inspection-status')?.value || 'Done',
-            approvedByLeader: document.getElementById('approved-by-leader')?.value || '',
+            approvedByLeader: leader,
             editingSessionId: editingSessionId || null,
             inspectionItems: items,
             savedAt: new Date().toISOString()
@@ -758,83 +780,97 @@ function clearDraftStorage(hideBanner = true) {
 
 function applyDraftToForm(draft) {
     if (!draft) return;
+    isRestoringDraft = true;
+    try {
+        editingSessionId = draft.editingSessionId || null;
 
-    editingSessionId = draft.editingSessionId || null;
+        if (draft.materialType) {
+            selectedMaterialType = draft.materialType;
+            const mtEl = document.getElementById('material-type');
+            if (mtEl) mtEl.value = selectedMaterialType;
+        }
+        renderVendorButtons();
 
-    if (draft.materialType) {
-        selectedMaterialType = draft.materialType;
-        const mtEl = document.getElementById('material-type');
-        if (mtEl) mtEl.value = selectedMaterialType;
+        if (draft.vendor) {
+            selectedVendor = draft.vendor;
+            refreshVendorButtons();
+            if (addItemBtn) addItemBtn.disabled = false;
+        }
+
+        if (draft.tanggalIncoming) {
+            const tinEl = document.getElementById('tanggal-incoming');
+            if (tinEl) tinEl.value = draft.tanggalIncoming;
+        }
+
+        if (Array.isArray(draft.selectedInspectionDates) && draft.selectedInspectionDates.length) {
+            window.setInspectionDates(draft.selectedInspectionDates, true);
+        } else if (draft.tanggalInspection) {
+            window.setInspectionDates(draft.tanggalInspection, true);
+        }
+
+        if (Array.isArray(draft.selectedBucketDates) && draft.selectedBucketDates.length) {
+            window.setBucketDates(draft.selectedBucketDates, true);
+        } else if (draft.tanggalBucket) {
+            window.setBucketDates(draft.tanggalBucket, true);
+        }
+
+        if (Array.isArray(draft.selectedStyles) && draft.selectedStyles.length > 0) {
+            window.setStyles(draft.selectedStyles, draft.modelName, true);
+        } else if (draft.styleNumber) {
+            window.setStyles(draft.styleNumber, draft.modelName, true);
+        } else {
+            window.setStyles([], '', true);
+        }
+
+        if (draft.styleInputBox) {
+            const sInput = document.getElementById('style-number-input');
+            if (sInput && !sInput.value) {
+                sInput.value = draft.styleInputBox;
+                if (typeof updateStyleInputPreview === 'function') {
+                    updateStyleInputPreview(draft.styleInputBox);
+                }
+            }
+        }
+
+        if (draft.inspectionLocation) {
+            const locEl = document.getElementById('inspection-location');
+            if (locEl) locEl.value = draft.inspectionLocation;
+        }
+
+        if (draft.status && typeof window.__syncInspectionStatusState === 'function') {
+            window.__syncInspectionStatusState(draft.status);
+        }
+
+        if (draft.approvedByLeader) {
+            const lEl = document.getElementById('approved-by-leader');
+            if (lEl) lEl.value = draft.approvedByLeader;
+            const lMob = document.getElementById('approved-by-leader-mobile');
+            if (lMob) lMob.value = draft.approvedByLeader;
+            const dCont = document.getElementById('evidence-upload-container');
+            if (dCont) dCont.classList.remove('hidden');
+            const mCont = document.getElementById('evidence-upload-container-mobile');
+            if (mCont) mCont.classList.remove('hidden');
+        }
+
+        if (Array.isArray(draft.inspectionItems) && draft.inspectionItems.length > 0) {
+            inspectionItems = draft.inspectionItems.map(it => ({
+                component: it.component,
+                process: it.process || '',
+                qtyIncoming: Number(it.qtyIncoming || 0),
+                qtyInspect: Number(it.qtyInspect || 0),
+                pass: Number(it.pass || 0),
+                defect: Number(it.defect || 0),
+                defects: Array.isArray(it.defects) ? [...it.defects] : []
+            }));
+        }
+
+        renderInspectedItems();
+        updateTotalQtyInspect();
+        checkInfoCompleteAndLockButtons();
+        updateSaveButtonState();
+    } finally {
+        isRestoringDraft = false;
     }
-    renderVendorButtons();
-
-    if (draft.vendor) {
-        selectedVendor = draft.vendor;
-        refreshVendorButtons();
-        if (addItemBtn) addItemBtn.disabled = false;
-    }
-
-    if (draft.tanggalIncoming) {
-        const tinEl = document.getElementById('tanggal-incoming');
-        if (tinEl) tinEl.value = draft.tanggalIncoming;
-    }
-
-    if (Array.isArray(draft.selectedInspectionDates) && draft.selectedInspectionDates.length) {
-        window.setInspectionDates(draft.selectedInspectionDates, true);
-    } else if (draft.tanggalInspection) {
-        window.setInspectionDates(draft.tanggalInspection, true);
-    }
-
-    if (Array.isArray(draft.selectedBucketDates) && draft.selectedBucketDates.length) {
-        window.setBucketDates(draft.selectedBucketDates, true);
-    } else if (draft.tanggalBucket) {
-        window.setBucketDates(draft.tanggalBucket, true);
-    }
-
-    if (Array.isArray(draft.selectedStyles) && draft.selectedStyles.length > 0) {
-        window.setStyles(draft.selectedStyles, draft.modelName, true);
-    } else if (draft.styleNumber) {
-        window.setStyles(draft.styleNumber, draft.modelName, true);
-    } else {
-        window.setStyles([], '', true);
-    }
-
-    if (draft.inspectionLocation) {
-        const locEl = document.getElementById('inspection-location');
-        if (locEl) locEl.value = draft.inspectionLocation;
-    }
-
-    if (draft.status && typeof window.__syncInspectionStatusState === 'function') {
-        window.__syncInspectionStatusState(draft.status);
-    }
-
-    if (draft.approvedByLeader) {
-        const lEl = document.getElementById('approved-by-leader');
-        if (lEl) lEl.value = draft.approvedByLeader;
-        const lMob = document.getElementById('approved-by-leader-mobile');
-        if (lMob) lMob.value = draft.approvedByLeader;
-        const dCont = document.getElementById('evidence-upload-container');
-        if (dCont) dCont.classList.remove('hidden');
-        const mCont = document.getElementById('evidence-upload-container-mobile');
-        if (mCont) mCont.classList.remove('hidden');
-    }
-
-    if (Array.isArray(draft.inspectionItems) && draft.inspectionItems.length > 0) {
-        inspectionItems = draft.inspectionItems.map(it => ({
-            component: it.component,
-            process: it.process || '',
-            qtyIncoming: Number(it.qtyIncoming || 0),
-            qtyInspect: Number(it.qtyInspect || 0),
-            pass: Number(it.pass || 0),
-            defect: Number(it.defect || 0),
-            defects: Array.isArray(it.defects) ? [...it.defects] : []
-        }));
-    }
-
-    renderInspectedItems();
-    updateTotalQtyInspect();
-    checkInfoCompleteAndLockButtons();
-    updateSaveButtonState();
 }
 
 function checkAndRestoreDraft() {
@@ -847,7 +883,8 @@ function checkAndRestoreDraft() {
         if (!draft) return;
 
         const hasItems = Array.isArray(draft.inspectionItems) && draft.inspectionItems.length > 0;
-        const hasContent = Boolean(draft.vendor || draft.styleNumber || draft.modelName || hasItems);
+        const hasStyles = Array.isArray(draft.selectedStyles) && draft.selectedStyles.length > 0;
+        const hasContent = Boolean(draft.vendor || draft.styleNumber || draft.modelName || draft.materialType || draft.styleInputBox || hasItems || hasStyles);
         if (!hasContent) return;
 
         // Auto-apply draft to form so inspector does not start from zero
@@ -2399,7 +2436,7 @@ async function initApp() {
         });
     }
     if (!selectedBucketDates.length) {
-        window.setBucketDates(todayStr);
+        window.setBucketDates(todayStr, true);
     }
 
     if (modelNameInput) {
@@ -2424,6 +2461,7 @@ async function initApp() {
     if (styleInputBox) {
         styleInputBox.addEventListener('input', () => {
             updateStyleInputPreview(styleInputBox.value);
+            saveToLocalStorage();
         });
         styleInputBox.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -2450,10 +2488,13 @@ async function initApp() {
         });
     }
 
-    if (tanggalIncomingInput) tanggalIncomingInput.addEventListener('change', () => {
-        saveToLocalStorage();
-        checkInfoCompleteAndLockButtons();
-    });
+    if (tanggalIncomingInput) {
+        tanggalIncomingInput.addEventListener('input', saveToLocalStorage);
+        tanggalIncomingInput.addEventListener('change', () => {
+            saveToLocalStorage();
+            checkInfoCompleteAndLockButtons();
+        });
+    }
     if (tanggalInspectionInput) tanggalInspectionInput.addEventListener('change', saveToLocalStorage);
     if (tanggalBucketInput) tanggalBucketInput.addEventListener('change', saveToLocalStorage);
 
