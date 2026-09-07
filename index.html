@@ -496,6 +496,7 @@
                 radial-gradient(ellipse 50% 70% at 50% 50%, rgba(29, 78, 216, 0.12) 0%, transparent 70%),
                 linear-gradient(135deg, #070f1e 0%, #0a1c36 40%, #08162b 70%, #070f1e 100%);
             z-index: 0;
+            pointer-events: none;
         }
 
         /* ── ANIMATED GLOWING ORBS (same as login.html) ── */
@@ -906,6 +907,8 @@
                                 <span class="material-symbols-outlined text-slate-500 text-[22px]">inventory_2</span>
                             </div>
                         </div>
+                    </div><!-- end top metrics -->
+
                     <!-- Draft Restore Banner -->
                     <div id="draft-restore-banner" class="hidden mb-4 p-4 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-50 to-orange-50 text-slate-800 shadow-sm transition-all duration-200">
                         <!-- Dynamic content injected by script.js -->
@@ -2340,6 +2343,7 @@
                         </div>
                     </div>
                 </div>
+            </div><!-- end view-admin -->
 
         </main>
     </div>
@@ -2502,10 +2506,6 @@
             </form>
         </div>
     </div>
-</main>
-    </div>
-
-
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
