@@ -825,50 +825,130 @@
             background: rgba(255, 255, 255, 0.02) !important;
         }
 
-        /* Defect Library text overrides */
-        .text-blue-900 {
+        /* ─── Global High-Contrast Text Overrides for Dark Mode ─── */
+        .text-blue-900, .text-blue-800, .text-blue-700 {
             color: #93c5fd !important;
         }
-
-        .text-amber-900 {
-            color: #fde047 !important;
-        }
-
-        .text-red-900 {
-            color: #fca5a5 !important;
-        }
-
         .text-blue-600 {
             color: #60a5fa !important;
         }
-
-        .text-amber-700 {
-            color: #fbbf24 !important;
+        .text-sky-900, .text-sky-800, .text-sky-700, .text-sky-600 {
+            color: #7dd3fc !important;
+        }
+        .text-amber-900, .text-amber-800, .text-amber-700, .text-amber-600 {
+            color: #fde047 !important;
+        }
+        .text-orange-900, .text-orange-800, .text-orange-700, .text-orange-600 {
+            color: #fdba74 !important;
+        }
+        .text-green-900, .text-green-800, .text-green-700, .text-green-600,
+        .text-emerald-900, .text-emerald-800, .text-emerald-700, .text-emerald-600 {
+            color: #86efac !important;
+        }
+        .text-red-900, .text-red-800, .text-red-700, .text-red-600,
+        .text-rose-900, .text-rose-800, .text-rose-700, .text-rose-600 {
+            color: #fca5a5 !important;
+        }
+        .text-purple-900, .text-purple-800, .text-purple-700, .text-purple-600 {
+            color: #d8b4fe !important;
         }
 
-        .text-red-600 {
-            color: #f87171 !important;
+        /* ─── Global Glassmorphic Badges & Status Pills (Dark Theme Contrast) ─── */
+        /* Amber / Pending / Warning Badges */
+        .bg-amber-100,
+        .bg-yellow-100 {
+            background: rgba(245, 158, 11, 0.16) !important;
+            border: 1px solid rgba(245, 158, 11, 0.4) !important;
+            color: #fef08a !important;
+        }
+        .bg-amber-100 *,
+        .bg-yellow-100 * {
+            color: #fef08a !important;
         }
 
-        /* Grading Guidelines text overrides */
-        .text-green-800,
-        .text-green-700 {
+        /* Green / Success / Pass Badges */
+        .bg-green-100,
+        .bg-emerald-100 {
+            background: rgba(16, 185, 129, 0.16) !important;
+            border: 1px solid rgba(16, 185, 129, 0.4) !important;
+            color: #86efac !important;
+        }
+        .bg-green-100 *,
+        .bg-emerald-100 * {
             color: #86efac !important;
         }
 
-        .text-orange-800,
-        .text-orange-700 {
-            color: #fde047 !important;
+        /* Blue / Sky / Approved / Info Badges */
+        .bg-blue-100,
+        .bg-sky-100 {
+            background: rgba(59, 130, 246, 0.16) !important;
+            border: 1px solid rgba(59, 130, 246, 0.4) !important;
+            color: #93c5fd !important;
+        }
+        .bg-blue-100 *,
+        .bg-sky-100 * {
+            color: #93c5fd !important;
         }
 
-        .text-red-800,
-        .text-red-700 {
+        /* Red / Rose / Critical / Danger Badges */
+        .bg-red-100,
+        .bg-rose-100 {
+            background: rgba(239, 68, 68, 0.16) !important;
+            border: 1px solid rgba(239, 68, 68, 0.4) !important;
+            color: #fca5a5 !important;
+        }
+        .bg-red-100 *,
+        .bg-rose-100 * {
             color: #fca5a5 !important;
         }
 
-        .text-amber-800,
-        .text-amber-700 {
+        /* Purple Badges */
+        .bg-purple-100 {
+            background: rgba(168, 85, 247, 0.16) !important;
+            border: 1px solid rgba(168, 85, 247, 0.4) !important;
+            color: #d8b4fe !important;
+        }
+        .bg-purple-100 * {
+            color: #d8b4fe !important;
+        }
+
+        /* Slate Badges & Pills */
+        span.bg-slate-100,
+        span.bg-slate-200,
+        .rounded-full.bg-slate-100,
+        .rounded-full.bg-slate-200 {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            color: #cbd5e1 !important;
+        }
+
+        /* Interactive badge & button hover states */
+        button.bg-green-100:hover, button.hover\:bg-green-200:hover {
+            background: rgba(16, 185, 129, 0.28) !important;
+            border-color: rgba(16, 185, 129, 0.55) !important;
+        }
+        button.bg-red-100:hover, button.hover\:bg-red-200:hover {
+            background: rgba(239, 68, 68, 0.28) !important;
+            border-color: rgba(239, 68, 68, 0.55) !important;
+        }
+        button.hover\:bg-blue-100:hover, a.hover\:bg-emerald-200:hover {
+            background: rgba(59, 130, 246, 0.25) !important;
+        }
+
+        /* Hint & Banner Containers */
+        #inspection-info-hint {
+            background: rgba(245, 158, 11, 0.12) !important;
+            border: 1px solid rgba(245, 158, 11, 0.35) !important;
+            color: #fef08a !important;
+        }
+        #inspection-info-hint span.material-symbols-outlined {
             color: #fde047 !important;
+        }
+
+        #draft-restore-banner {
+            background: rgba(245, 158, 11, 0.08) !important;
+            border: 1px solid rgba(245, 158, 11, 0.32) !important;
+            backdrop-filter: blur(12px) !important;
         }
 
 
@@ -1046,7 +1126,7 @@
 
                         <!-- Draft Restore Banner -->
                         <div id="draft-restore-banner"
-                            class="hidden mb-4 p-4 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-50 to-orange-50 text-slate-800 shadow-sm transition-all duration-200">
+                            class="hidden mb-4 p-3.5 sm:p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 backdrop-blur-md shadow-lg transition-all duration-200">
                             <!-- Dynamic content injected by script.js -->
                         </div>
 

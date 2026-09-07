@@ -84,9 +84,9 @@ function renderInspectionTags(skipSave = false) {
     container.innerHTML = selectedInspectionDates.map(dateStr => {
         const safeDate = String(dateStr).replace(/'/g, "\\'");
         return `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(16, 185, 129, 0.16);color:#86efac;border:1px solid rgba(16, 185, 129, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
                 <span>${dateStr}</span>
-                <button type="button" onclick="window.removeInspectionDate('${safeDate}')" style="color:#10b981;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
+                <button type="button" onclick="window.removeInspectionDate('${safeDate}')" style="color:#34d399;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
                     <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
                 </button>
             </span>
@@ -162,7 +162,7 @@ function renderBucketTags(skipSave = false) {
     container.innerHTML = selectedBucketDates.map(dateStr => {
         const safeDate = String(dateStr).replace(/'/g, "\\'");
         return `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(59, 130, 246, 0.16);color:#93c5fd;border:1px solid rgba(59, 130, 246, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
                 <span>${dateStr}</span>
                 <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
                     <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
@@ -252,10 +252,10 @@ function renderStyleTags(skipSave = false) {
             container.innerHTML = '<span style="font-size:12px;color:#94a3b8;font-style:italic;">Belum ada style number dipilih</span>';
         } else {
             container.innerHTML = selectedStyles.map(item => `
-                <span style="display:inline-flex;align-items:center;gap:6px;background:#e0f2fe;border:1px solid #7dd3fc;color:#0369a1;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:500;">
-                    <span style="font-weight:700;color:#0284c7;">${item.style}</span>
-                    <span style="color:#0369a1;font-size:11px;">(${item.model || '—'})</span>
-                    <button type="button" onclick="window.removeStyle('${item.style}')" style="background:transparent;border:none;color:#0284c7;cursor:pointer;font-weight:bold;font-size:14px;line-height:1;padding:0 2px;" title="Hapus">&times;</button>
+                <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(14, 165, 233, 0.16);border:1px solid rgba(14, 165, 233, 0.4);color:#bae6fd;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+                    <span style="font-weight:700;color:#38bdf8;">${item.style}</span>
+                    <span style="color:#93c5fd;font-size:11px;">(${item.model || '—'})</span>
+                    <button type="button" onclick="window.removeStyle('${item.style}')" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-weight:bold;font-size:14px;line-height:1;padding:0 2px;" title="Hapus">&times;</button>
                 </span>
             `).join('');
         }
@@ -901,21 +901,21 @@ function checkAndRestoreDraft() {
             banner.innerHTML = `
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center flex-shrink-0">
+                        <div class="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
                             <span class="material-symbols-outlined text-xl">history</span>
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Draf Tersimpan Dipulihkan</span>
-                                <span class="text-[11px] text-slate-500">${timeStr}</span>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded shadow-xs">Draf Tersimpan Dipulihkan</span>
+                                <span class="text-[11px] text-slate-400 font-medium">${timeStr}</span>
                             </div>
-                            <p class="text-xs text-slate-700 font-medium mt-0.5">
-                                <strong>${vendorName}</strong> • ${modelName} • <span class="text-emerald-700 font-semibold">${itemCount} item inspeksi</span>
+                            <p class="text-xs text-slate-200 font-medium mt-1">
+                                <strong class="text-white font-semibold">${vendorName}</strong> • <span class="text-slate-300">${modelName}</span> • <span class="text-emerald-400 font-bold">${itemCount} item inspeksi</span>
                             </p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 self-end sm:self-center">
-                        <button type="button" onclick="window.discardDraft()" class="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1">
+                        <button type="button" onclick="window.discardDraft()" class="px-3 py-1.5 text-xs font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 rounded-lg transition-colors cursor-pointer flex items-center gap-1">
                             <span class="material-symbols-outlined text-sm">delete</span>
                             Buang Draf
                         </button>
