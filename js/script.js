@@ -3019,7 +3019,7 @@ function renderInspectionResultTable(sessions) {
                 };
             }
             const agg = itemAgg[itemKey];
-            agg.qtyIncoming = Math.max(agg.qtyIncoming, it.qtyIncoming);
+            agg.qtyIncoming += it.qtyIncoming;
             agg.qtyInspect += it.qtyInspect;
             agg.pass += it.pass;
             agg.defect += it.defect;
