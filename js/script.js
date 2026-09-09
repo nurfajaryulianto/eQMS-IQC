@@ -5,7 +5,7 @@ import { supabase } from './db.js';
 const GAS_EVIDENCE_URL = 'https://script.google.com/macros/s/AKfycbxt5mmTI3bTAFMpaDo6VgVoKk8raDecfOoCbqsZgdK1-BwErb-VHROC0RSj8O8NYoR-JA/exec';
 // --- IMPOR DATABASE DARI FILE TERPISAH ---
 import { requireAuth, getUser, signOut, UI_TEST_MODE, ROLES } from './auth.js';
-import { renderDefectButtons, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap, getStyleModels } from './admin.js';
+import { renderDefectButtons, getDefects, renderVendorOptions, getVendors, getUsers, getComponents, getProcesses, syncAllFromSupabase, getStyleModelDatabaseMap, getStyleModels } from './admin.js';
 import { showAlert, showConfirm } from './dialog.js';
 
 let totalInspected = 0;
@@ -452,6 +452,23 @@ function applyVendorInactive(btn) {
 
 // ─── Modal Component / Process Selection ──────────────────────────
 
+// Modal Form State Variables (Declared early to avoid TDZ)
+let modalInspectionMode = 'single'; // 'single' | 'bulk'
+let modalComponent = '';
+let modalSelectedComponents = [];
+let modalActiveDefectComponent = '';
+let modalProcesses = [];
+let modalSelectedComponent = '';
+let modalSelectedProcesses = [];
+let modalItemDefects = {};
+let modalComponentDefects = {};
+let modalPassVal = 0;
+let modalDefectVal = 0;
+let modalQtyIncomingVal = 0;
+let modalQtyInspectVal = 0;
+let modalDefectSearchQuery = '';
+let modalDefectActiveCategory = 'all';
+
 function renderModalComponentButtons(vendorName) {
     const container = document.getElementById('modal-component-container');
     if (!container) return;
@@ -471,17 +488,49 @@ function renderModalComponentButtons(vendorName) {
     filtered.forEach(c => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = c.name;
         btn.dataset.value = c.name;
-        btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
 
-        if (modalComponent === c.name) {
-            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
+        const isSelected = modalInspectionMode === 'bulk'
+            ? modalSelectedComponents.includes(c.name)
+            : modalComponent === c.name;
+
+        if (isSelected) {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer flex items-center gap-1';
+            if (modalInspectionMode === 'bulk') {
+                btn.innerHTML = `<span class="material-symbols-outlined text-[13px] align-text-bottom">check</span>${c.name}`;
+            } else {
+                btn.textContent = c.name;
+            }
+        } else {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer flex items-center gap-1';
+            btn.textContent = c.name;
         }
 
         btn.addEventListener('click', () => {
-            modalComponent = c.name;
+            if (modalInspectionMode === 'bulk') {
+                if (modalSelectedComponents.includes(c.name)) {
+                    modalSelectedComponents = modalSelectedComponents.filter(name => name !== c.name);
+                    delete modalComponentDefects[c.name];
+                    if (modalActiveDefectComponent === c.name) {
+                        modalActiveDefectComponent = modalSelectedComponents[0] || '';
+                    }
+                } else {
+                    modalSelectedComponents.push(c.name);
+                    if (!modalComponentDefects[c.name]) modalComponentDefects[c.name] = {};
+                    if (!modalActiveDefectComponent) {
+                        modalActiveDefectComponent = c.name;
+                    }
+                }
+                modalComponent = modalSelectedComponents.join(', ');
+            } else {
+                modalComponent = c.name;
+                modalSelectedComponents = [c.name];
+                modalActiveDefectComponent = c.name;
+            }
             updateModalComponentButtonsActiveState();
+            renderModalDefectTargetPills();
+            renderEnhancedModalDefectButtons();
+            updateModalGradeState();
         });
         container.appendChild(btn);
     });
@@ -489,11 +538,73 @@ function renderModalComponentButtons(vendorName) {
 
 function updateModalComponentButtonsActiveState() {
     document.querySelectorAll('.modal-comp-btn').forEach(btn => {
-        if (btn.dataset.value === modalComponent) {
-            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer';
+        const val = btn.dataset.value;
+        const isSelected = modalInspectionMode === 'bulk'
+            ? modalSelectedComponents.includes(val)
+            : modalComponent === val;
+
+        if (isSelected) {
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-emerald-600 border-emerald-600 text-white shadow-sm cursor-pointer flex items-center gap-1';
+            if (modalInspectionMode === 'bulk') {
+                btn.innerHTML = `<span class="material-symbols-outlined text-[13px] align-text-bottom">check</span>${val}`;
+            } else {
+                btn.textContent = val;
+            }
         } else {
-            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer';
+            btn.className = 'modal-comp-btn px-3 py-1.5 rounded-full border text-xs transition-colors bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 cursor-pointer flex items-center gap-1';
+            btn.textContent = val;
         }
+    });
+}
+
+function renderModalDefectTargetPills() {
+    const targetContainer = document.getElementById('modal-defect-target-container');
+    const pillsContainer = document.getElementById('modal-defect-target-pills');
+    const activeLabel = document.getElementById('modal-active-defect-component-label');
+    const activeCompName = document.getElementById('modal-active-comp-name');
+
+    if (modalInspectionMode !== 'bulk' || modalSelectedComponents.length <= 1) {
+        if (targetContainer) targetContainer.classList.add('hidden');
+        if (activeLabel) activeLabel.classList.add('hidden');
+        return;
+    }
+
+    if (targetContainer) targetContainer.classList.remove('hidden');
+    if (activeLabel) activeLabel.classList.remove('hidden');
+    if (activeCompName) activeCompName.textContent = modalActiveDefectComponent || '—';
+
+    if (!pillsContainer) return;
+    pillsContainer.innerHTML = '';
+
+    modalSelectedComponents.forEach(comp => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.comp = comp;
+
+        // Calculate defects count for this component
+        let defectCount = 0;
+        const compDefects = modalComponentDefects[comp] || {};
+        for (const t in compDefects) defectCount += (compDefects[t] || 0);
+
+        const isActive = comp === modalActiveDefectComponent;
+        btn.className = isActive
+            ? 'px-3 py-1.5 rounded-lg border text-xs font-bold transition-all bg-amber-600 border-amber-600 text-white shadow-xs cursor-pointer flex items-center gap-1.5 ring-2 ring-amber-300'
+            : 'px-3 py-1.5 rounded-lg border text-xs font-medium transition-all bg-white border-amber-200 text-slate-700 hover:bg-amber-100/60 cursor-pointer flex items-center gap-1.5';
+
+        const countBadge = defectCount > 0
+            ? `<span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? 'bg-white text-amber-800' : 'bg-amber-200 text-amber-900'}">${defectCount}</span>`
+            : '';
+
+        btn.innerHTML = `<span>${comp}</span>${countBadge}`;
+
+        btn.addEventListener('click', () => {
+            modalActiveDefectComponent = comp;
+            renderModalDefectTargetPills();
+            if (activeCompName) activeCompName.textContent = comp;
+            renderEnhancedModalDefectButtons();
+        });
+
+        pillsContainer.appendChild(btn);
     });
 }
 
@@ -1843,16 +1954,120 @@ function renderInspectedItems() {
     });
 }
 
-// Modal Form State Variables
-let modalComponent = '';
-let modalProcesses = [];
-let modalSelectedComponent = '';
-let modalSelectedProcesses = [];
-let modalItemDefects = {};
-let modalPassVal = 0;
-let modalDefectVal = 0;
-let modalQtyIncomingVal = 0;
-let modalQtyInspectVal = 0;
+const MODAL_DEFECT_CATEGORY_STYLES = {
+    minor:    { bg: 'bg-blue-50',   hover: 'hover:bg-blue-100',   border: 'border-blue-200',   text: 'text-blue-800'   },
+    major:    { bg: 'bg-amber-50',  hover: 'hover:bg-amber-100',  border: 'border-amber-200',  text: 'text-amber-800'  },
+    critical: { bg: 'bg-red-50',    hover: 'hover:bg-red-100',    border: 'border-red-200',    text: 'text-red-800'    },
+};
+
+function renderEnhancedModalDefectButtons() {
+    const container = document.getElementById('modal-defect-buttons');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const defects = getDefects();
+    const query = (modalDefectSearchQuery || '').toLowerCase().trim();
+    const category = modalDefectActiveCategory || 'all';
+
+    const filtered = defects.filter(d => {
+        const cat = d.category || 'minor';
+        if (category !== 'all' && cat !== category) return false;
+        if (query) {
+            const nameMatch = (d.name || '').toLowerCase().includes(query);
+            const labelMatch = (d.label || '').toLowerCase().includes(query);
+            if (!nameMatch && !labelMatch) return false;
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-2 sm:col-span-3 text-center py-6 text-xs text-slate-400 italic">Tidak ada defect yang cocok dengan filter / pencarian.</div>';
+        return;
+    }
+
+    const activeComp = modalInspectionMode === 'bulk' ? modalActiveDefectComponent : null;
+    const currentDefectsMap = (modalInspectionMode === 'bulk' && activeComp)
+        ? (modalComponentDefects[activeComp] || {})
+        : modalItemDefects;
+
+    filtered.forEach(d => {
+        const cat = d.category || 'minor';
+        const s = MODAL_DEFECT_CATEGORY_STYLES[cat] || MODAL_DEFECT_CATEGORY_STYLES.minor;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `defect-button relative ${s.bg} ${s.hover} border ${s.border} rounded-lg p-2 text-center text-xs font-medium ${s.text} transition-all h-14 flex items-center justify-center leading-tight cursor-pointer select-none`;
+        btn.dataset.defect = d.name;
+
+        const count = currentDefectsMap[d.name] || 0;
+        let badgeHtml = '';
+        if (count > 0) {
+            badgeHtml = `<span class="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-black rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center shadow-md border-2 border-white pointer-events-none">${count}</span>`;
+        }
+
+        btn.innerHTML = `<span class="line-clamp-2">${d.label || d.name}</span>${badgeHtml}`;
+
+        btn.addEventListener('click', () => {
+            window.handleModalDefectClick(d.name);
+            btn.classList.add('scale-95');
+            setTimeout(() => btn.classList.remove('scale-95'), 120);
+        });
+
+        container.appendChild(btn);
+    });
+}
+
+function initModalDefectControls() {
+    const searchInput = document.getElementById('modal-defect-search');
+    const searchClear = document.getElementById('modal-defect-search-clear');
+    const categoryTabs = document.getElementById('modal-defect-category-tabs');
+
+    if (searchInput) {
+        searchInput.value = modalDefectSearchQuery;
+        searchInput.oninput = () => {
+            modalDefectSearchQuery = searchInput.value;
+            if (searchClear) {
+                if (modalDefectSearchQuery) searchClear.classList.remove('hidden');
+                else searchClear.classList.add('hidden');
+            }
+            renderEnhancedModalDefectButtons();
+        };
+    }
+
+    if (searchClear && searchInput) {
+        searchClear.onclick = () => {
+            searchInput.value = '';
+            modalDefectSearchQuery = '';
+            searchClear.classList.add('hidden');
+            renderEnhancedModalDefectButtons();
+            searchInput.focus();
+        };
+    }
+
+    if (categoryTabs) {
+        const catButtons = categoryTabs.querySelectorAll('.modal-cat-btn');
+        catButtons.forEach(btn => {
+            btn.onclick = () => {
+                const cat = btn.dataset.cat || 'all';
+                modalDefectActiveCategory = cat;
+
+                catButtons.forEach(b => {
+                    const bCat = b.dataset.cat;
+                    if (bCat === cat) {
+                        b.className = 'modal-cat-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-white transition-colors cursor-pointer';
+                    } else {
+                        let colorCls = 'text-slate-600 hover:bg-slate-100';
+                        if (bCat === 'critical') colorCls = 'text-red-700 hover:bg-red-50';
+                        if (bCat === 'major') colorCls = 'text-amber-700 hover:bg-amber-50';
+                        if (bCat === 'minor') colorCls = 'text-blue-700 hover:bg-blue-50';
+                        b.className = `modal-cat-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 ${colorCls} border border-slate-200 transition-colors cursor-pointer`;
+                    }
+                });
+
+                renderEnhancedModalDefectButtons();
+            };
+        });
+    }
+}
 
 function openInspectionItemModal(index = null) {
     const modal = document.getElementById('inspection-item-modal');
@@ -1860,42 +2075,115 @@ function openInspectionItemModal(index = null) {
 
     editingItemIndex = index;
 
-    // Clear / Init Modal fields
     const modalTitle = document.getElementById('modal-item-title');
+    const modeSelect = document.getElementById('modal-inspection-mode');
+    const modeHint = document.getElementById('modal-mode-hint');
+
+    // Reset defect search & filter state
+    modalDefectSearchQuery = '';
+    modalDefectActiveCategory = 'all';
+    const searchInput = document.getElementById('modal-defect-search');
+    if (searchInput) searchInput.value = '';
+    const searchClear = document.getElementById('modal-defect-search-clear');
+    if (searchClear) searchClear.classList.add('hidden');
+
+    // Reset category tabs styling
+    const categoryTabs = document.getElementById('modal-defect-category-tabs');
+    if (categoryTabs) {
+        const catButtons = categoryTabs.querySelectorAll('.modal-cat-btn');
+        catButtons.forEach(b => {
+            if (b.dataset.cat === 'all') {
+                b.className = 'modal-cat-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-800 text-white transition-colors cursor-pointer';
+            } else {
+                let colorCls = 'text-slate-600 hover:bg-slate-100';
+                if (b.dataset.cat === 'critical') colorCls = 'text-red-700 hover:bg-red-50';
+                if (b.dataset.cat === 'major') colorCls = 'text-amber-700 hover:bg-amber-50';
+                if (b.dataset.cat === 'minor') colorCls = 'text-blue-700 hover:bg-blue-50';
+                b.className = `modal-cat-btn px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 ${colorCls} border border-slate-200 transition-colors cursor-pointer`;
+            }
+        });
+    }
+
     if (index === null) {
         modalTitle.textContent = 'Tambah Item Inspeksi';
-        modalSelectedComponent = '';
+        modalInspectionMode = 'single';
+        modalComponent = '';
+        modalSelectedComponents = [];
+        modalActiveDefectComponent = '';
         modalSelectedProcesses = [];
         modalItemDefects = {};
+        modalComponentDefects = {};
         modalPassVal = 0;
         modalDefectVal = 0;
-
-        // Default quantities
         modalQtyIncomingVal = 0;
         modalQtyInspectVal = 0;
+
+        if (modeSelect) {
+            modeSelect.value = 'single';
+            modeSelect.disabled = false;
+        }
+        if (modeHint) modeHint.textContent = 'Pilih 1 komponen untuk diinspeksi.';
 
         const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
         if (modalModeSelect) modalModeSelect.value = 'manual';
     } else {
         modalTitle.textContent = 'Edit Item Inspeksi';
         const item = inspectionItems[index];
-        modalSelectedComponent = item.component;
+        modalInspectionMode = 'single';
+        modalComponent = item.component;
+        modalSelectedComponents = [item.component];
+        modalActiveDefectComponent = item.component;
         modalSelectedProcesses = item.process ? item.process.split(',').map(s => s.trim()) : [];
         modalQtyIncomingVal = item.qtyIncoming || 0;
         modalQtyInspectVal = item.qtyInspect || 0;
         modalPassVal = item.pass || 0;
         modalDefectVal = item.defect || 0;
 
-        // Re-construct modalItemDefects map
         modalItemDefects = {};
+        modalComponentDefects = {};
+        modalComponentDefects[item.component] = {};
         if (Array.isArray(item.defects)) {
             item.defects.forEach(d => {
-                modalItemDefects[d.type] = d.count;
+                const count = d.count || d.qty || 1;
+                modalItemDefects[d.type] = count;
+                modalComponentDefects[item.component][d.type] = count;
             });
         }
 
+        if (modeSelect) {
+            modeSelect.value = 'single';
+            modeSelect.disabled = true;
+        }
+        if (modeHint) modeHint.textContent = 'Editing mode (komponen tunggal).';
+
         const modalModeSelect = document.getElementById('modal-qty-inspect-mode');
-        if (modalModeSelect) modalModeSelect.value = 'manual'; // Always default to manual edit mode for previously saved items
+        if (modalModeSelect) modalModeSelect.value = 'manual';
+    }
+
+    // Bind mode selection change
+    if (modeSelect) {
+        modeSelect.onchange = () => {
+            const newMode = modeSelect.value;
+            modalInspectionMode = newMode;
+            if (newMode === 'bulk') {
+                if (modeHint) modeHint.textContent = 'Pilih 1 atau lebih komponen. Defect dapat diatribusikan per komponen.';
+                if (modalComponent && !modalSelectedComponents.includes(modalComponent)) {
+                    modalSelectedComponents = [modalComponent];
+                }
+                modalActiveDefectComponent = modalSelectedComponents[0] || '';
+                modalSelectedComponents.forEach(comp => {
+                    if (!modalComponentDefects[comp]) modalComponentDefects[comp] = {};
+                });
+            } else {
+                if (modeHint) modeHint.textContent = 'Pilih 1 komponen untuk diinspeksi.';
+                modalSelectedComponents = modalComponent ? [modalComponent] : [];
+                modalActiveDefectComponent = modalComponent;
+            }
+            updateModalComponentButtonsActiveState();
+            renderModalDefectTargetPills();
+            renderEnhancedModalDefectButtons();
+            updateModalGradeState();
+        };
     }
 
     // Set inputs values
@@ -1955,26 +2243,14 @@ function openInspectionItemModal(index = null) {
     }
 
     // Render Modal Components Buttons
-    modalComponent = modalSelectedComponent;
     modalProcesses = [...modalSelectedProcesses];
     renderModalComponentButtons(selectedVendor);
     renderModalProcessButtons();
+    renderModalDefectTargetPills();
 
-    // Render modal defect buttons dynamically
-    const modalDefectsContainer = document.getElementById('modal-defect-buttons');
-    if (modalDefectsContainer) {
-        renderDefectButtons(modalDefectsContainer);
-        // Bind click event for modal defects catalog
-        const modalButtons = modalDefectsContainer.querySelectorAll('.defect-button');
-        modalButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const defectType = button.dataset.defect || button.textContent.trim();
-                window.handleModalDefectClick(defectType);
-                button.classList.add('active-feedback');
-                setTimeout(() => button.classList.remove('active-feedback'), 200);
-            });
-        });
-    }
+    // Initialize defect catalog controls & render buttons
+    initModalDefectControls();
+    renderEnhancedModalDefectButtons();
 
     // Render logged defects and update numbers
     updateModalGradeState();
@@ -1986,12 +2262,24 @@ function openInspectionItemModal(index = null) {
 
 function updateModalGradeState() {
     let defectSum = 0;
-    for (const type in modalItemDefects) {
-        defectSum += modalItemDefects[type] || 0;
-    }
-    modalDefectVal = defectSum;
 
-    modalPassVal = Math.max(0, modalQtyInspectVal - modalDefectVal);
+    if (modalInspectionMode === 'bulk') {
+        modalSelectedComponents.forEach(comp => {
+            const compMap = modalComponentDefects[comp] || {};
+            for (const type in compMap) {
+                defectSum += (compMap[type] || 0);
+            }
+        });
+        modalDefectVal = defectSum;
+        const totalSample = modalQtyInspectVal * Math.max(1, modalSelectedComponents.length);
+        modalPassVal = Math.max(0, totalSample - modalDefectVal);
+    } else {
+        for (const type in modalItemDefects) {
+            defectSum += modalItemDefects[type] || 0;
+        }
+        modalDefectVal = defectSum;
+        modalPassVal = Math.max(0, modalQtyInspectVal - modalDefectVal);
+    }
 
     const passCounter = document.getElementById('modal-pass-counter');
     if (passCounter) passCounter.textContent = modalPassVal;
@@ -2003,6 +2291,8 @@ function updateModalGradeState() {
     if (inspectInput) inspectInput.value = modalQtyInspectVal;
 
     renderModalLoggedDefects();
+    renderModalDefectTargetPills();
+    renderEnhancedModalDefectButtons();
 }
 
 function renderModalLoggedDefects() {
@@ -2011,26 +2301,58 @@ function renderModalLoggedDefects() {
     container.innerHTML = '';
 
     let hasDefects = false;
-    for (const type in modalItemDefects) {
-        const count = modalItemDefects[type] || 0;
-        if (count > 0) {
-            hasDefects = true;
-            const div = document.createElement('div');
-            div.className = 'flex items-center justify-between py-1 text-xs text-slate-700';
-            div.innerHTML = `
-                <span class="font-medium text-slate-800">${type}</span>
-                <div class="flex items-center gap-1.5">
-                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', -1)">-1</button>
-                    <input type="number" min="0" value="${count}"
-                           title="Klik untuk ubah jumlah secara langsung" 
-                           class="w-14 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-text shadow-xs" 
-                           onchange="window.setModalDefectCount('${type}', this.value)" 
-                           onkeydown="if(event.key==='Enter'){ this.blur(); }" 
-                           onfocus="this.select()" />
-                    <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', 1)">+1</button>
-                </div>
-            `;
-            container.appendChild(div);
+
+    if (modalInspectionMode === 'bulk') {
+        modalSelectedComponents.forEach(comp => {
+            const compMap = modalComponentDefects[comp] || {};
+            for (const type in compMap) {
+                const count = compMap[type] || 0;
+                if (count > 0) {
+                    hasDefects = true;
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between py-1.5 text-xs text-slate-700';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${comp}</span>
+                            <span class="font-medium text-slate-800">${type}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', -1, '${comp}')">-1</button>
+                            <input type="number" min="0" value="${count}"
+                                   title="Klik untuk ubah jumlah secara langsung" 
+                                   class="w-14 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-text shadow-xs" 
+                                   onchange="window.setModalDefectCount('${type}', this.value, '${comp}')" 
+                                   onkeydown="if(event.key==='Enter'){ this.blur(); }" 
+                                   onfocus="this.select()" />
+                            <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', 1, '${comp}')">+1</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }
+            }
+        });
+    } else {
+        for (const type in modalItemDefects) {
+            const count = modalItemDefects[type] || 0;
+            if (count > 0) {
+                hasDefects = true;
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between py-1 text-xs text-slate-700';
+                div.innerHTML = `
+                    <span class="font-medium text-slate-800">${type}</span>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', -1)">-1</button>
+                        <input type="number" min="0" value="${count}"
+                               title="Klik untuk ubah jumlah secara langsung" 
+                               class="w-14 text-center font-bold text-slate-900 bg-white border border-slate-300 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-text shadow-xs" 
+                               onchange="window.setModalDefectCount('${type}', this.value)" 
+                               onkeydown="if(event.key==='Enter'){ this.blur(); }" 
+                               onfocus="this.select()" />
+                        <button type="button" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-bold rounded text-slate-700 cursor-pointer transition-colors" onclick="window.adjustModalDefect('${type}', 1)">+1</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
         }
     }
 
@@ -2039,52 +2361,111 @@ function renderModalLoggedDefects() {
     }
 }
 
-window.setModalDefectCount = function (defectType, val) {
+window.setModalDefectCount = function (defectType, val, compName = null) {
     const parsed = parseInt(val, 10);
     const newCount = isNaN(parsed) ? 0 : Math.max(0, parsed);
 
-    if (newCount === 0) {
-        delete modalItemDefects[defectType];
-    } else {
-        modalItemDefects[defectType] = newCount;
-    }
+    if (modalInspectionMode === 'bulk') {
+        const targetComp = compName || modalActiveDefectComponent;
+        if (!targetComp) return;
+        if (!modalComponentDefects[targetComp]) modalComponentDefects[targetComp] = {};
 
-    let defectSum = 0;
-    for (const type in modalItemDefects) {
-        defectSum += modalItemDefects[type] || 0;
-    }
-    if (defectSum > modalQtyInspectVal) {
-        modalQtyInspectVal = defectSum;
+        if (newCount === 0) {
+            delete modalComponentDefects[targetComp][defectType];
+        } else {
+            modalComponentDefects[targetComp][defectType] = newCount;
+        }
+
+        let compDefectSum = 0;
+        for (const t in modalComponentDefects[targetComp]) {
+            compDefectSum += (modalComponentDefects[targetComp][t] || 0);
+        }
+        if (compDefectSum > modalQtyInspectVal) {
+            modalQtyInspectVal = compDefectSum;
+        }
+    } else {
+        if (newCount === 0) {
+            delete modalItemDefects[defectType];
+        } else {
+            modalItemDefects[defectType] = newCount;
+        }
+
+        let defectSum = 0;
+        for (const type in modalItemDefects) {
+            defectSum += modalItemDefects[type] || 0;
+        }
+        if (defectSum > modalQtyInspectVal) {
+            modalQtyInspectVal = defectSum;
+        }
     }
 
     updateModalGradeState();
 };
 
-window.adjustModalDefect = function (defectType, amount) {
-    if (!modalItemDefects[defectType]) modalItemDefects[defectType] = 0;
+window.adjustModalDefect = function (defectType, amount, compName = null) {
+    if (modalInspectionMode === 'bulk') {
+        const targetComp = compName || modalActiveDefectComponent;
+        if (!targetComp) return;
+        if (!modalComponentDefects[targetComp]) modalComponentDefects[targetComp] = {};
 
-    const currentCount = modalItemDefects[defectType];
-    const newCount = Math.max(0, currentCount + amount);
+        const currentCount = modalComponentDefects[targetComp][defectType] || 0;
+        const newCount = Math.max(0, currentCount + amount);
 
-    if (newCount === 0) {
-        delete modalItemDefects[defectType];
+        if (newCount === 0) {
+            delete modalComponentDefects[targetComp][defectType];
+        } else {
+            modalComponentDefects[targetComp][defectType] = newCount;
+        }
+
+        let compDefectSum = 0;
+        for (const t in modalComponentDefects[targetComp]) {
+            compDefectSum += (modalComponentDefects[targetComp][t] || 0);
+        }
+        if (compDefectSum > modalQtyInspectVal) {
+            modalQtyInspectVal = compDefectSum;
+        }
     } else {
-        modalItemDefects[defectType] = newCount;
-    }
+        if (!modalItemDefects[defectType]) modalItemDefects[defectType] = 0;
 
-    let defectSum = 0;
-    for (const type in modalItemDefects) {
-        defectSum += modalItemDefects[type] || 0;
-    }
-    if (defectSum > modalQtyInspectVal) {
-        modalQtyInspectVal = defectSum;
+        const currentCount = modalItemDefects[defectType];
+        const newCount = Math.max(0, currentCount + amount);
+
+        if (newCount === 0) {
+            delete modalItemDefects[defectType];
+        } else {
+            modalItemDefects[defectType] = newCount;
+        }
+
+        let defectSum = 0;
+        for (const type in modalItemDefects) {
+            defectSum += modalItemDefects[type] || 0;
+        }
+        if (defectSum > modalQtyInspectVal) {
+            modalQtyInspectVal = defectSum;
+        }
     }
 
     updateModalGradeState();
 };
 
 window.handleModalDefectClick = function (defectType) {
-    window.adjustModalDefect(defectType, 1);
+    if (modalInspectionMode === 'bulk') {
+        if (!modalActiveDefectComponent) {
+            if (modalSelectedComponents.length > 0) {
+                modalActiveDefectComponent = modalSelectedComponents[0];
+            } else {
+                showAlert('Silakan pilih minimal 1 Component terlebih dahulu.', 'warning', 'Peringatan');
+                return;
+            }
+        }
+        window.adjustModalDefect(defectType, 1, modalActiveDefectComponent);
+    } else {
+        if (!modalComponent) {
+            showAlert('Silakan pilih Component terlebih dahulu.', 'warning', 'Peringatan');
+            return;
+        }
+        window.adjustModalDefect(defectType, 1);
+    }
 };
 
 function closeInspectionItemModal() {
@@ -2092,13 +2473,23 @@ function closeInspectionItemModal() {
     if (modal) modal.classList.add('hidden');
     document.body.classList.remove('modal-open');
     editingItemIndex = null;
+    modalDefectSearchQuery = '';
+    modalDefectActiveCategory = 'all';
 }
 
 function saveInspectionItem() {
-    if (!modalComponent) {
-        showAlert('Silakan pilih Component terlebih dahulu.', 'warning', 'Peringatan');
-        return;
+    if (modalInspectionMode === 'bulk') {
+        if (!modalSelectedComponents || modalSelectedComponents.length === 0) {
+            showAlert('Silakan pilih minimal 1 Component terlebih dahulu.', 'warning', 'Peringatan');
+            return;
+        }
+    } else {
+        if (!modalComponent) {
+            showAlert('Silakan pilih Component terlebih dahulu.', 'warning', 'Peringatan');
+            return;
+        }
     }
+
     if (!modalProcesses || modalProcesses.length === 0) {
         showAlert('Silakan pilih minimal 1 Process terlebih dahulu.', 'warning', 'Peringatan');
         return;
@@ -2112,28 +2503,62 @@ function saveInspectionItem() {
         return;
     }
 
-    const defectsArray = [];
-    for (const type in modalItemDefects) {
-        defectsArray.push({
-            type,
-            count: modalItemDefects[type]
+    if (modalInspectionMode === 'bulk') {
+        // Expand/unroll bulk components into independent items
+        modalSelectedComponents.forEach(comp => {
+            const compMap = modalComponentDefects[comp] || {};
+            const defectsArray = [];
+            let compDefectCount = 0;
+
+            for (const type in compMap) {
+                const cnt = compMap[type] || 0;
+                if (cnt > 0) {
+                    compDefectCount += cnt;
+                    defectsArray.push({
+                        type,
+                        count: cnt
+                    });
+                }
+            }
+
+            const compPassCount = Math.max(0, modalQtyInspectVal - compDefectCount);
+
+            const itemData = {
+                component: comp,
+                process: modalProcesses.join(', '),
+                qtyIncoming: modalQtyIncomingVal,
+                qtyInspect: modalQtyInspectVal,
+                pass: compPassCount,
+                defect: compDefectCount,
+                defects: defectsArray
+            };
+
+            inspectionItems.push(itemData);
         });
-    }
-
-    const itemData = {
-        component: modalComponent,
-        process: modalProcesses.join(', '),
-        qtyIncoming: modalQtyIncomingVal,
-        qtyInspect: modalQtyInspectVal,
-        pass: modalPassVal,
-        defect: modalDefectVal,
-        defects: defectsArray
-    };
-
-    if (editingItemIndex === null) {
-        inspectionItems.push(itemData);
     } else {
-        inspectionItems[editingItemIndex] = itemData;
+        const defectsArray = [];
+        for (const type in modalItemDefects) {
+            defectsArray.push({
+                type,
+                count: modalItemDefects[type]
+            });
+        }
+
+        const itemData = {
+            component: modalComponent,
+            process: modalProcesses.join(', '),
+            qtyIncoming: modalQtyIncomingVal,
+            qtyInspect: modalQtyInspectVal,
+            pass: modalPassVal,
+            defect: modalDefectVal,
+            defects: defectsArray
+        };
+
+        if (editingItemIndex === null) {
+            inspectionItems.push(itemData);
+        } else {
+            inspectionItems[editingItemIndex] = itemData;
+        }
     }
 
     closeInspectionItemModal();
