@@ -27,8 +27,13 @@ CREATE TABLE IF NOT EXISTS public.material_master_data (
   material_type       TEXT,
   status              VARCHAR(20)   NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending','in-progress','done')),
+  raw_done            BOOLEAN       DEFAULT FALSE,
+  rolling_done        BOOLEAN       DEFAULT FALSE,
+  laminating_done     BOOLEAN       DEFAULT FALSE,
+  bonding_done        BOOLEAN       DEFAULT FALSE,
   uploaded_by         TEXT,
-  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 -- Composite unique index (expression-based — tidak bisa pakai ADD CONSTRAINT di Postgres)
@@ -588,7 +593,12 @@ CREATE POLICY "subcont_storage_insert" ON storage.objects
   WITH CHECK (bucket_id = 'subcont-evidence');
 
 -- ─── 10. MIGRATION ALTER COLUMNS (4 Types & Pass All Traceability) ───
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS raw_done BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS laminating_done BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS bonding_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS rolling_done BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS executed_by VARCHAR(255);
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS pass_reason TEXT;
+
 
