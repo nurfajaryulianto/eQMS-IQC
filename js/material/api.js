@@ -766,7 +766,27 @@ export async function apiGetUsers() {
  * Buat atau update user material di material_users.
  */
 export async function apiSaveUser(userData) {
-    const { nik, name, role, isNew, material_assignment } = userData;
+    const { nik, name, role, isNew, material_assignment, password } = userData;
+
+    // 1. Prioritaskan Supabase RPC create_supabase_user (sinkronisasi Auth + app_users + material_users)
+    try {
+        const { data: rpcUserId, error: rpcErr } = await supabase.rpc('create_supabase_user', {
+            p_nik: String(nik).trim(),
+            p_name: String(name).trim(),
+            p_role: String(role).trim().toLowerCase(),
+            p_password: (password && password.trim()) ? password.trim() : (isNew ? 'user123' : ''),
+            p_material_assignment: material_assignment || '',
+        });
+
+        if (!rpcErr && rpcUserId) {
+            return { success: true, user_id: rpcUserId };
+        }
+        if (rpcErr) {
+            console.warn('RPC create_supabase_user failed, falling back:', rpcErr);
+        }
+    } catch (rpcEx) {
+        console.warn('RPC create_supabase_user exception, falling back:', rpcEx);
+    }
 
     if (isNew) {
         // Panggil Vercel serverless function

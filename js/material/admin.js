@@ -1243,12 +1243,14 @@ window.handleUserSubmit = async function (e) {
             }
             showToast('User berhasil disimpan (simulasi)!', 'success');
         } else {
+            const rawPw = document.getElementById('user-password')?.value?.trim();
+            const password = rawPw || (!editingUserNik ? 'user123' : '');
             await apiSaveUser({
                 nik,
                 name,
                 role,
                 material_assignment: matAssignment,
-                password: document.getElementById('user-password')?.value?.trim() || '123456',
+                password,
                 isNew: !editingUserNik
             });
             showToast(`User ${nik} berhasil disimpan!`, 'success');
@@ -1326,6 +1328,12 @@ window.editUser = function (nik) {
     if (formTitle) formTitle.textContent = 'Edit Pengguna: ' + user.nik;
     if (cancelBtn) cancelBtn.style.display = 'block';
 
+    const pwInput = document.getElementById('user-password');
+    if (pwInput) {
+        pwInput.value = '';
+        pwInput.placeholder = 'Kosongkan jika tidak ingin mengubah password';
+    }
+
     if (nameInput) nameInput.focus();
 };
 
@@ -1377,6 +1385,12 @@ window.resetUserForm = function () {
     if (customAssignInput) customAssignInput.value = '';
     if (formTitle) formTitle.textContent = 'Tambah Pengguna Baru';
     if (cancelBtn) cancelBtn.style.display = 'none';
+
+    const pwInput = document.getElementById('user-password');
+    if (pwInput) {
+        pwInput.value = '';
+        pwInput.placeholder = 'Kosongkan jika ingin default: user123';
+    }
 };
 
 // ─── SPREADSHEET STATUS (deprecated — replaced by Supabase) ──
