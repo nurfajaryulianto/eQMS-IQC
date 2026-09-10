@@ -543,11 +543,22 @@ export async function apiSubmitInspection(payload) {
 
         // Update status master data
         if (payload.master_data_id) {
-            const mdPatch = {};
+            const mdPatch = {
+                updated_at: new Date().toISOString()
+            };
             if (isRaw) mdPatch.raw_done = true;
             if (isRolling) mdPatch.rolling_done = true;
             if (isLam) mdPatch.laminating_done = true;
             if (isBonding) mdPatch.bonding_done = true;
+
+            if (payload.is_final_release) {
+                mdPatch.status = 'done';
+                mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
+                mdPatch.released_at = new Date().toISOString();
+                if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
+            } else if (payload.status) {
+                mdPatch.status = payload.status;
+            }
 
             await supabase
                 .from('material_master_data')
@@ -555,7 +566,7 @@ export async function apiSubmitInspection(payload) {
                 .eq('id', payload.master_data_id);
         }
 
-        return { status: 'ok', inspection_id: existing.inspection_id || inspectionId, message: 'Data inspeksi berhasil diperbarui.' };
+        return { status: 'ok', inspection_id: existing.inspection_id || inspectionId, message: payload.is_final_release ? 'Material berhasil diinspeksi & dirilis ke produksi!' : 'Data inspeksi berhasil diperbarui.' };
     }
 
     // INSERT BARIS PERTAMA
@@ -574,7 +585,7 @@ export async function apiSubmitInspection(payload) {
         ok:                       isRaw ? ok : 0,
         no_qty:                   isRaw ? noQ : 0,
         receive_date:             parseDateSafe(payload.receive_date),
-        status:                   payload.status || 'done',
+        status:                   payload.is_final_release ? 'done' : (payload.status || 'done'),
         inspection_date:          payload.inspection_date || new Date().toISOString(),
         inspector_nik:            payload.inspector_nik || payload.inspector_name || '',
         defect_notes:             payload.defect_notes || payload.bonding_notes || '',
@@ -596,11 +607,22 @@ export async function apiSubmitInspection(payload) {
     if (error) throw new Error(error.message);
 
     if (payload.master_data_id) {
-        const mdPatch = {};
+        const mdPatch = {
+            updated_at: new Date().toISOString()
+        };
         if (isRaw) mdPatch.raw_done = true;
         if (isRolling) mdPatch.rolling_done = true;
         if (isLam) mdPatch.laminating_done = true;
         if (isBonding) mdPatch.bonding_done = true;
+
+        if (payload.is_final_release) {
+            mdPatch.status = 'done';
+            mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
+            mdPatch.released_at = new Date().toISOString();
+            if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
+        } else if (payload.status) {
+            mdPatch.status = payload.status;
+        }
 
         await supabase
             .from('material_master_data')
@@ -608,7 +630,35 @@ export async function apiSubmitInspection(payload) {
             .eq('id', payload.master_data_id);
     }
 
-    return { status: 'ok', inspection_id: inspectionId, message: 'Data inspeksi berhasil disimpan.' };
+    return { status: 'ok', inspection_id: inspectionId, message: payload.is_final_release ? 'Material berhasil diinspeksi & dirilis ke produksi!' : 'Data inspeksi berhasil disimpan.' };
+}
+
+/**
+ * Rilis Material ke Produksi secara langsung (Ready to Deliver).
+ * @param {number} masterDataId
+ * @param {string} releasedBy
+ * @param {string} releaseNotes
+ */
+export async function apiReleaseMaterialToProduction({ masterDataId, releasedBy, releaseNotes = '' }) {
+    if (!masterDataId) throw new Error('masterDataId wajib diisi.');
+    const now = new Date().toISOString();
+    const patch = {
+        status: 'done',
+        released_by: releasedBy || 'Inspector',
+        released_at: now,
+        release_notes: releaseNotes || 'Dirilis ke produksi oleh inspector',
+        updated_at: now
+    };
+
+    const { data, error } = await supabase
+        .from('material_master_data')
+        .update(patch)
+        .eq('id', masterDataId)
+        .select()
+        .single();
+
+    if (error) throw new Error(error.message);
+    return { success: true, data };
 }
 
 /**

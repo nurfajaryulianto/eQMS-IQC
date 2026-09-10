@@ -486,12 +486,12 @@
     <div id="validation-overlay" style="display: none;">
         <div class="validation-dialog" style="background: linear-gradient(145deg, #0e1c2e, #091322); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 24px; padding: 28px; max-width: 480px; width: 100%; box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 40px rgba(16, 185, 129, 0.15); animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
-                <div style="width: 50px; height: 50px; border-radius: 16px; background: rgba(16, 185, 129, 0.15); border: 1.5px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);">
-                    <span class="material-symbols-outlined" style="color: #34d399; font-size: 28px;">verified</span>
+                <div id="validation-modal-icon-box" style="width: 50px; height: 50px; border-radius: 16px; background: rgba(16, 185, 129, 0.15); border: 1.5px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2);">
+                    <span id="validation-modal-icon" class="material-symbols-outlined" style="color: #34d399; font-size: 28px;">verified</span>
                 </div>
                 <div>
-                    <h3 style="font-size: 17px; font-weight: 800; color: white; margin: 0 0 3px; letter-spacing: -0.01em;">Konfirmasi Data Inspeksi</h3>
-                    <p style="font-size: 12px; color: rgba(255,255,255,0.45); margin: 0;">Periksa kembali target PO & rincian data sebelum disimpan</p>
+                    <h3 id="validation-modal-title" style="font-size: 17px; font-weight: 800; color: white; margin: 0 0 3px; letter-spacing: -0.01em;">Konfirmasi Data Inspeksi</h3>
+                    <p id="validation-modal-desc" style="font-size: 12px; color: rgba(255,255,255,0.45); margin: 0;">Periksa kembali target PO & rincian data sebelum disimpan</p>
                 </div>
             </div>
 
@@ -898,17 +898,24 @@
                         </div>
                     </div>
 
-                    <!-- Action Buttons: Reset All & Submit -->
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; width: 100%;">
-                        <button type="button" id="reset-form-btn" onclick="resetForm(true)" class="btn-secondary"
-                            style="padding: 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
-                            <span class="material-symbols-outlined" style="font-size: 18px;">restart_alt</span>
-                            Reset All
-                        </button>
-                        <button id="submit-btn" onclick="openValidationDialog()"
-                            style="padding: 13px; border-radius: 12px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.25s; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);">
-                            <span class="material-symbols-outlined" style="font-size: 18px;">fact_check</span>
-                            Verifikasi & Simpan
+                    <!-- Action Buttons: Simpan Progres, Selesaikan & Rilis ke Produksi, Reset -->
+                    <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button type="button" id="reset-form-btn" onclick="resetForm(true)" class="btn-secondary"
+                                style="padding: 12px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">restart_alt</span>
+                                Reset All
+                            </button>
+                            <button type="button" id="btn-save-progress" onclick="openValidationDialog(false)"
+                                style="padding: 12px; border-radius: 12px; border: 1.5px solid rgba(59, 130, 246, 0.35); background: rgba(59, 130, 246, 0.12); color: #93c5fd; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">bookmark_added</span>
+                                Simpan Progres
+                            </button>
+                        </div>
+                        <button type="button" id="btn-submit-release" onclick="openValidationDialog(true)"
+                            style="padding: 14px; border-radius: 12px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.25s; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);">
+                            <span class="material-symbols-outlined" style="font-size: 20px;">local_shipping</span>
+                            Selesaikan & Rilis ke Produksi
                         </button>
                     </div>
 

@@ -4,12 +4,15 @@
 -- Jalankan di: Supabase Dashboard → SQL Editor → New Query → Run
 -- ============================================================
 
--- 1. TAMBAH KOLOM STATUS YANG BELUM ADA PADA material_master_data
+-- 1. TAMBAH KOLOM STATUS & RELEASE PADA material_master_data
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS raw_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS laminating_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS bonding_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS rolling_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS released_by TEXT;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS release_notes TEXT;
 
 -- TAMBAH KOLOM TRACEABILITY DUAL-ACTOR PADA material_inspections
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS executed_by VARCHAR(255);
@@ -130,6 +133,9 @@ BEGIN
         rolling_done = TRUE,
         laminating_done = TRUE,
         bonding_done = TRUE,
+        released_by = admin_name,
+        released_at = NOW(),
+        release_notes = v_eff_reason,
         updated_at = NOW()
     WHERE id = v_id;
 

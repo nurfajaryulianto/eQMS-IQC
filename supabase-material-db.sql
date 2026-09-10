@@ -598,6 +598,9 @@ ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS laminating_done
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS bonding_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS rolling_done BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS released_by TEXT;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ;
+ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS release_notes TEXT;
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS executed_by VARCHAR(255);
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS pass_reason TEXT;
 

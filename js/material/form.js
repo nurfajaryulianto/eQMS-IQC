@@ -3,7 +3,7 @@
 // ============================================================
 
 import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES } from './auth.js';
-import { apiGetMasterData, apiGetUsers, apiSubmitInspection } from './api.js';
+import { apiGetMasterData, apiGetUsers, apiSubmitInspection, apiReleaseMaterialToProduction } from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allPOData = [];       // semua master_data dari GAS
@@ -11,9 +11,10 @@ let filteredPO = [];      // setelah filter/search
 let selectedPO = null;    // PO yang sedang dipilih user
 let currentUser = null;   // user yang sedang login
 
-let currentInspectionType = 'raw'; // 'raw' | 'laminating'
+let currentInspectionType = 'raw'; // 'raw' | 'rolling' | 'laminating' | 'bonding'
 let lamColorChoice = 'YES'; // 'YES' | 'NO'
 let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
+let pendingIsFinalRelease = false; // flag apakah submit tombol Selesaikan & Rilis ke Produksi
 
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
 
@@ -112,12 +113,16 @@ window.switchInspectionTab = function (type) {
     const commonFields = document.getElementById('common-fields-body');
     const sectionTitle = document.getElementById('form-section-title');
     const doneNotice = document.getElementById('done-po-notice');
-    const submitBtn = document.getElementById('submit-btn');
-
     const isRawDone = selectedPO && selectedPO.raw_done;
     const isRollingDone = selectedPO && selectedPO.rolling_done;
     const isLamDone = selectedPO && selectedPO.laminating_done;
     const isBondDone = selectedPO && selectedPO.bonding_done;
+
+    const isStageDone = (type === 'raw' && isRawDone) ||
+                        (type === 'rolling' && isRollingDone) ||
+                        (type === 'laminating' && isLamDone) ||
+                        (type === 'bonding' && isBondDone);
+    const isPOAlreadyDone = selectedPO && (selectedPO.status === 'done' || (selectedPO.raw_done && selectedPO.rolling_done && selectedPO.laminating_done && selectedPO.bonding_done));
 
     [tabRaw, tabRolling, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
     if (bodyRaw) bodyRaw.style.display = 'none';
@@ -134,26 +139,14 @@ window.switchInspectionTab = function (type) {
         if (isRawDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
             }
             if (bodyRaw) { bodyRaw.style.opacity = '0.35'; bodyRaw.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.style.opacity = '0.4';
-                submitBtn.style.pointerEvents = 'none';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
-            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyRaw) { bodyRaw.style.opacity = '1'; bodyRaw.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = '1';
-                submitBtn.style.pointerEvents = 'auto';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
-            }
         }
     } else if (type === 'rolling') {
         if (tabRolling) tabRolling.classList.add('active');
@@ -164,26 +157,14 @@ window.switchInspectionTab = function (type) {
         if (isRollingDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pemeriksaan <strong>Rolling Inspection (Raw)</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pemeriksaan <strong>Rolling Inspection (Raw)</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
             }
             if (bodyRolling) { bodyRolling.style.opacity = '0.35'; bodyRolling.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.style.opacity = '0.4';
-                submitBtn.style.pointerEvents = 'none';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
-            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyRolling) { bodyRolling.style.opacity = '1'; bodyRolling.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = '1';
-                submitBtn.style.pointerEvents = 'auto';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
-            }
         }
     } else if (type === 'laminating') {
         if (tabLam) tabLam.classList.add('active');
@@ -194,26 +175,14 @@ window.switchInspectionTab = function (type) {
         if (isLamDone) {
             if (doneNotice) {
                 doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya yang masih Pending.</span>`;
+                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
             }
             if (bodyLam) { bodyLam.style.opacity = '0.35'; bodyLam.style.pointerEvents = 'none'; }
             if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.style.opacity = '0.4';
-                submitBtn.style.pointerEvents = 'none';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
-            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyLam) { bodyLam.style.opacity = '1'; bodyLam.style.pointerEvents = 'auto'; }
             if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = '1';
-                submitBtn.style.pointerEvents = 'auto';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
-            }
         }
     } else if (type === 'bonding') {
         if (tabBond) tabBond.classList.add('active');
@@ -227,22 +196,48 @@ window.switchInspectionTab = function (type) {
                 doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini telah <strong>Selesai (Done)</strong>.</span>`;
             }
             if (bodyBond) { bodyBond.style.opacity = '0.35'; bodyBond.style.pointerEvents = 'none'; }
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.style.opacity = '0.4';
-                submitBtn.style.pointerEvents = 'none';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">lock</span> Pengecekan Sudah Selesai';
-            }
         } else {
             if (doneNotice) doneNotice.style.display = 'none';
             if (bodyBond) { bodyBond.style.opacity = '1'; bodyBond.style.pointerEvents = 'auto'; }
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = '1';
-                submitBtn.style.pointerEvents = 'auto';
-                submitBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">fact_check</span> Verifikasi & Simpan';
-            }
         }
+    }
+
+    // ── Update Action Buttons ──
+    const btnSaveProgress = document.getElementById('btn-save-progress');
+    const btnSubmitRelease = document.getElementById('btn-submit-release');
+    const legacySubmit = document.getElementById('submit-btn');
+
+    if (btnSaveProgress) {
+        if (isStageDone || isPOAlreadyDone) {
+            btnSaveProgress.disabled = true;
+            btnSaveProgress.style.opacity = '0.4';
+            btnSaveProgress.style.pointerEvents = 'none';
+            btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span> Tahap Selesai';
+        } else {
+            btnSaveProgress.disabled = false;
+            btnSaveProgress.style.opacity = '1';
+            btnSaveProgress.style.pointerEvents = 'auto';
+            btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">bookmark_added</span> Simpan Progres';
+        }
+    }
+
+    if (btnSubmitRelease) {
+        if (isPOAlreadyDone) {
+            btnSubmitRelease.disabled = true;
+            btnSubmitRelease.style.opacity = '0.5';
+            btnSubmitRelease.style.pointerEvents = 'none';
+            btnSubmitRelease.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">verified</span> Sudah Dirilis ke Produksi';
+        } else {
+            btnSubmitRelease.disabled = false;
+            btnSubmitRelease.style.opacity = '1';
+            btnSubmitRelease.style.pointerEvents = 'auto';
+            btnSubmitRelease.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">local_shipping</span> Selesaikan & Rilis ke Produksi';
+        }
+    }
+
+    if (legacySubmit) {
+        legacySubmit.disabled = isStageDone && isPOAlreadyDone;
+        legacySubmit.style.opacity = legacySubmit.disabled ? '0.4' : '1';
     }
 };
 
@@ -497,9 +492,13 @@ async function fetchMasterData() {
             receive_date:   row.receive_date || '',
             status:         (row.status || 'pending').toLowerCase(),
             raw_done:       Boolean(row.raw_done),
+            rolling_done:   Boolean(row.rolling_done),
             laminating_done: Boolean(row.laminating_done),
             bonding_done:   Boolean(row.bonding_done),
             material_type:  row.material_type || '',
+            released_by:    row.released_by || '',
+            released_at:    row.released_at || '',
+            release_notes:  row.release_notes || '',
         }));
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
@@ -557,10 +556,12 @@ function renderPOList(data) {
 
     // Sort: pending -> 0, in-progress -> 1, done -> 2
     const sorted = [...data].sort((a, b) => {
-        const order = { 'pending': 0, 'in-progress': 1, 'done': 2 };
-        const valA = order[a.status] !== undefined ? order[a.status] : 0;
-        const valB = order[b.status] !== undefined ? order[b.status] : 0;
-        return valA - valB;
+        const getRank = (po) => {
+            if (po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done)) return 2;
+            if (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done) return 1;
+            return 0;
+        };
+        return getRank(a) - getRank(b);
     });
 
     sorted.forEach(po => {
@@ -568,14 +569,20 @@ function renderPOList(data) {
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
 
-        const isAllDone = po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done;
-        const isPartial = (po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done) && !isAllDone;
-        const badgeClass = isAllDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
-        const badgeText = isAllDone ? 'Done' : (isPartial ? 'In-Progress' : 'Pending');
+        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
+        const isPartial = !isDone && (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done);
+        const badgeClass = isDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
+        const badgeText = isDone ? 'Ready to Deliver' : (isPartial ? 'In-Progress' : 'Pending');
 
-        const tagBadge = (done, label) => done 
-            ? `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); font-weight:700; display:inline-flex; align-items:center; gap:2px;">✓ ${label}</span>`
-            : `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.4); font-weight:600; display:inline-flex; align-items:center; gap:2px;">⏳ ${label}</span>`;
+        const tagBadge = (done, label) => {
+            if (done) {
+                return `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); font-weight:700; display:inline-flex; align-items:center; gap:2px;">✓ ${label}</span>`;
+            } else if (isDone) {
+                return `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.03); color:rgba(255,255,255,0.3); border:1px dashed rgba(255,255,255,0.1); font-weight:600; display:inline-flex; align-items:center; gap:2px;">— ${label} (N/A)</span>`;
+            } else {
+                return `<span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.4); font-weight:600; display:inline-flex; align-items:center; gap:2px;">⏳ ${label}</span>`;
+            }
+        };
 
         card.innerHTML = `
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;">
@@ -705,6 +712,38 @@ async function selectPO(po, cardEl) {
         const balanceQty = po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - checkedQty);
         const inProgressColor = checkedQty > 0 ? '#fbbf24' : 'rgba(255,255,255,0.7)';
         const balanceColor = balanceQty > 0 ? '#60a5fa' : '#34d399';
+        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
+
+        let releaseBannerHtml = '';
+        if (isDone) {
+            const relBy = po.released_by || 'Inspector';
+            const relAt = po.released_at ? formatReceiveDate(po.released_at) : '—';
+            releaseBannerHtml = `
+                <div style="margin-top:14px; padding:12px 14px; border-radius:12px; background:rgba(16, 185, 129, 0.12); border:1.5px solid rgba(16, 185, 129, 0.35); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span class="material-symbols-outlined" style="color:#34d399; font-size:24px;">verified</span>
+                        <div>
+                            <div style="color:#34d399; font-weight:800; font-size:13px;">READY TO DELIVER (DONE)</div>
+                            <div style="color:rgba(255,255,255,0.6); font-size:11px;">Rilis oleh: <strong style="color:white;">${esc(relBy)}</strong> &bull; ${esc(relAt)}</div>
+                        </div>
+                    </div>
+                    <span style="font-size:11px; font-weight:700; color:#34d399; background:rgba(16,185,129,0.2); padding:4px 8px; border-radius:6px;">Siap Kirim ke Produksi</span>
+                </div>
+            `;
+        } else {
+            releaseBannerHtml = `
+                <div style="margin-top:14px; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <div style="font-size:12px; color:rgba(255,255,255,0.65);">
+                        Tahap pengecekan sudah cukup untuk material ini?
+                    </div>
+                    <button type="button" onclick="quickReleaseCurrentPO()" style="padding:7px 14px; border-radius:8px; border:none; background:linear-gradient(135deg, #10b981, #059669); color:white; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(16,185,129,0.25); transition:all 0.2s;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">local_shipping</span>
+                        Rilis Langsung ke Produksi
+                    </button>
+                </div>
+            `;
+        }
+
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
@@ -719,6 +758,7 @@ async function selectPO(po, cardEl) {
                 <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">In-Progress Qty</span><span style="color:${inProgressColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${checkedQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
                 <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">Balance Qty</span><span style="color:${balanceColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${balanceQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
             </div>
+            ${releaseBannerHtml}
         `;
     }
 
@@ -790,17 +830,17 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const isAllDone = Boolean(po.raw_done && po.laminating_done && po.bonding_done) || po.status === 'done';
-        const hasPending = Boolean(!po.raw_done || !po.laminating_done || !po.bonding_done);
-        const isPartial = (Boolean(po.raw_done || po.laminating_done || po.bonding_done) || po.status === 'in-progress') && !isAllDone;
+        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
+        const isPartial = !isDone && (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done);
+        const isPending = !isDone && !isPartial;
 
         let matchStatus = true;
         if (status === 'pending') {
-            matchStatus = hasPending || po.status === 'pending';
+            matchStatus = isPending;
         } else if (status === 'in-progress') {
-            matchStatus = isPartial || po.status === 'in-progress';
+            matchStatus = isPartial;
         } else if (status === 'done') {
-            matchStatus = isAllDone || po.status === 'done';
+            matchStatus = isDone;
         } else if (status === 'all') {
             matchStatus = true;
         }
@@ -894,7 +934,9 @@ window.updateCalculations = function () {
 
 // ─── VALIDATION & SUBMIT ──────────────────────────────────────
 
-window.openValidationDialog = function () {
+window.openValidationDialog = function (isFinalRelease = false) {
+    pendingIsFinalRelease = Boolean(isFinalRelease);
+
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
     const notes = document.getElementById('defect-notes')?.value.trim() || '';
@@ -951,6 +993,37 @@ window.openValidationDialog = function () {
     const errorsEl = document.getElementById('validation-errors');
     const summaryEl = document.getElementById('validation-summary');
     const overlay = document.getElementById('validation-overlay');
+    const modalTitle = document.getElementById('validation-modal-title');
+    const modalDesc = document.getElementById('validation-modal-desc');
+    const modalIcon = document.getElementById('validation-modal-icon');
+    const modalIconBox = document.getElementById('validation-modal-icon-box');
+    const confirmBtn = document.getElementById('validation-confirm-btn');
+
+    // Adapt modal title, desc & confirm button based on release vs save progress
+    if (modalTitle) {
+        modalTitle.textContent = pendingIsFinalRelease ? 'Konfirmasi Selesai & Rilis ke Produksi' : 'Konfirmasi Simpan Progres Tahap';
+    }
+    if (modalDesc) {
+        modalDesc.textContent = pendingIsFinalRelease 
+            ? 'Material akan diselesaikan & dinyatakan Siap Kirim (Ready to Deliver) ke Produksi'
+            : 'Periksa kembali target PO & rincian data sebelum disimpan sebagai progres berjalan';
+    }
+    if (modalIcon) {
+        modalIcon.textContent = pendingIsFinalRelease ? 'local_shipping' : 'bookmark_added';
+    }
+    if (modalIconBox) {
+        modalIconBox.style.background = pendingIsFinalRelease ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+        modalIconBox.style.borderColor = pendingIsFinalRelease ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)';
+    }
+    if (confirmBtn) {
+        if (pendingIsFinalRelease) {
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">local_shipping</span> Selesaikan & Rilis';
+            confirmBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        } else {
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span> Simpan Progres';
+            confirmBtn.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+        }
+    }
 
     if (errors.length) {
         errorsEl.style.display = 'block';
@@ -972,10 +1045,11 @@ window.openValidationDialog = function () {
 
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
-        const statusChecking = document.getElementById('checking-status')?.value === 'in-progress' ? 'In-Progress (Belum Selesai)' : 'Done (Selesai)';
+        const actionStatusText = pendingIsFinalRelease ? 'Selesai & Rilis ke Produksi (DONE)' : 'Simpan Progres Tahap Ini (In-Progress)';
 
         let summaryHtml = `
-            ${summaryRow('Target PO Number', selectedPO.po_number, true)}
+            ${summaryRow('Tindakan', actionStatusText, true)}
+            ${summaryRow('Target PO Number', selectedPO.po_number)}
             ${summaryRow('Material Name', selectedPO.material_name)}
             ${summaryRow('Vendor', selectedPO.vendor_name)}
             ${summaryRow('Jenis Inspeksi', inspectTypeLabel)}
@@ -1024,7 +1098,6 @@ window.openValidationDialog = function () {
             summaryHtml += `
                 ${summaryRow('Leader Approval', leaderVal)}
                 ${leaderSelect && leaderSelect.value ? summaryRow('Evidence File', evidenceFileText) : ''}
-                ${summaryRow('Status Checking', statusChecking)}
                 ${notes ? summaryRow('Catatan', notes) : ''}
             `;
         }
@@ -1185,12 +1258,18 @@ async function submitInspection() {
             file_name:                fileName,
             file_type:                fileType,
             inspection_date:          new Date().toISOString(),
-            status:                   checkingStatus,
+            status:                   pendingIsFinalRelease ? 'done' : checkingStatus,
+            is_final_release:         pendingIsFinalRelease,
+            released_by:              inspectorName,
+            release_notes:            pendingIsFinalRelease ? 'Dirilis saat inspeksi selesai' : '',
         });
 
         if (result.status === 'ok') {
             loading.classList.remove('visible');
-            showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan!`, 'success');
+            const msg = result.message || (pendingIsFinalRelease 
+                ? `Material PO ${selectedPO.po_number} berhasil diinspeksi & dirilis ke produksi!` 
+                : `Data inspeksi ${selectedPO.po_number} berhasil disimpan!`);
+            showToast(msg, 'success');
             const curPoNum = selectedPO.po_number;
             const curPoId = selectedPO.id;
             await fetchMasterData();
@@ -1219,6 +1298,56 @@ async function submitInspection() {
         showToast('Error: ' + err.message, 'error');
     }
 }
+
+window.quickReleaseCurrentPO = async function () {
+    if (!selectedPO) {
+        showToast('Pilih PO terlebih dahulu.', 'error');
+        return;
+    }
+    const confirmRelease = confirm(
+        `Konfirmasi Rilis ke Produksi?\n\nPO: ${selectedPO.po_number}\nMaterial: ${selectedPO.material_name}\n\nMaterial ini akan ditandai SELESAI (Done) dan Siap Kirim (Ready to Deliver) ke Produksi tanpa proses inspeksi lanjutan.`
+    );
+    if (!confirmRelease) return;
+
+    const loading = document.getElementById('loading-overlay');
+    const loadingTxt = document.getElementById('loading-text');
+    if (loading) loading.classList.add('visible');
+    if (loadingTxt) loadingTxt.textContent = 'Merilis material ke produksi...';
+
+    try {
+        const inspectorName = currentUser?.name || currentUser?.nik || 'Inspector';
+        await apiReleaseMaterialToProduction({
+            masterDataId: selectedPO.id,
+            releasedBy: inspectorName,
+            releaseNotes: 'Dirilis langsung ke produksi (Ready to Deliver)'
+        });
+
+        if (loading) loading.classList.remove('visible');
+        showToast(`PO ${selectedPO.po_number} berhasil dirilis ke produksi!`, 'success');
+
+        const curPoNum = selectedPO.po_number;
+        const curPoId = selectedPO.id;
+        await fetchMasterData();
+
+        const updatedPO = allPOData.find(p => (curPoId && p.id === curPoId) || p.po_number === curPoNum);
+        if (updatedPO) {
+            let cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+            if (!cardEl) {
+                const statusFilterEl = document.getElementById('status-filter');
+                if (statusFilterEl && statusFilterEl.value !== 'all') {
+                    statusFilterEl.value = 'all';
+                    filterPOList();
+                    cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                }
+            }
+            await selectPO(updatedPO, cardEl || document.createElement('div'));
+        }
+    } catch (err) {
+        console.error('quickReleaseCurrentPO error:', err);
+        if (loading) loading.classList.remove('visible');
+        showToast('Gagal merilis material: ' + err.message, 'error');
+    }
+};
 
 window.resetForm = function (userTriggered = false) {
     selectedPO = null;
