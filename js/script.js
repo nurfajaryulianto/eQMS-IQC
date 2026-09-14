@@ -3542,20 +3542,12 @@ function renderInspectionResultTable(sessions) {
                 const canEdit = canUserEditSession(targetObj, currentUser);
                 if (canEdit) {
                     actionHTML = `
-                        <div class="inline-flex items-center gap-1">
-                            <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
-                                    title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
-                                    class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
-                                <span class="material-symbols-outlined text-[12px]">edit</span>
-                                <span>Edit</span>
-                            </button>
-                            <button onclick="window.cancelInProgressSession('${activeInProgSession}')" 
-                                    title="Batalkan Sesi ${activeInProgSession}" 
-                                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
-                                <span class="material-symbols-outlined text-[12px]">close</span>
-                                <span>Batal</span>
-                            </button>
-                        </div>
+                        <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
+                                title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
+                                class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                            <span class="material-symbols-outlined text-[12px]">edit</span>
+                            <span>Edit</span>
+                        </button>
                     `;
                 } else {
                     const auditorName = targetObj?.auditor || 'Auditor lain';
@@ -3696,64 +3688,14 @@ window.continueInProgressSession = function (sessionId) {
     showAlert(`Sesi inspeksi ${session.vendor} (${session.sessionId}) berhasil dimuat ke form untuk di-edit/dilanjutkan!`, 'success', 'Sesi Dimuat');
 };
 
-/** Cancel / Void an In-Progress session */
-window.cancelInProgressSession = async function (sessionId) {
-    if (!sessionId) return;
-    const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
-    if (!session) {
-        showAlert('Data sesi tidak ditemukan.', 'error');
-        return;
-    }
-
-    if (!canUserEditSession(session, currentUser)) {
-        const ownerName = session.auditor || 'auditor lain';
-        showAlert(`Akses ditolak: Sesi ini milik ${ownerName}. Anda hanya berwenang membatalkan sesi milik Anda sendiri.`, 'error', 'Wewenang Terbatas');
-        return;
-    }
-
-    const confirmed = await showConfirm(
-        `Apakah Anda yakin ingin membatalkan sesi In-Progress (${sessionId}) ini?\nData sesi dan log defect terkait akan dihapus dari database.`,
-        'Konfirmasi Pembatalan Sesi',
-        'Ya, Batalkan',
-        'Tidak'
-    );
-    if (!confirmed) return;
-
-    try {
-        // Hapus defect logs terkait
-        await supabase.from('subcont_defect_logs').delete().eq('session_id', sessionId);
-
-        // Hapus session dari subcont_inspections
-        const { error: delErr } = await supabase.from('subcont_inspections').delete().eq('session_id', sessionId);
-        if (delErr) throw delErr;
-
-        // Update cache lokal
-        allInspectionSessions = allInspectionSessions.filter(s => String(s.sessionId) !== String(sessionId));
-
-        // Jika sesi yang dibatalkan sedang dimuat aktif di form, reset form
-        if (editingSessionId === sessionId) {
-            window.exitEditingSession(true);
-        }
-
-        showAlert(`Sesi ${sessionId} berhasil dibatalkan dan dihapus.`, 'success', 'Sesi Dibatalkan');
-
-        if (typeof window.loadInspectionResults === 'function') {
-            window.loadInspectionResults();
-        }
-    } catch (err) {
-        console.error('Gagal membatalkan sesi:', err);
-        showAlert(`Gagal membatalkan sesi: ${err.message || err}`, 'error', 'Gagal Membatalkan');
-    }
-};
-
-/** Exit editing mode without deleting the session, returning to a clean form */
+/** Exit editing mode without deleting any session, returning to a clean form */
 window.exitEditingSession = function (silent = false) {
     editingSessionId = null;
     hideEditingSessionBanner();
     resetAllFields();
     clearDraftStorage();
     if (!silent) {
-        showAlert('Mode edit sesi dilepas. Form kembali ke status baru.', 'info', 'Form Direset');
+        showAlert('Mode edit sesi dibatalkan. Form kembali ke status baru.', 'info', 'Form Direset');
     }
 };
 
@@ -3776,16 +3718,11 @@ function renderEditingSessionBanner(session) {
             </div>
         </div>
         <div class="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
-            <button type="button" onclick="window.cancelInProgressSession('${session.sessionId}')" 
-                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all flex items-center gap-1 cursor-pointer">
-                <span class="material-symbols-outlined text-sm">cancel</span>
-                <span>Batalkan Sesi</span>
-            </button>
             <button type="button" onclick="window.exitEditingSession()" 
                     class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-                    title="Lepas sesi ini dan buka form kosong untuk input sesi baru">
+                    title="Batalkan proses edit sesi ini dan kembali ke form input baru">
                 <span class="material-symbols-outlined text-sm">close</span>
-                <span>Lepas Sesi / Form Baru</span>
+                <span>Batal Edit / Form Baru</span>
             </button>
         </div>
     `;
