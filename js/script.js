@@ -296,6 +296,10 @@ window.addStyle = function(styleStr, optModelStr) {
     selectedStyles.push({ style: upperStyle, model: modelName });
     renderStyleTags();
 
+    if (typeof checkExistingInProgressSession === 'function') {
+        checkExistingInProgressSession(upperStyle);
+    }
+
     const inputEl = document.getElementById('style-number-input');
     if (inputEl) inputEl.value = '';
     const previewEl = document.getElementById('style-model-preview');
@@ -308,6 +312,15 @@ window.addStyle = function(styleStr, optModelStr) {
 window.removeStyle = function(styleStr) {
     selectedStyles = selectedStyles.filter(s => s.style !== styleStr);
     renderStyleTags();
+    const detectBanner = document.getElementById('in-progress-detect-banner');
+    if (detectBanner) {
+        if (!selectedStyles.length) {
+            detectBanner.classList.add('hidden');
+        } else if (typeof checkExistingInProgressSession === 'function') {
+            const hasAny = selectedStyles.some(s => checkExistingInProgressSession(s.style));
+            if (!hasAny) detectBanner.classList.add('hidden');
+        }
+    }
 };
 
 window.setStyles = function(stylesVal, modelsVal, skipSave = false) {
@@ -683,6 +696,9 @@ function resetContextSelection() {
 
 function resetAllFields() {
     editingSessionId = null;
+    if (typeof hideEditingSessionBanner === 'function') hideEditingSessionBanner();
+    const detectBanner = document.getElementById('in-progress-detect-banner');
+    if (detectBanner) detectBanner.classList.add('hidden');
     const mtSelectEl = document.getElementById("material-type");
     if (mtSelectEl) mtSelectEl.value = '';
     const locSelectEl = document.getElementById("inspection-location");
@@ -979,6 +995,18 @@ function applyDraftToForm(draft) {
         updateTotalQtyInspect();
         checkInfoCompleteAndLockButtons();
         updateSaveButtonState();
+
+        if (editingSessionId) {
+            const sessObj = (Array.isArray(allInspectionSessions) && allInspectionSessions.find(s => String(s.sessionId) === String(editingSessionId))) || {
+                sessionId: editingSessionId,
+                styleNumber: draft.styleNumber,
+                modelName: draft.modelName,
+                vendor: draft.vendor
+            };
+            if (typeof renderEditingSessionBanner === 'function') {
+                renderEditingSessionBanner(sessObj);
+            }
+        }
     } finally {
         isRestoringDraft = false;
     }
@@ -3444,7 +3472,7 @@ function renderInspectionResultTable(sessions) {
                 };
             }
             const agg = itemAgg[itemKey];
-            agg.qtyIncoming += it.qtyIncoming;
+            agg.qtyIncoming = Math.max(agg.qtyIncoming, it.qtyIncoming);
             agg.qtyInspect += it.qtyInspect;
             agg.pass += it.pass;
             agg.defect += it.defect;
@@ -3514,12 +3542,20 @@ function renderInspectionResultTable(sessions) {
                 const canEdit = canUserEditSession(targetObj, currentUser);
                 if (canEdit) {
                     actionHTML = `
-                        <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
-                                title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
-                                class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
-                            <span class="material-symbols-outlined text-[12px]">edit</span>
-                            <span>Edit</span>
-                        </button>
+                        <div class="inline-flex items-center gap-1">
+                            <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
+                                    title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
+                                    class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                                <span class="material-symbols-outlined text-[12px]">edit</span>
+                                <span>Edit</span>
+                            </button>
+                            <button onclick="window.cancelInProgressSession('${activeInProgSession}')" 
+                                    title="Batalkan Sesi ${activeInProgSession}" 
+                                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                                <span class="material-symbols-outlined text-[12px]">close</span>
+                                <span>Batal</span>
+                            </button>
+                        </div>
                     `;
                 } else {
                     const auditorName = targetObj?.auditor || 'Auditor lain';
@@ -3656,5 +3692,158 @@ window.continueInProgressSession = function (sessionId) {
         window.showView('dashboard');
     }
 
+    renderEditingSessionBanner(session);
     showAlert(`Sesi inspeksi ${session.vendor} (${session.sessionId}) berhasil dimuat ke form untuk di-edit/dilanjutkan!`, 'success', 'Sesi Dimuat');
 };
+
+/** Cancel / Void an In-Progress session */
+window.cancelInProgressSession = async function (sessionId) {
+    if (!sessionId) return;
+    const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
+    if (!session) {
+        showAlert('Data sesi tidak ditemukan.', 'error');
+        return;
+    }
+
+    if (!canUserEditSession(session, currentUser)) {
+        const ownerName = session.auditor || 'auditor lain';
+        showAlert(`Akses ditolak: Sesi ini milik ${ownerName}. Anda hanya berwenang membatalkan sesi milik Anda sendiri.`, 'error', 'Wewenang Terbatas');
+        return;
+    }
+
+    const confirmed = await showConfirm(
+        `Apakah Anda yakin ingin membatalkan sesi In-Progress (${sessionId}) ini?\nData sesi dan log defect terkait akan dihapus dari database.`,
+        'Konfirmasi Pembatalan Sesi',
+        'Ya, Batalkan',
+        'Tidak'
+    );
+    if (!confirmed) return;
+
+    try {
+        // Hapus defect logs terkait
+        await supabase.from('subcont_defect_logs').delete().eq('session_id', sessionId);
+
+        // Hapus session dari subcont_inspections
+        const { error: delErr } = await supabase.from('subcont_inspections').delete().eq('session_id', sessionId);
+        if (delErr) throw delErr;
+
+        // Update cache lokal
+        allInspectionSessions = allInspectionSessions.filter(s => String(s.sessionId) !== String(sessionId));
+
+        // Jika sesi yang dibatalkan sedang dimuat aktif di form, reset form
+        if (editingSessionId === sessionId) {
+            window.exitEditingSession(true);
+        }
+
+        showAlert(`Sesi ${sessionId} berhasil dibatalkan dan dihapus.`, 'success', 'Sesi Dibatalkan');
+
+        if (typeof window.loadInspectionResults === 'function') {
+            window.loadInspectionResults();
+        }
+    } catch (err) {
+        console.error('Gagal membatalkan sesi:', err);
+        showAlert(`Gagal membatalkan sesi: ${err.message || err}`, 'error', 'Gagal Membatalkan');
+    }
+};
+
+/** Exit editing mode without deleting the session, returning to a clean form */
+window.exitEditingSession = function (silent = false) {
+    editingSessionId = null;
+    hideEditingSessionBanner();
+    resetAllFields();
+    clearDraftStorage();
+    if (!silent) {
+        showAlert('Mode edit sesi dilepas. Form kembali ke status baru.', 'info', 'Form Direset');
+    }
+};
+
+/** Render banner when form is in In-Progress editing mode */
+function renderEditingSessionBanner(session) {
+    const banner = document.getElementById('in-progress-editing-banner');
+    if (!banner || !session) return;
+
+    banner.innerHTML = `
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-amber-500 text-2xl animate-pulse">edit_document</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-200/80 px-2 py-0.5 rounded">Mode Edit Sesi In-Progress</span>
+                    <span class="text-xs font-bold text-slate-800 font-mono">${session.sessionId}</span>
+                </div>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Melanjutkan pemeriksaan <strong class="text-slate-900">${session.styleNumber || '—'}</strong> (${session.modelName || '—'}) - Vendor: <strong class="text-slate-900">${session.vendor || '—'}</strong>
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
+            <button type="button" onclick="window.cancelInProgressSession('${session.sessionId}')" 
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 shadow-sm transition-all flex items-center gap-1 cursor-pointer">
+                <span class="material-symbols-outlined text-sm">cancel</span>
+                <span>Batalkan Sesi</span>
+            </button>
+            <button type="button" onclick="window.exitEditingSession()" 
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                    title="Lepas sesi ini dan buka form kosong untuk input sesi baru">
+                <span class="material-symbols-outlined text-sm">close</span>
+                <span>Lepas Sesi / Form Baru</span>
+            </button>
+        </div>
+    `;
+    banner.classList.remove('hidden');
+}
+
+function hideEditingSessionBanner() {
+    const banner = document.getElementById('in-progress-editing-banner');
+    if (banner) {
+        banner.innerHTML = '';
+        banner.classList.add('hidden');
+    }
+}
+
+/** Check if there is an in-progress session for the added style and notify user */
+function checkExistingInProgressSession(styleStr) {
+    if (editingSessionId || !styleStr || !Array.isArray(allInspectionSessions)) return false;
+    const detectBanner = document.getElementById('in-progress-detect-banner');
+    if (!detectBanner) return false;
+
+    const cleanUpper = String(styleStr).trim().toUpperCase();
+    const matched = allInspectionSessions.find(s => {
+        const sStyle = String(s.styleNumber || '').toUpperCase();
+        const st = String(s.status || '').toLowerCase();
+        return (sStyle === cleanUpper || sStyle.includes(cleanUpper)) &&
+               (st.includes('progress') || st.includes('leader') || st.includes('approval'));
+    });
+
+    if (matched) {
+        detectBanner.innerHTML = `
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-sky-600 text-2xl">info</span>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-sky-800 bg-sky-100 px-2 py-0.5 rounded">Sesi In-Progress Ditemukan</span>
+                        <span class="text-xs font-semibold text-slate-700 font-mono">${matched.sessionId}</span>
+                    </div>
+                    <p class="text-xs text-slate-600 mt-0.5">
+                        Style <strong class="text-slate-900">${matched.styleNumber}</strong> (${matched.modelName || '—'}) memiliki sesi aktif oleh <strong class="text-slate-900">${matched.auditor || 'Auditor'}</strong>.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
+                <button type="button" onclick="window.continueInProgressSession('${matched.sessionId}')" 
+                        class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white shadow-sm transition-all flex items-center gap-1 cursor-pointer">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                    <span>Lanjutkan Sesi Ini</span>
+                </button>
+                <button type="button" onclick="document.getElementById('in-progress-detect-banner').classList.add('hidden')" 
+                        class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 shadow-sm transition-all flex items-center gap-1 cursor-pointer">
+                    <span>Abaikan / Sesi Baru</span>
+                </button>
+            </div>
+        `;
+        detectBanner.classList.remove('hidden');
+        return true;
+    } else {
+        detectBanner.classList.add('hidden');
+        return false;
+    }
+}

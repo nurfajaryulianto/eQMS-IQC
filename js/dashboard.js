@@ -341,7 +341,15 @@ function updateDashboard() {
 }
 
 function updateMetrics(data) {
-    const totalQtyIncoming = data.reduce((sum, item) => sum + (Number(item.QtyIncoming) || 0), 0);
+    // Deduplicate QtyIncoming per unique component lot across multi-day inspection sessions
+    const lotIncomingMap = new Map();
+    data.forEach(item => {
+        const lotKey = `${item['Style Number'] || ''}|${item.Model || ''}|${item.Vendor || ''}|${item.Component || ''}|${item.Process || ''}|${item.TanggalIncoming || ''}`;
+        const currentVal = lotIncomingMap.get(lotKey) || 0;
+        lotIncomingMap.set(lotKey, Math.max(currentVal, Number(item.QtyIncoming) || 0));
+    });
+    const totalQtyIncoming = Array.from(lotIncomingMap.values()).reduce((sum, v) => sum + v, 0);
+
     const totalQtyInspect = data.reduce((sum, item) => sum + (Number(item.Qty_Inspect) || 0), 0);
     const totalPass = data.reduce((sum, item) => sum + (Number(item.Pass) || 0), 0);
     const totalDefect = data.reduce((sum, item) => sum + (Number(item.Defect) || 0), 0);
