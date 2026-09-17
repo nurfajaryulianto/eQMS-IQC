@@ -11,7 +11,7 @@ import {
     apiGetAssignments, apiSaveAssignment, apiDeleteAssignment,
     apiGetUsers, apiSaveUser, apiDeleteUser,
     apiSubmitClaim, apiGetClaims,
-    getCurrentUserMeta
+    getCurrentUserMeta, apiReleaseMaterialToProduction
 } from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -150,6 +150,9 @@ window.renderMasterTable = function () {
         const claimBtn = hasInspection
             ? `<button onclick="window.openClaimModal(${d.row_idx || d.id})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
             : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
+        const releaseAdminBtn = d.status !== 'done'
+            ? `<button onclick="window.adminReleaseMasterRow('${d.id}','${esc(d.po_number)}','${esc(d.material_name)}')" title="Rilis ke Produksi (Ready to Deliver by Admin)" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;" onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'"><span class='material-symbols-outlined' style='font-size:13px;'>local_shipping</span>Rilis</button>`
+            : `<span title="Dirilis oleh: ${esc(d.released_by || 'Admin')}&#10;Catatan: ${esc(d.release_notes || '—')}" style="color:#34d399;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:2px;cursor:help;"><span class='material-symbols-outlined' style='font-size:14px;'>verified</span>Siap Kirim</span>`;
         const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
         const deleteBtn = d.status === 'pending'
             ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
@@ -164,7 +167,7 @@ window.renderMasterTable = function () {
             <td style="padding:10px 14px;text-align:center;">${badge}</td>
             <td style="padding:10px 14px;text-align:center;">${claimBtn}</td>
             <td style="padding:10px 14px;text-align:center;">
-                <div style="display:flex;gap:6px;justify-content:center;">${editBtn}${deleteBtn}</div>
+                <div style="display:flex;gap:6px;justify-content:center;align-items:center;">${releaseAdminBtn}${editBtn}${deleteBtn}</div>
             </td>
         </tr>`;
     }).join('');
@@ -343,6 +346,34 @@ window.deleteMasterRow = async function (id, poNumber) {
     } catch (err) {
         console.error('deleteMasterRow error:', err);
         showToast('Gagal menghapus data: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
+
+window.adminReleaseMasterRow = async function (id, poNumber, materialName) {
+    const reason = prompt(
+        `Otorisasi Rilis ke Produksi (Ready to Deliver by Admin):\n\nNomor PO: ${poNumber}\nMaterial: ${materialName}\n\nMasukkan catatan/alasan rilis khusus oleh Admin (misal: CoA Vendor Valid / Disetujui SPV):`,
+        'Disetujui Admin - Siap Kirim (CoA Valid)'
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+        showToast('Catatan/alasan rilis oleh Admin wajib diisi.', 'error');
+        return;
+    }
+    setLoading(true, 'Merilis material ke produksi...');
+    try {
+        const adminName = (currentUser?.name || currentUser?.nik || 'Admin') + ' (Admin)';
+        await apiReleaseMaterialToProduction({
+            masterDataId: id,
+            releasedBy: adminName,
+            releaseNotes: reason.trim()
+        });
+        showToast(`PO ${poNumber} berhasil dirilis ke produksi oleh Admin!`, 'success');
+        await loadMasterData();
+    } catch (err) {
+        console.error('adminReleaseMasterRow error:', err);
+        showToast('Gagal merilis material: ' + err.message, 'error');
     } finally {
         setLoading(false);
     }

@@ -16,6 +16,41 @@ let lamColorChoice = 'YES'; // 'YES' | 'NO'
 let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
 let pendingIsFinalRelease = false; // flag apakah submit tombol Selesaikan & Rilis ke Produksi
 
+// ─── STEP CHECKERS & STATUS HELPERS ─────────────────────────
+export function countCompletedSteps(po) {
+    if (!po) return 0;
+    return (po.raw_done ? 1 : 0) +
+           (po.rolling_done ? 1 : 0) +
+           (po.laminating_done ? 1 : 0) +
+           (po.bonding_done ? 1 : 0);
+}
+
+export function isPOFullyDone(po) {
+    if (!po) return false;
+    const steps = countCompletedSteps(po);
+    const isReleasedByAdmin = Boolean(po.released_by && (
+        po.released_by.toLowerCase().includes('admin') ||
+        po.released_by.toLowerCase().includes('supervisor') ||
+        po.released_by.toLowerCase().includes('spv') ||
+        po.released_by.toLowerCase().includes('manager')
+    ));
+    // Ready to Deliver HANYA jika:
+    // 1. Sudah berstatus done di database DAN minimal 3 langkah terpenuhi, ATAU
+    // 2. Seluruh 4 langkah terpenuhi, ATAU
+    // 3. Sudah di-release resmi oleh Admin/Supervisor (Admin Override).
+    return (po.status === 'done' && (steps >= 3 || isReleasedByAdmin)) || (steps >= 4);
+}
+
+export function isPOInProgress(po) {
+    if (!po || isPOFullyDone(po)) return false;
+    const steps = countCompletedSteps(po);
+    return steps > 0 ||
+           po.status === 'in-progress' ||
+           po.status === 'in progress' ||
+           (po.checked_qty > 0) ||
+           po.status === 'done';
+}
+
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
 
 window.updateTabBadges = function (po) {
@@ -122,7 +157,7 @@ window.switchInspectionTab = function (type) {
                         (type === 'rolling' && isRollingDone) ||
                         (type === 'laminating' && isLamDone) ||
                         (type === 'bonding' && isBondDone);
-    const isPOAlreadyDone = selectedPO && (selectedPO.status === 'done' || (selectedPO.raw_done && selectedPO.rolling_done && selectedPO.laminating_done && selectedPO.bonding_done));
+    const isPOAlreadyDone = selectedPO && isPOFullyDone(selectedPO);
 
     [tabRaw, tabRolling, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
     if (bodyRaw) bodyRaw.style.display = 'none';
@@ -557,8 +592,8 @@ function renderPOList(data) {
     // Sort: pending -> 0, in-progress -> 1, done -> 2
     const sorted = [...data].sort((a, b) => {
         const getRank = (po) => {
-            if (po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done)) return 2;
-            if (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done) return 1;
+            if (isPOFullyDone(po)) return 2;
+            if (isPOInProgress(po)) return 1;
             return 0;
         };
         return getRank(a) - getRank(b);
@@ -570,8 +605,8 @@ function renderPOList(data) {
         card.dataset.poNumber = po.po_number;
         if (po.id) card.dataset.id = po.id;
 
-        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
-        const isPartial = !isDone && (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done);
+        const isDone = isPOFullyDone(po);
+        const isPartial = isPOInProgress(po);
         const badgeClass = isDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
         const badgeText = isDone ? 'Ready to Deliver' : (isPartial ? 'In-Progress' : 'Pending');
 
@@ -717,7 +752,7 @@ async function selectPO(po, cardEl) {
         const balanceQty = po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - checkedQty);
         const inProgressColor = checkedQty > 0 ? '#fbbf24' : 'rgba(255,255,255,0.7)';
         const balanceColor = balanceQty > 0 ? '#60a5fa' : '#34d399';
-        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
+        const isDone = isPOFullyDone(po);
 
         let releaseBannerHtml = '';
         if (isDone) {
@@ -736,15 +771,38 @@ async function selectPO(po, cardEl) {
                 </div>
             `;
         } else {
+            const stepsDone = countCompletedSteps(po);
+            const isAdminOrSpv = currentUser?.role === 'admin' || currentUser?.role === 'supervisor' || currentUser?.role === 'manager';
+            
+            let actionBtnHtml = '';
+            if (isAdminOrSpv) {
+                actionBtnHtml = `
+                    <button type="button" onclick="quickReleaseCurrentPO()" style="padding:7px 14px; border-radius:8px; border:none; background:linear-gradient(135deg, #10b981, #059669); color:white; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(16,185,129,0.25); transition:all 0.2s;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">admin_panel_settings</span>
+                        Rilis Khusus (Admin)
+                    </button>
+                `;
+            } else if (stepsDone >= 3) {
+                actionBtnHtml = `
+                    <button type="button" onclick="quickReleaseCurrentPO()" style="padding:7px 14px; border-radius:8px; border:none; background:linear-gradient(135deg, #10b981, #059669); color:white; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(16,185,129,0.25); transition:all 0.2s;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">local_shipping</span>
+                        Rilis ke Produksi (${stepsDone}/4 Selesai)
+                    </button>
+                `;
+            } else {
+                actionBtnHtml = `
+                    <span style="font-size:11px; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.04); padding:4px 10px; border-radius:6px; border:1px dashed rgba(255,255,255,0.1);">
+                        Minimal 3 tahap untuk rilis (Saat ini: ${stepsDone}/4)
+                    </span>
+                `;
+            }
+
             releaseBannerHtml = `
                 <div style="margin-top:14px; padding:12px 14px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                     <div style="font-size:12px; color:rgba(255,255,255,0.65);">
-                        Tahap pengecekan sudah cukup untuk material ini?
+                        Progres inspeksi: <strong style="color:${stepsDone >= 3 ? '#34d399' : '#fbbf24'}">${stepsDone} dari 4</strong> tahapan selesai
                     </div>
-                    <button type="button" onclick="quickReleaseCurrentPO()" style="padding:7px 14px; border-radius:8px; border:none; background:linear-gradient(135deg, #10b981, #059669); color:white; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(16,185,129,0.25); transition:all 0.2s;">
-                        <span class="material-symbols-outlined" style="font-size:16px;">local_shipping</span>
-                        Rilis Langsung ke Produksi
-                    </button>
+                    ${actionBtnHtml}
                 </div>
             `;
         }
@@ -835,8 +893,8 @@ window.filterPOList = function () {
             po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
-        const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
-        const isPartial = !isDone && (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done);
+        const isDone = isPOFullyDone(po);
+        const isPartial = isPOInProgress(po);
         const isPending = !isDone && !isPartial;
 
         let matchStatus = true;
@@ -986,6 +1044,20 @@ window.openValidationDialog = function (isFinalRelease = false) {
         const bondingFileEl = document.getElementById('bonding-file');
         if (!bondingFileEl || !bondingFileEl.files || bondingFileEl.files.length === 0) {
             errors.push('Harap upload file evidence / dokumen Bonding Test.');
+        }
+    }
+
+    if (isFinalRelease) {
+        let willBeDone = countCompletedSteps(selectedPO);
+        if (currentInspectionType === 'raw' && !selectedPO.raw_done) willBeDone++;
+        if (currentInspectionType === 'rolling' && !selectedPO.rolling_done) willBeDone++;
+        if (currentInspectionType === 'laminating' && !selectedPO.laminating_done) willBeDone++;
+        if (currentInspectionType === 'bonding' && !selectedPO.bonding_done) willBeDone++;
+
+        const isAdminOrSpv = currentUser?.role === 'admin' || currentUser?.role === 'supervisor' || currentUser?.role === 'manager';
+        if (!isAdminOrSpv && willBeDone < 3) {
+            showToast(`Tidak dapat merilis ke produksi: Minimal 3 dari 4 tahapan inspeksi (Raw, Rolling, Laminating, Bonding) harus diselesaikan sebelum rilis. Saat ini baru ${willBeDone}/4 tahapan. Silakan gunakan tombol "Simpan Progres" atau minta otorisasi Admin.`, 'warning');
+            return;
         }
     }
 
@@ -1269,10 +1341,10 @@ async function submitInspection() {
             file_name:                fileName,
             file_type:                fileType,
             inspection_date:          new Date().toISOString(),
-            status:                   pendingIsFinalRelease ? 'done' : checkingStatus,
+            status:                   pendingIsFinalRelease ? 'done' : 'in-progress',
             is_final_release:         pendingIsFinalRelease,
-            released_by:              inspectorName,
-            release_notes:            pendingIsFinalRelease ? 'Dirilis saat inspeksi selesai' : '',
+            released_by:              pendingIsFinalRelease ? (inspectorName + ((currentUser?.role === 'admin' || currentUser?.role === 'supervisor') ? ' (Admin)' : '')) : '',
+            release_notes:            pendingIsFinalRelease ? ((currentUser?.role === 'admin' || currentUser?.role === 'supervisor') ? 'Dirilis oleh Admin/Supervisor' : 'Dirilis setelah memenuhi minimal 3 tahapan inspeksi') : '',
         });
 
         if (result.status === 'ok') {
@@ -1318,10 +1390,32 @@ window.quickReleaseCurrentPO = async function () {
         showToast('Pilih PO terlebih dahulu.', 'error');
         return;
     }
-    const confirmRelease = confirm(
-        `Konfirmasi Rilis ke Produksi?\n\nPO: ${selectedPO.po_number}\nMaterial: ${selectedPO.material_name}\n\nMaterial ini akan ditandai SELESAI (Done) dan Siap Kirim (Ready to Deliver) ke Produksi tanpa proses inspeksi lanjutan.`
-    );
-    if (!confirmRelease) return;
+    const stepsDone = countCompletedSteps(selectedPO);
+    const isAdminOrSpv = currentUser?.role === 'admin' || currentUser?.role === 'supervisor' || currentUser?.role === 'manager';
+
+    if (!isAdminOrSpv && stepsDone < 3) {
+        showToast(`Otorisasi ditolak: Minimal 3 tahapan inspeksi harus diselesaikan sebelum dapat dirilis ke produksi. Tahapan saat ini: ${stepsDone}/4. Hubungi Admin jika memerlukan rilis khusus.`, 'error');
+        return;
+    }
+
+    let releaseNotes = 'Dirilis ke produksi setelah memenuhi minimal tahapan inspeksi';
+    if (isAdminOrSpv && stepsDone < 3) {
+        const inputReason = prompt(
+            `Otorisasi Rilis Langsung (Ready to Deliver by Admin):\n\nNomor PO: ${selectedPO.po_number}\nMaterial: ${selectedPO.material_name}\nTahap selesai: ${stepsDone}/4\n\nMasukkan catatan/alasan rilis khusus oleh Admin (misal: CoA Vendor Valid / Disetujui SPV):`,
+            'Disetujui Admin - Siap Kirim (CoA Valid)'
+        );
+        if (inputReason === null) return;
+        if (!inputReason.trim()) {
+            showToast('Catatan alasan rilis oleh Admin wajib diisi.', 'error');
+            return;
+        }
+        releaseNotes = inputReason.trim();
+    } else {
+        const confirmRelease = confirm(
+            `Konfirmasi Rilis ke Produksi?\n\nPO: ${selectedPO.po_number}\nMaterial: ${selectedPO.material_name}\nTahap selesai: ${stepsDone}/4\n\nMaterial ini akan ditandai SELESAI (Done) dan Siap Kirim (Ready to Deliver) ke Produksi.`
+        );
+        if (!confirmRelease) return;
+    }
 
     const loading = document.getElementById('loading-overlay');
     const loadingTxt = document.getElementById('loading-text');
@@ -1329,11 +1423,11 @@ window.quickReleaseCurrentPO = async function () {
     if (loadingTxt) loadingTxt.textContent = 'Merilis material ke produksi...';
 
     try {
-        const inspectorName = currentUser?.name || currentUser?.nik || 'Inspector';
+        const inspectorName = (currentUser?.name || currentUser?.nik || 'Inspector') + (isAdminOrSpv ? ' (Admin)' : '');
         await apiReleaseMaterialToProduction({
             masterDataId: selectedPO.id,
             releasedBy: inspectorName,
-            releaseNotes: 'Dirilis langsung ke produksi (Ready to Deliver)'
+            releaseNotes: releaseNotes
         });
 
         if (loading) loading.classList.remove('visible');

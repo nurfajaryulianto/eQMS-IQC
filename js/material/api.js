@@ -656,13 +656,32 @@ export async function apiSubmitInspection(payload) {
             if (isLam) mdPatch.laminating_done = true;
             if (isBonding) mdPatch.bonding_done = true;
 
-            if (payload.is_final_release) {
+            const { data: curMd } = await supabase
+                .from('material_master_data')
+                .select('raw_done, rolling_done, laminating_done, bonding_done, released_by')
+                .eq('id', payload.master_data_id)
+                .maybeSingle();
+
+            const rDone = isRaw || Boolean(curMd?.raw_done);
+            const rollDone = isRolling || Boolean(curMd?.rolling_done);
+            const lDone = isLam || Boolean(curMd?.laminating_done);
+            const bDone = isBonding || Boolean(curMd?.bonding_done);
+            const totalSteps = (rDone ? 1 : 0) + (rollDone ? 1 : 0) + (lDone ? 1 : 0) + (bDone ? 1 : 0);
+            const relBy = payload.released_by || curMd?.released_by || '';
+            const isAdminRel = Boolean(relBy && (
+                relBy.toLowerCase().includes('admin') ||
+                relBy.toLowerCase().includes('supervisor') ||
+                relBy.toLowerCase().includes('spv') ||
+                relBy.toLowerCase().includes('manager')
+            ));
+
+            if ((payload.is_final_release && (totalSteps >= 3 || isAdminRel)) || totalSteps === 4) {
                 mdPatch.status = 'done';
                 mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
                 mdPatch.released_at = new Date().toISOString();
                 if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
-            } else if (payload.status) {
-                mdPatch.status = payload.status;
+            } else {
+                mdPatch.status = 'in-progress';
             }
 
             await supabase
@@ -720,13 +739,32 @@ export async function apiSubmitInspection(payload) {
         if (isLam) mdPatch.laminating_done = true;
         if (isBonding) mdPatch.bonding_done = true;
 
-        if (payload.is_final_release) {
+        const { data: curMd } = await supabase
+            .from('material_master_data')
+            .select('raw_done, rolling_done, laminating_done, bonding_done, released_by')
+            .eq('id', payload.master_data_id)
+            .maybeSingle();
+
+        const rDone = isRaw || Boolean(curMd?.raw_done);
+        const rollDone = isRolling || Boolean(curMd?.rolling_done);
+        const lDone = isLam || Boolean(curMd?.laminating_done);
+        const bDone = isBonding || Boolean(curMd?.bonding_done);
+        const totalSteps = (rDone ? 1 : 0) + (rollDone ? 1 : 0) + (lDone ? 1 : 0) + (bDone ? 1 : 0);
+        const relBy = payload.released_by || curMd?.released_by || '';
+        const isAdminRel = Boolean(relBy && (
+            relBy.toLowerCase().includes('admin') ||
+            relBy.toLowerCase().includes('supervisor') ||
+            relBy.toLowerCase().includes('spv') ||
+            relBy.toLowerCase().includes('manager')
+        ));
+
+        if ((payload.is_final_release && (totalSteps >= 3 || isAdminRel)) || totalSteps === 4) {
             mdPatch.status = 'done';
             mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
             mdPatch.released_at = new Date().toISOString();
             if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
-        } else if (payload.status) {
-            mdPatch.status = payload.status;
+        } else {
+            mdPatch.status = 'in-progress';
         }
 
         await supabase
@@ -1080,9 +1118,10 @@ function normalizeRow(row) {
         ? row.material_inspections
         : (row.material_inspections ? [row.material_inspections] : []);
 
-    let rawDone = false;
-    let lamDone = false;
-    let bondDone = false;
+    let rawDone = Boolean(row.raw_done);
+    let rollingDone = Boolean(row.rolling_done);
+    let lamDone = Boolean(row.laminating_done);
+    let bondDone = Boolean(row.bonding_done);
     let checkedQty = 0;
 
     inspections.forEach(insp => {
@@ -1091,33 +1130,50 @@ function normalizeRow(row) {
         const total = ok + noQ;
         checkedQty += total;
 
-        // 1. Raw Material is DONE if qty inspected > 0 or evidence photo is present
-        if (total > 0 || (insp.evidence_url && String(insp.evidence_url).trim() !== '')) {
-            rawDone = true;
+        const itype = String(insp.inspection_type || '').toLowerCase();
+        if (itype.includes('rolling') || String(insp.rolling_inspection || '').toLowerCase() === 'yes' || String(insp.roll_inspection_flag || '').toLowerCase() === 'yes') {
+            rollingDone = true;
         }
-
-        // 2. Laminating is DONE ONLY if color_check_status OR packaging_status is filled with 'YES' / 'NO'
+        if (itype.includes('laminating')) {
+            lamDone = true;
+        }
+        if (itype.includes('bonding') || (insp.bonding_test_url && String(insp.bonding_test_url).trim() !== '')) {
+            bondDone = true;
+        }
         const colorStatus = String(insp.color_check_status || '').trim().toUpperCase();
         const pkgStatus = String(insp.packaging_status || '').trim().toUpperCase();
         if (colorStatus === 'YES' || colorStatus === 'NO' || pkgStatus === 'YES' || pkgStatus === 'NO') {
             lamDone = true;
         }
-
-        // 3. Bonding Test is DONE ONLY if valid bonding_test_url is present
-        if (insp.bonding_test_url && String(insp.bonding_test_url).trim() !== '') {
-            bondDone = true;
+        if (itype.includes('raw') || total > 0 || (insp.evidence_url && String(insp.evidence_url).trim() !== '')) {
+            rawDone = true;
         }
     });
 
     // Fallback jika status master data sudah done dari batch pass all (tanpa inspeksi manual)
-    if ((row.status || '').toLowerCase() === 'done' && !rawDone && !lamDone && !bondDone) {
+    if ((row.status || '').toLowerCase() === 'done' && !rawDone && !rollingDone && !lamDone && !bondDone && row.released_by) {
         rawDone = true;
+        rollingDone = true;
         lamDone = true;
         bondDone = true;
     }
 
-    const isAllDone = (rawDone && lamDone && bondDone) || (row.status || '').toLowerCase() === 'done';
-    const isPartial = (rawDone || lamDone || bondDone || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress') && !isAllDone;
+    const stepsCount = (rawDone ? 1 : 0) + (rollingDone ? 1 : 0) + (lamDone ? 1 : 0) + (bondDone ? 1 : 0);
+    const isReleasedByAdmin = Boolean(row.released_by && (
+        row.released_by.toLowerCase().includes('admin') ||
+        row.released_by.toLowerCase().includes('supervisor') ||
+        row.released_by.toLowerCase().includes('spv') ||
+        row.released_by.toLowerCase().includes('manager')
+    ));
+
+    // Syarat Ready to Deliver:
+    // 1. Sudah berstatus done di database DAN minimal 3 tahapan terpenuhi, ATAU
+    // 2. Seluruh 4 tahapan selesai, ATAU
+    // 3. Dirilis resmi oleh Admin/Supervisor (Admin Override).
+    const isAllDone = (stepsCount >= 3 && (row.status || '').toLowerCase() === 'done') ||
+                      (stepsCount === 4) ||
+                      (isReleasedByAdmin && (row.status || '').toLowerCase() === 'done');
+    const isPartial = !isAllDone && (stepsCount > 0 || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress' || (row.status || '').toLowerCase() === 'done');
     const computedStatus = isAllDone ? 'done' : (isPartial ? 'in-progress' : (row.status || 'pending').toLowerCase());
 
     const supName = (row.supplier_name && String(row.supplier_name).trim() !== '') ? String(row.supplier_name).trim() : '';
@@ -1145,8 +1201,12 @@ function normalizeRow(row) {
         status:               computedStatus,
         material_type:        row.material_type || '',
         raw_done:             rawDone,
+        rolling_done:         rollingDone,
         laminating_done:      lamDone,
         bonding_done:         bondDone,
+        released_by:          row.released_by || '',
+        released_at:          row.released_at || '',
+        release_notes:        row.release_notes || '',
         po_area:              row.po_area || '',
         bucket:               row.bucket || '',
         shipment_number:      row.shipment_number || '',
