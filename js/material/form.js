@@ -568,6 +568,7 @@ function renderPOList(data) {
         const card = document.createElement('div');
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
+        if (po.id) card.dataset.id = po.id;
 
         const isDone = po.status === 'done' || (po.raw_done && po.rolling_done && po.laminating_done && po.bonding_done);
         const isPartial = !isDone && (po.status === 'in-progress' || po.status === 'in progress' || po.raw_done || po.rolling_done || po.laminating_done || po.bonding_done);
@@ -688,7 +689,11 @@ async function selectPO(po, cardEl) {
 
     // Deselect all
     document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
-    cardEl.classList.add('selected');
+    if (!cardEl || !cardEl.classList || !cardEl.isConnected) {
+        cardEl = (po.id ? document.querySelector(`.po-card[data-id="${po.id}"]`) : null) || 
+                 document.querySelector(`.po-card[data-po-number="${po.po_number}"]`);
+    }
+    if (cardEl) cardEl.classList.add('selected');
 
     selectedPO = po;
 
@@ -1133,10 +1138,17 @@ function setupValidationDialog() {
     if (confirmBtn) confirmBtn.addEventListener('click', submitInspection);
 }
 
+let isSubmittingInspection = false;
+
 async function submitInspection() {
+    if (isSubmittingInspection) return;
+    isSubmittingInspection = true;
+
     const overlay = document.getElementById('validation-overlay');
     const loading = document.getElementById('loading-overlay');
     const loadingTxt = document.getElementById('loading-text');
+    const confirmBtn = document.getElementById('validation-confirm-btn');
+    if (confirmBtn) confirmBtn.disabled = true;
 
     overlay.style.display = 'none';
     loading.classList.add('visible');
@@ -1217,7 +1229,7 @@ async function submitInspection() {
     try {
         if (MATERIAL_TEST_MODE) {
             await delay(1000);
-            const idx = allPOData.findIndex(p => p.po_number === selectedPO.po_number);
+            const idx = allPOData.findIndex(p => (selectedPO.id && p.id === selectedPO.id) || (p.po_number === selectedPO.po_number && p.material_name === selectedPO.material_name));
             if (idx !== -1) {
                 allPOData[idx].status = checkingStatus;
                 if (checkingStatus === 'in-progress') {
@@ -1225,7 +1237,6 @@ async function submitInspection() {
                     allPOData[idx].balance_qty = Math.max(0, allPOData[idx].planned_qty - allPOData[idx].checked_qty);
                 }
             }
-            loading.classList.remove('visible');
             showToast(`Data inspeksi ${selectedPO.po_number} berhasil disimpan! (simulasi)`, 'success');
             resetForm();
             filterPOList();
@@ -1265,25 +1276,25 @@ async function submitInspection() {
         });
 
         if (result.status === 'ok') {
-            loading.classList.remove('visible');
             const msg = result.message || (pendingIsFinalRelease 
                 ? `Material PO ${selectedPO.po_number} berhasil diinspeksi & dirilis ke produksi!` 
                 : `Data inspeksi ${selectedPO.po_number} berhasil disimpan!`);
             showToast(msg, 'success');
             const curPoNum = selectedPO.po_number;
             const curPoId = selectedPO.id;
+            const curMatName = selectedPO.material_name;
             await fetchMasterData();
 
-            const updatedPO = allPOData.find(p => (curPoId && p.id === curPoId) || p.po_number === curPoNum);
+            const updatedPO = allPOData.find(p => (curPoId && p.id === curPoId) || (p.po_number === curPoNum && p.material_name === curMatName));
             if (updatedPO) {
-                let cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                let cardEl = document.querySelector(`.po-card[data-id="${updatedPO.id}"]`);
                 if (!cardEl) {
                     // Jika tersembunyi karena filter status, kembalikan filter ke 'all' agar card tetap terlihat
                     const statusFilterEl = document.getElementById('status-filter');
                     if (statusFilterEl && statusFilterEl.value !== 'all') {
                         statusFilterEl.value = 'all';
                         filterPOList();
-                        cardEl = document.querySelector(`.po-card[data-po-number="${updatedPO.po_number}"]`);
+                        cardEl = document.querySelector(`.po-card[data-id="${updatedPO.id}"]`);
                     }
                 }
                 await selectPO(updatedPO, cardEl || document.createElement('div'));
@@ -1294,8 +1305,11 @@ async function submitInspection() {
 
     } catch (err) {
         console.error('submitInspection error:', err);
-        loading.classList.remove('visible');
         showToast('Error: ' + err.message, 'error');
+    } finally {
+        isSubmittingInspection = false;
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (loading) loading.classList.remove('visible');
     }
 }
 

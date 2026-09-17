@@ -1585,6 +1585,17 @@ window.renderLeaderMonitorLog = function () {
         const hasDefects = fail > 0;
         const leaderApproved = item.approved_by_leader && item.approved_by_leader.trim().length > 0;
 
+        let dateFormatted = '—';
+        const rawDate = item.inspection_date || item.uploaded_at || item.created_at;
+        if (rawDate) {
+            const dObj = new Date(rawDate);
+            if (!isNaN(dObj.getTime())) {
+                dateFormatted = dObj.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            } else {
+                dateFormatted = String(rawDate).slice(0, 10);
+            }
+        }
+
         let statusBadge = '';
         if (!hasDefects) {
             statusBadge = '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);display:inline-block;white-space:nowrap;">Auto-Pass</span>';

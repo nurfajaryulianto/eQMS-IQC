@@ -85,17 +85,21 @@ export async function apiGetMasterData({
                     .select('*')
                     .in('po_no', poList);
                 if (inspList && inspList.length > 0) {
-                    const inspMap = {};
+                    const inspMapByMdId = {};
+                    const inspMapByPoMat = {};
                     inspList.forEach(insp => {
-                        const key = `${insp.po_no}_${insp.material_name || ''}`;
-                        if (!inspMap[key]) inspMap[key] = [];
-                        inspMap[key].push(insp);
-                        if (!inspMap[insp.po_no]) inspMap[insp.po_no] = [];
-                        inspMap[insp.po_no].push(insp);
+                        if (insp.master_data_id) {
+                            if (!inspMapByMdId[insp.master_data_id]) inspMapByMdId[insp.master_data_id] = [];
+                            inspMapByMdId[insp.master_data_id].push(insp);
+                        }
+                        const poKey = `${(insp.po_no || '').trim().toLowerCase()}_${(insp.material_name || '').trim().toLowerCase()}`;
+                        if (!inspMapByPoMat[poKey]) inspMapByPoMat[poKey] = [];
+                        inspMapByPoMat[poKey].push(insp);
                     });
                     masterRows.forEach(m => {
                         if (!m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0)) {
-                            const found = inspMap[`${m.po_number}_${m.material_name || ''}`] || inspMap[m.po_number];
+                            const poKey = `${(m.po_number || '').trim().toLowerCase()}_${(m.material_name || '').trim().toLowerCase()}`;
+                            const found = (m.id && inspMapByMdId[m.id]) || (poKey !== '_' ? inspMapByPoMat[poKey] : null);
                             if (found && found.length > 0) {
                                 m.material_inspections = found;
                             }
@@ -317,7 +321,8 @@ export async function apiGetInspectionLogs({
 
     // Fallback enrichment jika ada record lama yang belum ter-link foreign key
     const unlinkedRows = (data || []).filter(d => !d.material_master_data && d.po_no);
-    let masterMap = {};
+    let masterMapById = {};
+    let masterMapByPoMat = {};
     if (unlinkedRows.length > 0) {
         const poList = [...new Set(unlinkedRows.map(d => d.po_no))];
         try {
@@ -328,8 +333,9 @@ export async function apiGetInspectionLogs({
 
             if (mdList && mdList.length > 0) {
                 mdList.forEach(m => {
-                    masterMap[`${m.po_number}_${m.material_name || ''}`] = m;
-                    if (!masterMap[m.po_number]) masterMap[m.po_number] = m;
+                    if (m.id) masterMapById[m.id] = m;
+                    const key = `${(m.po_number || '').trim().toLowerCase()}_${(m.material_name || '').trim().toLowerCase()}`;
+                    masterMapByPoMat[key] = m;
                 });
             }
         } catch (e) {
@@ -339,12 +345,13 @@ export async function apiGetInspectionLogs({
 
     return {
         data: (data || []).map(d => {
-            const md = d.material_master_data || masterMap[`${d.po_no}_${d.material_name || ''}`] || masterMap[d.po_no] || {};
+            const poKey = `${(d.po_no || '').trim().toLowerCase()}_${(d.material_name || '').trim().toLowerCase()}`;
+            const md = d.material_master_data || (d.master_data_id ? masterMapById[d.master_data_id] : null) || (poKey !== '_' ? masterMapByPoMat[poKey] : null) || {};
             const supName = (md.supplier_name && String(md.supplier_name).trim() !== '') ? String(md.supplier_name).trim() : ((d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : '');
             const sup = (md.supplier && String(md.supplier).trim() !== '') ? String(md.supplier).trim() : ((d.supplier && String(d.supplier).trim() !== '') ? String(d.supplier).trim() : '');
             const vendorName = supName || sup || '';
-            const matDesc = md.material_description || d.item_description || d.material_description || '';
-            const matName = md.material_name || d.material_name || '';
+            const matName = d.material_name || md.material_name || '';
+            const matDesc = d.item_description || md.material_description || d.material_description || '';
 
             return {
                 ...d,
@@ -393,16 +400,32 @@ export async function apiConsolidateDuplicateInspections() {
 
         const grouped = {};
         rows.forEach(r => {
-            const key = r.master_data_id
-                ? `md_${r.master_data_id}`
-                : `po_${(r.po_no || r.po_number || '').trim().toLowerCase()}_${(r.material_name || '').trim().toLowerCase()}`;
-            if (!grouped[key]) grouped[key] = [];
-            grouped[key].push(r);
+            const po = (r.po_no || r.po_number || '').trim().toLowerCase();
+            const mat = (r.material_name || '').trim().toLowerCase();
+            // Hanya kelompokkan jika ada master_data_id ATAU kombinasi PO + Material keduanya lengkap
+            if (r.master_data_id) {
+                const key = `md_${r.master_data_id}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(r);
+            } else if (po && mat) {
+                const key = `po_${po}_${mat}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(r);
+            }
         });
 
         for (const key in grouped) {
             const list = grouped[key];
             if (list.length > 1) {
+                // Pastikan seluruh item dalam grup memiliki material_name dan po_no yang sama persis
+                const firstPo = (list[0].po_no || list[0].po_number || '').trim().toLowerCase();
+                const firstMat = (list[0].material_name || '').trim().toLowerCase();
+                const allSame = list.every(item => 
+                    (item.po_no || item.po_number || '').trim().toLowerCase() === firstPo &&
+                    (item.material_name || '').trim().toLowerCase() === firstMat
+                );
+                if (!allSame) continue; // Jangan gabungkan jika material tidak identik
+
                 let primary = list.find(r => (Number(r.ok) > 0 || Number(r.no_qty) > 0 || (r.inspection_type || '').includes('Raw'))) || list[0];
                 const others = list.filter(r => r.id !== primary.id);
 
@@ -440,7 +463,7 @@ export async function apiConsolidateDuplicateInspections() {
                     roll_inspection_flag: mergedRollFlag,
                     roll_inspection_percentage: mergedRollPct,
                     defect_notes: mergedNotes,
-                    inspection_type: 'Raw Material'
+                    inspection_type: primary.inspection_type || 'Raw Material'
                 }).eq('id', primary.id);
 
                 const otherIds = others.map(o => o.id);
@@ -494,7 +517,8 @@ export async function apiSubmitInspection(payload) {
             .limit(1)
             .maybeSingle();
         existing = data;
-    } else if (payload.po_number && payload.material_name) {
+    }
+    if (!existing && payload.po_number && payload.material_name) {
         const { data } = await supabase
             .from('material_inspections')
             .select('*')
@@ -517,6 +541,10 @@ export async function apiSubmitInspection(payload) {
         }
 
         const patch = {
+            master_data_id: payload.master_data_id || existing.master_data_id || null,
+            po_no: payload.po_number || existing.po_no,
+            material_name: payload.material_name || existing.material_name,
+            item_description: payload.item_description || existing.item_description,
             ...(isRaw ? { ok: updatedOk, no_qty: updatedNoQ } : {}),
             defect_notes: newNotes,
             status: payload.status || existing.status || 'done',
