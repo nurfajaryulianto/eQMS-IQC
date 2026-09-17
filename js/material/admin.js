@@ -397,12 +397,17 @@ window.handleDragLeave = function () {
 function detectHeaderRow(sheet) {
     // Read the first 10 rows as a 2D array to find the header row
     const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: '' });
+    const targetKeys = new Set([
+        'ponumber', 'materialname', 'pono', 'supplier', 'po', 'nomorpo', 'nopo',
+        'materialcode', 'kodematerial', 'material', 'item', 'itemcode', 'itemdescription',
+        'vendor', 'vendorname', 'materialdescription', 'deskripsi', 'namamaterial', 'batchsize', 'qty'
+    ]);
     for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
         const row = rawRows[i];
         if (Array.isArray(row)) {
             const hasHeaderKey = row.some(cell => {
                 const s = String(cell || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                return s === 'ponumber' || s === 'materialname' || s === 'pono' || s === 'supplier';
+                return targetKeys.has(s);
             });
             if (hasHeaderKey) {
                 return i;
@@ -427,7 +432,7 @@ function processFile(file) {
     reader.onload = (e) => {
         try {
             const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
             // Auto-detect header row index (handles both generated template at row 0 and ADF layout at row 1)
@@ -474,7 +479,7 @@ window.clearFile = function () {
 window.confirmUpload = async function () {
     if (!parsedFileData.length) { showToast('Tidak ada data untuk diupload.', 'error'); return; }
 
-    if (!confirm(`Upload ${parsedFileData.length} baris data ke Spreadsheet? Data dengan nomor PO yang sudah terdaftar di database akan ditolak/diabaikan.`)) return;
+    if (!confirm(`Upload ${parsedFileData.length} baris data ke Database? Data dengan nomor PO yang sudah terdaftar di database akan ditolak/diabaikan.`)) return;
 
     setLoading(true, `Mengupload ${parsedFileData.length} baris...`);
 

@@ -156,19 +156,36 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
     }
 
     const now = new Date().toISOString();
-    // Helper: ambil nilai kolom — support header Excel dengan spasi (e.g. 'PO Number')
-    // maupun camelCase/snake_case dari row yang sudah dinormalisasi
+
+    // Helper ekstra fleksibel: mendukung variasi nama header Excel, spasi, newline, dan case-insensitive
     const g = (r, ...keys) => {
+        // 1. Direct match
         for (const k of keys) {
-            if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') return String(r[k]).trim();
+            if (r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== '') {
+                return String(r[k]).trim();
+            }
+        }
+        // 2. Normalized match (lowercase tanpa spasi & karakter non-alfanumerik)
+        const normMap = {};
+        for (const rawKey of Object.keys(r)) {
+            const clean = rawKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!normMap[clean] && r[rawKey] !== undefined && r[rawKey] !== null) {
+                normMap[clean] = r[rawKey];
+            }
+        }
+        for (const k of keys) {
+            const clean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normMap[clean] !== undefined && normMap[clean] !== null && String(normMap[clean]).trim() !== '') {
+                return String(normMap[clean]).trim();
+            }
         }
         return '';
     };
 
     const insertRows = rows.map(r => {
-        const matName = g(r, 'Material Name','material_name','MaterialName','MATERIAL_NAME');
-        const matDesc = g(r, 'Material Description','material_description','ItemDescription','MATERIAL_DESCRIPTION');
-        let matType = g(r, 'Material Type','material_type','MaterialType','MATERIAL_TYPE');
+        const matName = g(r, 'Material Name', 'material_name', 'MaterialName', 'MATERIAL_NAME', 'Material', 'material', 'Material Code', 'material_code', 'Item', 'item', 'Item Code', 'item_code', 'Kode Material', 'Nama Material');
+        const matDesc = g(r, 'Material Description', 'material_description', 'ItemDescription', 'MATERIAL_DESCRIPTION', 'Item Description', 'item_description', 'Description', 'Deskripsi');
+        let matType = g(r, 'Material Type', 'material_type', 'MaterialType', 'MATERIAL_TYPE', 'Jenis Material', 'Type');
 
         if (!matType) {
             const textUpper = (matName + ' ' + matDesc).toUpperCase();
@@ -180,23 +197,26 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
             else matType = 'Raw Material';
         }
 
+        const rawBatchSize = g(r, 'Batch Size', 'batch_size', 'BatchSize', 'BATCH_SIZE', 'planned_qty', 'Planned Qty', 'QTY', 'Qty', 'Quantity', 'Jumlah', 'Jumlah Masuk');
+        const parsedBatchSize = parseFloat(String(rawBatchSize).replace(/,/g, '')) || 0;
+
         return {
-            po_number:            g(r, 'PO Number','po_number','PONumber','PO_NUMBER'),
+            po_number:            g(r, 'PO Number', 'po_number', 'PONumber', 'PO_NUMBER', 'po_no', 'PO No', 'PO NO', 'PONO', 'PO', 'po', 'Purchase Order', 'No PO', 'Nomor PO', 'No. PO'),
             material_name:        matName,
             material_description: matDesc,
-            uom:                  g(r, 'UOM','uom','Uom'),
-            supplier:             g(r, 'Supplier','supplier','SUPPLIER'),
-            supplier_name:        g(r, 'Supplier Name','supplier_name','SupplierName','vendor_name','SUPPLIER_NAME'),
-            po_area:              g(r, 'PO Area','po_area','POArea','PO_AREA'),
-            batch_size:           Number(g(r, 'Batch Size','batch_size','BatchSize','BATCH_SIZE','planned_qty') || 0) || 0,
-            product_code:         g(r, 'Product Code','product_code','ProductCode','style','PRODUCT_CODE'),
-            model_name:           g(r, 'Model Name','model_name','ModelName','model_shoe','MODEL_NAME'),
-            bucket:               g(r, 'Bucket','bucket','BUCKET'),
-            receive_date:         parseDateSafe(g(r, 'Receive Date','receive_date','ReceiveDate','RECEIVE_DATE')),
-            shipment_number:      g(r, 'Shipment Number','shipment_number','ShipmentNumber','SHIPMENT_NUMBER'),
-            no_bc:                g(r, 'No BC','no_bc','NoBc','NO_BC'),
-            bc_type:              g(r, 'BC Type','bc_type','BcType','BC_TYPE'),
-            receive_number:       g(r, 'Receive Number','receive_number','ReceiveNumber','RECEIVE_NUMBER'),
+            uom:                  g(r, 'UOM', 'uom', 'Uom', 'Unit', 'Satuan'),
+            supplier:             g(r, 'Supplier', 'supplier', 'SUPPLIER'),
+            supplier_name:        g(r, 'Supplier Name', 'supplier_name', 'SupplierName', 'vendor_name', 'Vendor Name', 'SUPPLIER_NAME', 'Supplier', 'supplier', 'Vendor', 'vendor', 'Nama Vendor', 'Nama Supplier'),
+            po_area:              g(r, 'PO Area', 'po_area', 'POArea', 'PO_AREA', 'Area'),
+            batch_size:           parsedBatchSize,
+            product_code:         g(r, 'Product Code', 'product_code', 'ProductCode', 'style', 'Style', 'PRODUCT_CODE', 'Kode Produk', 'Art No'),
+            model_name:           g(r, 'Model Name', 'model_name', 'ModelName', 'model_shoe', 'Model Shoe', 'MODEL_NAME', 'Model Sepatu'),
+            bucket:               g(r, 'Bucket', 'bucket', 'BUCKET'),
+            receive_date:         parseDateSafe(g(r, 'Receive Date', 'receive_date', 'ReceiveDate', 'RECEIVE_DATE', 'Tanggal Terima', 'Tgl Terima', 'Date')),
+            shipment_number:      g(r, 'Shipment Number', 'shipment_number', 'ShipmentNumber', 'SHIPMENT_NUMBER', 'No Surat Jalan', 'Surat Jalan'),
+            no_bc:                g(r, 'No BC', 'no_bc', 'NoBc', 'NO_BC', 'Nomor BC'),
+            bc_type:              g(r, 'BC Type', 'bc_type', 'BcType', 'BC_TYPE', 'Jenis BC'),
+            receive_number:       g(r, 'Receive Number', 'receive_number', 'ReceiveNumber', 'RECEIVE_NUMBER', 'No Penerimaan'),
             material_type:        matType,
             status:               'pending',
             uploaded_by:          uploaderNik,
@@ -204,10 +224,24 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
         };
     }).filter(r => r.po_number && r.material_name);
 
+    if (insertRows.length === 0) {
+        throw new Error('Tidak ada baris yang valid ditemukan. Pastikan file memiliki kolom Nomor PO dan Nama Material.');
+    }
+
     console.log('[upload] parsed rows sample:', insertRows[0]);
     console.log('[upload] total valid rows:', insertRows.length, 'of', rows.length);
 
-    // Cek duplikat di sisi client dengan chunking agar aman dari URL length limit
+    // Helper key komposit identik dengan unique index uq_md_po_date_mat_recnum_qty
+    const makeKey = (po, date, mat, recnum, qty) => {
+        const p = String(po || '').trim().toLowerCase();
+        const d = date ? String(date).split('T')[0].trim() : '';
+        const m = String(mat || '').trim().toLowerCase();
+        const r = String(recnum || '').trim().toLowerCase();
+        const q = Math.round((Number(qty) || 0) * 100) / 100;
+        return `${p}|${d}|${m}|${r}|${q}`;
+    };
+
+    // Ambil data existing dari database secara chunking
     const uniquePoList = [...new Set(insertRows.map(r => r.po_number))];
     let existing = [];
     const PO_CHUNK = 100;
@@ -224,47 +258,90 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
 
     const existingKeys = new Set(
         (existing || []).map(e =>
-            `${(e.po_number || '').toLowerCase()}|${e.receive_date || ''}|${(e.material_name || '').toLowerCase()}|${(e.receive_number || '').toLowerCase()}|${e.batch_size}`
+            makeKey(e.po_number, e.receive_date, e.material_name, e.receive_number, e.batch_size)
         )
     );
 
-    const newRows = insertRows.filter(r => {
-        const key = `${(r.po_number || '').toLowerCase()}|${r.receive_date || ''}|${(r.material_name || '').toLowerCase()}|${(r.receive_number || '').toLowerCase()}|${r.batch_size}`;
-        return !existingKeys.has(key);
+    // Filter duplikat dari database DAN deduplikasi intra-file
+    const seenNewKeys = new Set();
+    const newRows = [];
+    const rejectedList = [];
+
+    insertRows.forEach(r => {
+        const key = makeKey(r.po_number, r.receive_date, r.material_name, r.receive_number, r.batch_size);
+        if (existingKeys.has(key) || seenNewKeys.has(key)) {
+            rejectedList.push(`${r.po_number} (${r.material_name})`);
+        } else {
+            seenNewKeys.add(key);
+            newRows.push(r);
+        }
     });
 
-    const rejected = insertRows.length - newRows.length;
+    const rejected = rejectedList.length;
     let inserted = 0;
 
     if (newRows.length > 0) {
         // Cek auth session aktif
         const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
+        let token = sessionData?.session?.access_token;
+        if (!token) {
+            try {
+                const s1 = JSON.parse(sessionStorage.getItem('eqms_material_auth_v1') || '{}');
+                const s2 = JSON.parse(sessionStorage.getItem('eqms_auth_v1') || '{}');
+                const s3 = JSON.parse(sessionStorage.getItem('iqc_material_session_v1') || '{}');
+                const cand = (s1?.access_token && s1?.refresh_token) ? s1 : ((s2?.access_token && s2?.refresh_token) ? s2 : null);
+                if (cand) {
+                    await supabase.auth.setSession({
+                        access_token: cand.access_token,
+                        refresh_token: cand.refresh_token
+                    });
+                    token = cand.access_token;
+                } else {
+                    token = s1?.access_token || s2?.access_token || s3?.token || '';
+                }
+            } catch (_) {}
+        }
         if (!token) {
             throw new Error('Sesi login tidak ditemukan. Silakan login ulang dan coba lagi.');
         }
-        const userMeta = sessionData?.session?.user?.user_metadata || {};
-        console.log('[upload] user role:', userMeta.role, '| NIK:', userMeta.nik);
 
-        const BATCH = 200;
+        const BATCH = 100;
         for (let i = 0; i < newRows.length; i += BATCH) {
             const batch = newRows.slice(i, i + BATCH);
-            const { data, error } = await supabase
-                .from('material_master_data')
-                .insert(batch)
-                .select('id');
-            if (error) {
-                console.error(`[upload] Error batch ${Math.floor(i / BATCH) + 1} (${i + 1}-${Math.min(i + BATCH, newRows.length)}):`, error);
-                throw new Error(`Gagal menyimpan batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+            try {
+                const { data, error } = await supabase
+                    .from('material_master_data')
+                    .insert(batch)
+                    .select('id');
+                if (error) throw error;
+                inserted += data?.length || batch.length;
+            } catch (batchErr) {
+                // Fallback jika ada duplikat lolos di unique constraint: simpan per baris
+                if (batchErr.message && (batchErr.message.includes('unique constraint') || batchErr.code === '23505')) {
+                    for (const singleRow of batch) {
+                        const { error: sErr } = await supabase
+                            .from('material_master_data')
+                            .insert([singleRow]);
+                        if (!sErr) {
+                            inserted++;
+                        } else if (sErr.message && (sErr.message.includes('unique constraint') || sErr.code === '23505')) {
+                            rejectedList.push(`${singleRow.po_number} (${singleRow.material_name})`);
+                        } else {
+                            throw sErr;
+                        }
+                    }
+                } else {
+                    console.error(`[upload] Error batch ${Math.floor(i / BATCH) + 1}:`, batchErr);
+                    throw new Error(`Gagal menyimpan batch ${Math.floor(i / BATCH) + 1}: ${batchErr.message}`);
+                }
             }
-            inserted += data?.length || batch.length;
         }
     }
 
     return {
         inserted,
         rejected,
-        rejectedList: [],
+        rejectedList,
         message: `Upload selesai: ${inserted} baru disimpan, ${rejected} duplikat dilewati.`,
     };
 }
@@ -1142,6 +1219,16 @@ function parseDateSafe(val) {
         }
     }
 
+    // Compact YYYYMMDD (e.g. SAP export 20240525)
+    if (/^\d{8}$/.test(s)) {
+        const yr = s.slice(0, 4);
+        const mo = s.slice(4, 6);
+        const dy = s.slice(6, 8);
+        if (Number(yr) > 1900 && Number(yr) < 2100 && Number(mo) >= 1 && Number(mo) <= 12 && Number(dy) >= 1 && Number(dy) <= 31) {
+            return `${yr}-${mo}-${dy}`;
+        }
+    }
+
     // Standard JS Date fallback
     const dt = new Date(s);
     if (!isNaN(dt.getTime()) && dt.getFullYear() > 1900) {
@@ -1151,7 +1238,7 @@ function parseDateSafe(val) {
         return `${y}-${m}-${d}`;
     }
 
-    return s;
+    return null;
 }
 
 /**
