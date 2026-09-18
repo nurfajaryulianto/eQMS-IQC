@@ -361,6 +361,52 @@ export async function apiGetInspectionLogs({
     page = 1,
     limit = 25,
 } = {}) {
+    let matchedMasterIds = [];
+    let matchedPoNumbers = [];
+    const isSearchingDesc = Boolean(materialDesc && materialDesc.trim());
+    const rawDesc = isSearchingDesc ? materialDesc.trim() : '';
+
+    if (isSearchingDesc) {
+        // Ambil token kata dari input pencarian (abaikan tanda baca non-alfanumerik di tepi kata)
+        const tokens = rawDesc
+            .toLowerCase()
+            .split(/[\s,]+/)
+            .map(w => w.replace(/^[^a-zA-Z0-9"'-]+|[^a-zA-Z0-9"'-]+$/g, ''))
+            .filter(w => w.length > 0);
+
+        // Pilih kata kunci terpanjang untuk query pencarian awal di database
+        const candidateTokens = [...tokens].sort((a, b) => b.length - a.length);
+        const bestKeyword = candidateTokens[0] || rawDesc;
+        const safeToken = bestKeyword.replace(/[,()"]/g, '').trim();
+
+        try {
+            // 1. Cari kandidat di material_master_data (karena deskripsi lengkap ada di tabel ini)
+            let mdQuery = supabase
+                .from('material_master_data')
+                .select('id, po_number, material_name, material_description');
+
+            if (safeToken) {
+                mdQuery = mdQuery.or(`material_description.ilike.%${safeToken}%,material_name.ilike.%${safeToken}%,po_number.ilike.%${safeToken}%`);
+            }
+
+            const { data: mdCandidates } = await mdQuery.limit(500);
+
+            if (mdCandidates && mdCandidates.length > 0) {
+                // Filter kandidat master data: pastikan semua token kata yang diketik cocok
+                const matchedCandidates = mdCandidates.filter(m => {
+                    const text = `${m.material_name || ''} ${m.material_description || ''} ${m.po_number || ''}`.toLowerCase();
+                    return tokens.every(t => text.includes(t));
+                });
+
+                const finalCandidates = matchedCandidates.length > 0 ? matchedCandidates : mdCandidates;
+                matchedMasterIds = finalCandidates.map(m => m.id).filter(Boolean);
+                matchedPoNumbers = [...new Set(finalCandidates.map(m => m.po_number).filter(Boolean))];
+            }
+        } catch (e) {
+            console.warn('Lookup master_data for description search error:', e);
+        }
+    }
+
     let query = supabase
         .from('material_inspections')
         .select('*, material_master_data(*)', { count: 'exact' })
@@ -378,12 +424,37 @@ export async function apiGetInspectionLogs({
     if (inspectorNik) {
         query = query.ilike('inspector_nik', `%${inspectorNik}%`);
     }
-    if (materialDesc && materialDesc.trim()) {
-        const descTerm = materialDesc.trim();
-        if (descTerm.includes(',')) {
-            query = query.ilike('item_description', `%${descTerm}%`);
+
+    if (isSearchingDesc) {
+        const tokens = rawDesc
+            .toLowerCase()
+            .split(/[\s,]+/)
+            .map(w => w.replace(/^[^a-zA-Z0-9"'-]+|[^a-zA-Z0-9"'-]+$/g, ''))
+            .filter(w => w.length > 0);
+        const candidateTokens = [...tokens].sort((a, b) => b.length - a.length);
+        const bestKeyword = candidateTokens[0] || rawDesc;
+        const safeToken = bestKeyword.replace(/[,()"]/g, '').trim();
+
+        const orClauses = [];
+        if (safeToken) {
+            orClauses.push(`item_description.ilike.%${safeToken}%`);
+            orClauses.push(`material_name.ilike.%${safeToken}%`);
+            orClauses.push(`po_no.ilike.%${safeToken}%`);
+        }
+        if (matchedMasterIds.length > 0) {
+            orClauses.push(`master_data_id.in.(${matchedMasterIds.slice(0, 50).join(',')})`);
+        }
+        if (matchedPoNumbers.length > 0) {
+            const cleanPos = matchedPoNumbers.slice(0, 50).map(p => p.trim()).filter(Boolean);
+            if (cleanPos.length > 0) {
+                orClauses.push(`po_no.in.(${cleanPos.join(',')})`);
+            }
+        }
+
+        if (orClauses.length > 0) {
+            query = query.or(orClauses.join(','));
         } else {
-            query = query.or(`item_description.ilike.%${descTerm}%,material_name.ilike.%${descTerm}%`);
+            query = query.eq('id', -999999);
         }
     }
 
@@ -429,42 +500,58 @@ export async function apiGetInspectionLogs({
         }
     }
 
-    return {
-        data: (data || []).map(d => {
-            const poKey = `${(d.po_no || '').trim().toLowerCase()}_${(d.material_name || '').trim().toLowerCase()}`;
-            const md = d.material_master_data || (d.master_data_id ? masterMapById[d.master_data_id] : null) || (poKey !== '_' ? masterMapByPoMat[poKey] : null) || {};
-            const supName = (md.supplier_name && String(md.supplier_name).trim() !== '') ? String(md.supplier_name).trim() : ((d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : '');
-            const sup = (md.supplier && String(md.supplier).trim() !== '') ? String(md.supplier).trim() : ((d.supplier && String(d.supplier).trim() !== '') ? String(d.supplier).trim() : '');
-            const vendorName = supName || sup || '';
-            const matName = d.material_name || md.material_name || '';
-            const matDesc = d.item_description || md.material_description || d.material_description || '';
+    const enriched = (data || []).map(d => {
+        const poKey = `${(d.po_no || '').trim().toLowerCase()}_${(d.material_name || '').trim().toLowerCase()}`;
+        const md = d.material_master_data || (d.master_data_id ? masterMapById[d.master_data_id] : null) || (poKey !== '_' ? masterMapByPoMat[poKey] : null) || {};
+        const supName = (md.supplier_name && String(md.supplier_name).trim() !== '') ? String(md.supplier_name).trim() : ((d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : '');
+        const sup = (md.supplier && String(md.supplier).trim() !== '') ? String(md.supplier).trim() : ((d.supplier && String(d.supplier).trim() !== '') ? String(d.supplier).trim() : '');
+        const vendorName = supName || sup || '';
+        const matName = d.material_name || md.material_name || '';
+        const matDesc = d.item_description || md.material_description || d.material_description || '';
 
-            return {
-                ...d,
-                po_number:            d.po_no || d.po_number || md.po_number || '',
-                po_no:                d.po_no || d.po_number || md.po_number || '',
-                material_name:        matName,
-                material_description: matDesc,
-                item_description:     matDesc,
-                uom:                  d.uom || md.uom || '',
-                style:                d.style || md.product_code || md.style || '',
-                product_code:         d.style || md.product_code || md.style || '',
-                model_shoe:           d.model_shoe || md.model_name || md.shoe_model || '',
-                model_name:           d.model_shoe || md.model_name || md.shoe_model || '',
-                shoe_model:           d.model_shoe || md.model_name || md.shoe_model || '',
-                bucket:               d.bucket || md.bucket || '',
-                supplier_name:        vendorName,
-                vendor_name:          vendorName,
-                supplier:             sup,
-                receive_date:         d.receive_date || md.receive_date || '',
-                qty_receive:          Number(d.qty_receive) || Number(md.batch_size) || 0,
-                qty_inspect:          (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
-                qty_fail:             Number(d.no_qty) || 0,
-                result_status:        (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
-                inspection_date:      d.inspection_date ? new Date(d.inspection_date) : null,
-            };
-        }),
-        total: count || 0,
+        return {
+            ...d,
+            po_number:            d.po_no || d.po_number || md.po_number || '',
+            po_no:                d.po_no || d.po_number || md.po_number || '',
+            material_name:        matName,
+            material_description: matDesc,
+            item_description:     matDesc,
+            uom:                  d.uom || md.uom || '',
+            style:                d.style || md.product_code || md.style || '',
+            product_code:         d.style || md.product_code || md.style || '',
+            model_shoe:           d.model_shoe || md.model_name || md.shoe_model || '',
+            model_name:           d.model_shoe || md.model_name || md.shoe_model || '',
+            shoe_model:           d.model_shoe || md.model_name || md.shoe_model || '',
+            bucket:               d.bucket || md.bucket || '',
+            supplier_name:        vendorName,
+            vendor_name:          vendorName,
+            supplier:             sup,
+            receive_date:         d.receive_date || md.receive_date || '',
+            qty_receive:          Number(d.qty_receive) || Number(md.batch_size) || 0,
+            qty_inspect:          (Number(d.ok) || 0) + (Number(d.no_qty) || 0),
+            qty_fail:             Number(d.no_qty) || 0,
+            result_status:        (Number(d.no_qty) || 0) === 0 ? 'Pass' : 'Fail',
+            inspection_date:      d.inspection_date ? new Date(d.inspection_date) : null,
+        };
+    });
+
+    let finalRows = enriched;
+    if (isSearchingDesc) {
+        const tokens = rawDesc
+            .toLowerCase()
+            .split(/[\s,]+/)
+            .map(w => w.replace(/^[^a-zA-Z0-9"'-]+|[^a-zA-Z0-9"'-]+$/g, ''))
+            .filter(w => w.length > 0);
+
+        finalRows = enriched.filter(row => {
+            const haystack = `${row.material_name || ''} ${row.material_description || ''} ${row.item_description || ''} ${row.po_no || ''}`.toLowerCase();
+            return tokens.every(t => haystack.includes(t));
+        });
+    }
+
+    return {
+        data: finalRows,
+        total: isSearchingDesc ? finalRows.length : (count || 0),
         page,
         limit,
     };

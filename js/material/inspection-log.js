@@ -28,8 +28,23 @@ function setupFilters() {
 
     const startEl = document.getElementById('ilog-start');
     const endEl   = document.getElementById('ilog-end');
-    if (startEl && !startEl.value) startEl.value = thirtyDays;
-    if (endEl   && !endEl.value)   endEl.value   = today;
+    if (startEl && !startEl.value) {
+        startEl.value = thirtyDays;
+        startEl.dataset.isDefault = 'true';
+    }
+    if (endEl && !endEl.value) {
+        endEl.value = today;
+        endEl.dataset.isDefault = 'true';
+    }
+
+    if (startEl && !startEl.dataset.bound) {
+        startEl.dataset.bound = 'true';
+        startEl.addEventListener('change', () => { startEl.dataset.isDefault = 'false'; });
+    }
+    if (endEl && !endEl.dataset.bound) {
+        endEl.dataset.bound = 'true';
+        endEl.addEventListener('change', () => { endEl.dataset.isDefault = 'false'; });
+    }
 }
 
 // ─── LOAD ─────────────────────────────────────────────────────
@@ -46,13 +61,24 @@ export async function loadInspectionLog(resetPage = true) {
             Memuat data inspeksi...
         </td></tr>`;
 
+    const startEl = document.getElementById('ilog-start');
+    const endEl   = document.getElementById('ilog-end');
+    const descVal = document.getElementById('ilog-desc')?.value?.trim() || '';
+
+    // Jika user mencari spesifik deskripsi material dan tanggal awal belum pernah diubah secara manual dari default 30 hari,
+    // jangan batasi startDate ke 30 hari terakhir agar record historis material tersebut tetap ditemukan.
+    let effStartDate = startEl?.value || '';
+    if (descVal && startEl?.dataset?.isDefault === 'true') {
+        effStartDate = '';
+    }
+
     currentFilters = {
-        startDate:      document.getElementById('ilog-start')?.value || '',
-        endDate:        document.getElementById('ilog-end')?.value   || '',
+        startDate:      effStartDate,
+        endDate:        endEl?.value || '',
         inspectionType: document.getElementById('ilog-type')?.value  || '',
         inspectorNik:   document.getElementById('ilog-inspector')?.value || '',
         fileFilter:     document.getElementById('ilog-file-filter')?.value || 'all',
-        materialDesc:   document.getElementById('ilog-desc')?.value?.trim() || '',
+        materialDesc:   descVal,
         page:           currentPage,
         limit:          pageLimit,
     };
@@ -494,8 +520,14 @@ window.resetInspectionLogFilters = function() {
     const fileEl  = document.getElementById('ilog-file-filter');
     const descEl  = document.getElementById('ilog-desc');
 
-    if (startEl) startEl.value = thirtyDays;
-    if (endEl) endEl.value = today;
+    if (startEl) {
+        startEl.value = thirtyDays;
+        startEl.dataset.isDefault = 'true';
+    }
+    if (endEl) {
+        endEl.value = today;
+        endEl.dataset.isDefault = 'true';
+    }
     if (typeEl) typeEl.value = '';
     if (inspEl) inspEl.value = '';
     if (fileEl) fileEl.value = 'all';

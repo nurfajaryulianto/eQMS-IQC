@@ -1125,10 +1125,10 @@
                     <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px;">
                         <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Deskripsi Material</label>
                         <input type="text" id="ilog-desc" class="styled-input" placeholder="Cari Deskripsi (cth: TROPHY JR, GABARDINE)..."
-                            style="padding:7px 10px;font-size:12px;border-radius:8px;" onkeydown="if(event.key==='Enter')window.loadInspectionLogTab()">
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;" onkeydown="if(event.key==='Enter')window.loadInspectionLogTab(true)">
                     </div>
                     <div style="display:flex;gap:8px;">
-                        <button onclick="window.loadInspectionLogTab()" class="btn-gradient"
+                        <button onclick="window.loadInspectionLogTab(true)" class="btn-gradient"
                             style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;height:35px;white-space:nowrap;">
                             <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
                         </button>
@@ -1542,12 +1542,12 @@
         import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
         import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
         window.__inspLogInit = false;
-        window.loadInspectionLogTab = async function () {
+        window.loadInspectionLogTab = async function (resetPage = true) {
             if (!window.__inspLogInit) {
                 await initInspectionLog();
                 window.__inspLogInit = true;
             } else {
-                await loadInspectionLog();
+                await loadInspectionLog(resetPage);
             }
         };
         window.exportMasterDataBtn = function () {
