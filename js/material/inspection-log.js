@@ -49,9 +49,10 @@ export async function loadInspectionLog(resetPage = true) {
     currentFilters = {
         startDate:      document.getElementById('ilog-start')?.value || '',
         endDate:        document.getElementById('ilog-end')?.value   || '',
-        inspectorNik:   document.getElementById('ilog-inspector')?.value || '',
         inspectionType: document.getElementById('ilog-type')?.value  || '',
+        inspectorNik:   document.getElementById('ilog-inspector')?.value || '',
         fileFilter:     document.getElementById('ilog-file-filter')?.value || 'all',
+        materialDesc:   document.getElementById('ilog-desc')?.value?.trim() || '',
         page:           currentPage,
         limit:          pageLimit,
     };
@@ -481,4 +482,24 @@ window.deleteInspectionRow = async function(id, poNo) {
         console.error(err);
         alert('Gagal menghapus data inspeksi: ' + err.message);
     }
+};
+
+window.resetInspectionLogFilters = function() {
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDays = new Date(Date.now() - 30 * 86400 * 1000).toISOString().split('T')[0];
+    const startEl = document.getElementById('ilog-start');
+    const endEl   = document.getElementById('ilog-end');
+    const typeEl  = document.getElementById('ilog-type');
+    const inspEl  = document.getElementById('ilog-inspector');
+    const fileEl  = document.getElementById('ilog-file-filter');
+    const descEl  = document.getElementById('ilog-desc');
+
+    if (startEl) startEl.value = thirtyDays;
+    if (endEl) endEl.value = today;
+    if (typeEl) typeEl.value = '';
+    if (inspEl) inspEl.value = '';
+    if (fileEl) fileEl.value = 'all';
+    if (descEl) descEl.value = '';
+
+    window.loadInspectionLogTab();
 };

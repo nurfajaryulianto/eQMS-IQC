@@ -357,6 +357,7 @@ export async function apiGetInspectionLogs({
     inspectionType = 'all',
     inspectorNik = '',
     fileFilter = 'all',
+    materialDesc = '',
     page = 1,
     limit = 25,
 } = {}) {
@@ -376,6 +377,14 @@ export async function apiGetInspectionLogs({
     }
     if (inspectorNik) {
         query = query.ilike('inspector_nik', `%${inspectorNik}%`);
+    }
+    if (materialDesc && materialDesc.trim()) {
+        const descTerm = materialDesc.trim();
+        if (descTerm.includes(',')) {
+            query = query.ilike('item_description', `%${descTerm}%`);
+        } else {
+            query = query.or(`item_description.ilike.%${descTerm}%,material_name.ilike.%${descTerm}%`);
+        }
     }
 
     // Filter berkas: has_files / has_bonding / has_evidence / no_files

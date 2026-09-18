@@ -1122,10 +1122,22 @@
                             <option value="no_file">Tanpa Berkas</option>
                         </select>
                     </div>
-                    <button onclick="window.loadInspectionLogTab()" class="btn-gradient"
-                        style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
-                        <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
-                    </button>
+                    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Deskripsi Material</label>
+                        <input type="text" id="ilog-desc" class="styled-input" placeholder="Cari Deskripsi (cth: TROPHY JR, GABARDINE)..."
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;" onkeydown="if(event.key==='Enter')window.loadInspectionLogTab()">
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="window.loadInspectionLogTab()" class="btn-gradient"
+                            style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;height:35px;white-space:nowrap;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
+                        </button>
+                        <button onclick="window.resetInspectionLogFilters()" class="btn-secondary"
+                            style="padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;height:35px;white-space:nowrap;"
+                            title="Reset Semua Filter">
+                            <span class="material-symbols-outlined" style="font-size:15px;">restart_alt</span>Reset
+                        </button>
+                    </div>
                 </div>
                 <!-- Table -->
                 <div class="thin-scroll" style="overflow-x:auto;">
