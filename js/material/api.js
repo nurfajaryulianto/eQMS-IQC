@@ -182,7 +182,7 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
         return '';
     };
 
-    const insertRows = rows.map(r => {
+    const mappedRows = rows.map(r => {
         const matName = g(r, 'Material Name', 'material_name', 'MaterialName', 'MATERIAL_NAME', 'Material', 'material', 'Material Code', 'material_code', 'Item', 'item', 'Item Code', 'item_code', 'Kode Material', 'Nama Material');
         const matDesc = g(r, 'Material Description', 'material_description', 'ItemDescription', 'MATERIAL_DESCRIPTION', 'Item Description', 'item_description', 'Description', 'Deskripsi');
         let matType = g(r, 'Material Type', 'material_type', 'MaterialType', 'MATERIAL_TYPE', 'Jenis Material', 'Type');
