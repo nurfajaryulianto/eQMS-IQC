@@ -442,13 +442,6 @@
                             style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
-                        <select id="master-status-filter" onchange="renderMasterTable()" class="styled-input"
-                            style="padding:6px 10px; width:auto; cursor:pointer;">
-                            <option value="all">Semua Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="in-progress">In-Progress</option>
-                            <option value="done">Done</option>
-                        </select>
                         <button onclick="window.exportMasterDataBtn()" class="btn-secondary"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#34d399;border-color:rgba(52,211,153,0.3);">
                             <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export Excel
@@ -456,8 +449,7 @@
                         <button onclick="syncOrphanedStatus()" class="btn-secondary"
                             title="Reset semua baris 'Done' yang tidak memiliki data inspeksi kembali ke 'Pending'"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;border-color:rgba(251,191,36,0.4);color:#fbbf24;">
-                            <span class="material-symbols-outlined" style="font-size:15px;">sync_problem</span>Sync
-                            Status
+                            <span class="material-symbols-outlined" style="font-size:15px;">sync_problem</span>Sync Status
                         </button>
                         <button onclick="loadMasterData()" class="btn-secondary"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;">
@@ -465,43 +457,116 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Master Data Filter Bar (Identik dengan Inspection Log) -->
+                <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;background:rgba(255,255,255,0.015);">
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Dari Tanggal</label>
+                        <input type="date" id="master-filter-start" class="styled-input"
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Sampai Tanggal</label>
+                        <input type="date" id="master-filter-end" class="styled-input"
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Jenis Material / Inspeksi</label>
+                        <select id="master-filter-type" class="styled-input" onchange="window.applyMasterDataFilter()"
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;cursor:pointer;">
+                            <option value="">Semua Jenis</option>
+                            <option value="Raw Material">Raw Material</option>
+                            <option value="Rolling Inspection">Rolling Inspection</option>
+                            <option value="Laminating">Laminating</option>
+                            <option value="Bonding Test">Bonding Test</option>
+                            <option value="LEATHER">LEATHER</option>
+                            <option value="TEXTILE">TEXTILE</option>
+                            <option value="SYNTHETIC">SYNTHETIC</option>
+                            <option value="RUBBER">RUBBER</option>
+                            <option value="PACKAGING">PACKAGING</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:125px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Status</label>
+                        <select id="master-filter-status" class="styled-input" onchange="window.applyMasterDataFilter()"
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;cursor:pointer;">
+                            <option value="all">Semua Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In-Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:130px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Inspector NIK</label>
+                        <input type="text" id="master-filter-inspector" class="styled-input" placeholder="NIK / Inspector..."
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;" onkeydown="if(event.key==='Enter')window.applyMasterDataFilter()">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;min-width:140px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Filter Berkas</label>
+                        <select id="master-filter-file" class="styled-input" onchange="window.applyMasterDataFilter()"
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;cursor:pointer;">
+                            <option value="all">Semua Data</option>
+                            <option value="has_file">Memiliki Berkas (Foto/Bonding)</option>
+                            <option value="bonding">Hanya Bonding Test</option>
+                            <option value="evidence">Hanya Foto Evidence</option>
+                            <option value="no_file">Tanpa Berkas</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:240px;">
+                        <label style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);">Deskripsi Material</label>
+                        <input type="text" id="master-filter-desc" class="styled-input" placeholder="Cari Deskripsi (cth: TROPHY JR, GABARDINE)..."
+                            style="padding:7px 10px;font-size:12px;border-radius:8px;" onkeydown="if(event.key==='Enter')window.applyMasterDataFilter()">
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="window.applyMasterDataFilter()" class="btn-gradient"
+                            style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;height:35px;white-space:nowrap;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">filter_list</span>Filter
+                        </button>
+                        <button onclick="window.resetMasterDataFilters()" class="btn-secondary"
+                            style="padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;height:35px;white-space:nowrap;"
+                            title="Reset Semua Filter">
+                            <span class="material-symbols-outlined" style="font-size:15px;">restart_alt</span>Reset
+                        </button>
+                    </div>
+                </div>
+
                 <div class="thin-scroll" style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%;table-layout:fixed;">
+                    <table class="data-table" style="width:100%;min-width:1100px;table-layout:fixed;border-collapse:collapse;">
                         <colgroup>
-                            <col style="width: 17%;"> <!-- PO Number -->
-                            <col style="width: 22%;"> <!-- Material -->
-                            <col style="width: 18%;"> <!-- Vendor -->
-                            <col style="width: 7%;"> <!-- UOM -->
-                            <col style="width: 9%;"> <!-- Planned Qty -->
-                            <col style="width: 9%;"> <!-- Status -->
-                            <col style="width: 9%;"> <!-- Klaim -->
-                            <col style="width: 9%;"> <!-- Actions -->
+                            <col style="width: 14%; min-width: 125px;"> <!-- PO Number -->
+                            <col style="width: 22%; min-width: 180px;"> <!-- Material -->
+                            <col style="width: 18%; min-width: 150px;"> <!-- Vendor -->
+                            <col style="width: 6%; min-width: 55px;">  <!-- UOM -->
+                            <col style="width: 8%; min-width: 75px;">  <!-- Planned Qty -->
+                            <col style="width: 12%; min-width: 115px;"> <!-- Status (Lebar cukup agar In Progress tidak terpotong) -->
+                            <col style="width: 8%; min-width: 80px;">  <!-- Klaim -->
+                            <col style="width: 12%; min-width: 120px;"> <!-- Actions -->
                         </colgroup>
                         <thead>
                             <tr>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); white-space:nowrap;">
                                     PO Number</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); white-space:nowrap;">
                                     Material</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); white-space:nowrap;">
                                     Vendor</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); white-space:nowrap; text-align:center;">
                                     UOM</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:right;">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:right; white-space:nowrap;">
                                     Planned Qty</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center; white-space:nowrap;">
                                     Status</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center; white-space:nowrap;">
                                     Klaim</th>
                                 <th
-                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center;">
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center; white-space:nowrap;">
                                     Aksi</th>
                             </tr>
                         </thead>
@@ -1554,7 +1619,7 @@
 
     <!-- SheetJS CDN for Excel parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="../js/material/admin.js?v=20260921b"></script>
+    <script type="module" src="../js/material/admin.js?v=20260921c"></script>
     <script type="module">
         import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
         import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
@@ -1568,14 +1633,14 @@
             }
         };
         window.exportMasterDataBtn = function () {
-            const data = window.__allMasterData || [];
+            const data = window.__filteredMasterData || window.__allMasterData || [];
             exportMasterDataToExcel(data);
         };
         window.exportClaimsBtn = async function () {
             const btn = document.getElementById('claims-export-btn');
             if (btn) { btn.disabled = true; }
             try {
-                const { apiGetClaims } = await import('../js/material/api.js?v=20260921b');
+                const { apiGetClaims } = await import('../js/material/api.js?v=20260921c');
                 const result = await apiGetClaims({ limit: 9999 });
                 exportClaimsToExcel(result.data || []);
             } catch (e) { alert('Gagal export: ' + e.message); }

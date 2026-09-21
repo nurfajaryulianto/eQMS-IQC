@@ -12,7 +12,7 @@ import {
     apiGetUsers, apiSaveUser, apiDeleteUser,
     apiSubmitClaim, apiGetClaims,
     getCurrentUserMeta, apiReleaseMaterialToProduction
-} from './api.js?v=20260921b';
+} from './api.js?v=20260921c';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allMasterData = [];
@@ -108,9 +108,100 @@ window.loadMasterData = async function () {
     }
 };
 
+window.applyMasterDataFilter = function () {
+    masterCurrentPage = 1;
+    renderMasterTable();
+};
+
+window.resetMasterDataFilters = function () {
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+    setVal('master-filter-start', '');
+    setVal('master-filter-end', '');
+    setVal('master-filter-type', '');
+    setVal('master-filter-status', 'all');
+    setVal('master-filter-inspector', '');
+    setVal('master-filter-file', 'all');
+    setVal('master-filter-desc', '');
+    masterCurrentPage = 1;
+    renderMasterTable();
+};
+
 window.renderMasterTable = function () {
-    const filterStatus = document.getElementById('master-status-filter')?.value || 'all';
-    const filtered = allMasterData.filter(d => filterStatus === 'all' || d.status === filterStatus);
+    const startDate = document.getElementById('master-filter-start')?.value || '';
+    const endDate = document.getElementById('master-filter-end')?.value || '';
+    const filterType = (document.getElementById('master-filter-type')?.value || '').toLowerCase().trim();
+    const filterStatus = document.getElementById('master-filter-status')?.value || 'all';
+    const filterInspector = (document.getElementById('master-filter-inspector')?.value || '').toLowerCase().trim();
+    const fileFilter = document.getElementById('master-filter-file')?.value || 'all';
+    const rawDesc = (document.getElementById('master-filter-desc')?.value || '').trim();
+
+    const tokens = rawDesc ? rawDesc.toLowerCase().split(/[\s,]+/).filter(Boolean) : [];
+
+    const filtered = allMasterData.filter(d => {
+        // 1. Status Filter
+        if (filterStatus !== 'all' && d.status !== filterStatus) {
+            return false;
+        }
+
+        // 2. Date Range Filter
+        if (startDate || endDate) {
+            const rawDate = d.receive_date || d.created_at || '';
+            if (!rawDate) return false;
+            const dateStr = String(rawDate).slice(0, 10);
+            if (startDate && dateStr < startDate) return false;
+            if (endDate && dateStr > endDate) return false;
+        }
+
+        // 3. Jenis Material / Inspeksi Filter
+        if (filterType) {
+            const matType = (d.material_type || '').toLowerCase();
+            const insps = Array.isArray(d.material_inspections) ? d.material_inspections : [];
+            const hasInspType = insps.some(i => (i.inspection_type || '').toLowerCase().includes(filterType));
+            const hasStepDone = (filterType.includes('raw') && d.raw_done) ||
+                                (filterType.includes('laminat') && d.laminating_done) ||
+                                (filterType.includes('bond') && d.bonding_done);
+            if (!matType.includes(filterType) && !hasInspType && !hasStepDone) {
+                return false;
+            }
+        }
+
+        // 4. Inspector NIK Filter
+        if (filterInspector) {
+            const insps = Array.isArray(d.material_inspections) ? d.material_inspections : [];
+            const hasInspector = insps.some(i => (i.inspector_nik || '').toLowerCase().includes(filterInspector));
+            const matchesUploader = (d.uploaded_by || '').toLowerCase().includes(filterInspector);
+            if (!hasInspector && !matchesUploader) {
+                return false;
+            }
+        }
+
+        // 5. Filter Berkas
+        if (fileFilter !== 'all') {
+            const insps = Array.isArray(d.material_inspections) ? d.material_inspections : [];
+            const hasBonding = insps.some(i => i.bonding_test_url && i.bonding_test_url.trim() !== '');
+            const hasEvidence = insps.some(i => i.evidence_url && i.evidence_url.trim() !== '');
+            const hasAnyFile = hasBonding || hasEvidence;
+
+            if (fileFilter === 'has_file' && !hasAnyFile) return false;
+            if (fileFilter === 'bonding' && !hasBonding) return false;
+            if (fileFilter === 'evidence' && !hasEvidence) return false;
+            if (fileFilter === 'no_file' && hasAnyFile) return false;
+        }
+
+        // 6. Deskripsi Material / Token search
+        if (tokens.length > 0) {
+            const haystack = `${d.po_number || ''} ${d.material_name || ''} ${d.material_description || ''} ${d.supplier_name || ''} ${d.vendor_name || ''} ${d.supplier || ''} ${d.product_code || ''} ${d.model_name || ''}`.toLowerCase();
+            const matchesAllTokens = tokens.every(token => haystack.includes(token));
+            if (!matchesAllTokens) return false;
+        }
+
+        return true;
+    });
+
+    window.__filteredMasterData = filtered;
 
     const countEl = document.getElementById('master-count');
     if (countEl) countEl.textContent = `${filtered.length} item`;
@@ -123,7 +214,7 @@ window.renderMasterTable = function () {
         tbody.innerHTML = `<tr><td colspan="8" style="padding:48px;text-align:center;">
             <div style="color:#94a3b8;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:6px;">
                 <span class="material-symbols-outlined" style="font-size:32px;">inbox</span>
-                Tidak ada data untuk filter ini.
+                Tidak ada data yang sesuai filter pencarian.
             </div></td></tr>`;
         if (paginationEl) paginationEl.innerHTML = '';
         return;
@@ -140,34 +231,34 @@ window.renderMasterTable = function () {
     tbody.innerHTML = pageItems.map(d => {
         let badge;
         if (d.status === 'done') {
-            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-done">Done</span>`;
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-done">Done</span>`;
         } else if (d.status === 'in-progress') {
-            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);">In Progress</span>`;
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);white-space:nowrap;display:inline-block;">In Progress</span>`;
         } else {
-            badge = `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;" class="badge-pending">Pending</span>`;
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-pending">Pending</span>`;
         }
         const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0;
         const claimBtn = hasInspection
-            ? `<button onclick="window.openClaimModal(${d.row_idx || d.id})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
+            ? `<button onclick="window.openClaimModal(${d.row_idx || d.id})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
             : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
         const releaseAdminBtn = d.status !== 'done'
-            ? `<button onclick="window.adminReleaseMasterRow('${d.id}','${esc(d.po_number)}','${esc(d.material_name)}')" title="Rilis ke Produksi (Ready to Deliver by Admin)" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;" onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'"><span class='material-symbols-outlined' style='font-size:13px;'>local_shipping</span>Rilis</button>`
-            : `<span title="Dirilis oleh: ${esc(d.released_by || 'Admin')}&#10;Catatan: ${esc(d.release_notes || '—')}" style="color:#34d399;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:2px;cursor:help;"><span class='material-symbols-outlined' style='font-size:14px;'>verified</span>Siap Kirim</span>`;
-        const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
+            ? `<button onclick="window.adminReleaseMasterRow('${d.id}','${esc(d.po_number)}','${esc(d.material_name)}')" title="Rilis ke Produksi (Ready to Deliver by Admin)" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;" onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'"><span class='material-symbols-outlined' style='font-size:13px;'>local_shipping</span>Rilis</button>`
+            : `<span title="Dirilis oleh: ${esc(d.released_by || 'Admin')}&#10;Catatan: ${esc(d.release_notes || '—')}" style="color:#34d399;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:2px;cursor:help;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:14px;'>verified</span>Siap Kirim</span>`;
+        const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
         const deleteBtn = d.status === 'pending'
-            ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
+            ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
             : '';
         const vendorName = (d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : (d.supplier || d.vendor_name || '—');
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
-            <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 14px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
-            <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 14px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
-            <td class="truncate" title="${esc(vendorName)}" style="padding:10px 14px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(vendorName)}</td>
-            <td class="truncate" style="padding:10px 14px;color:rgba(255,255,255,0.55);font-size:12px;">${esc(d.uom)}</td>
-            <td style="padding:10px 14px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;">${Number(d.planned_qty || d.batch_size || 0).toLocaleString('id-ID')}</td>
-            <td style="padding:10px 14px;text-align:center;">${badge}</td>
-            <td style="padding:10px 14px;text-align:center;">${claimBtn}</td>
-            <td style="padding:10px 14px;text-align:center;">
-                <div style="display:flex;gap:6px;justify-content:center;align-items:center;">${releaseAdminBtn}${editBtn}${deleteBtn}</div>
+            <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 12px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
+            <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 12px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
+            <td class="truncate" title="${esc(vendorName)}" style="padding:10px 12px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(vendorName)}</td>
+            <td class="truncate" style="padding:10px 8px;color:rgba(255,255,255,0.55);font-size:12px;text-align:center;">${esc(d.uom)}</td>
+            <td style="padding:10px 12px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;white-space:nowrap;">${Number(d.planned_qty || d.batch_size || 0).toLocaleString('id-ID')}</td>
+            <td style="padding:10px 8px;text-align:center;white-space:nowrap;">${badge}</td>
+            <td style="padding:10px 8px;text-align:center;white-space:nowrap;">${claimBtn}</td>
+            <td style="padding:10px 8px;text-align:center;white-space:nowrap;">
+                <div style="display:flex;gap:4px;justify-content:center;align-items:center;white-space:nowrap;">${releaseAdminBtn}${editBtn}${deleteBtn}</div>
             </td>
         </tr>`;
     }).join('');
