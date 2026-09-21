@@ -1664,7 +1664,7 @@ window.loadLeaderMonitorLog = async function () {
         } else {
             const result = await apiGetInspectionData({
                 approvedOnly: true,
-                limit: 500,
+                limit: 5000,
             });
             allLeaderMonitorInspections = result.data || [];
         }

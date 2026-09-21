@@ -86,7 +86,7 @@ async function fetchData() {
                 qty_fail: Number(d.qty_fail),
             }));
         } else {
-            const result = await apiGetInspectionData({});
+            const result = await apiGetInspectionData({ limit: 10000 });
             if (result.data) {
                 allInspections = (result.data || []).map(d => ({
                     ...d,

@@ -3133,13 +3133,20 @@ window.loadInspectionResults = async function () {
                 }
             ];
         } else {
-            // Query langsung dari Supabase subcont_inspections
-            const { data: sessData, error: sessErr } = await supabase
-                .from('subcont_inspections')
-                .select('*')
-                .order('timestamp', { ascending: false });
-
-            if (sessErr) throw sessErr;
+            // Query langsung dari Supabase subcont_inspections dengan auto-chunking
+            let sessData = [], from = 0;
+            while (sessData.length < 5000) {
+                const { data, error } = await supabase
+                    .from('subcont_inspections')
+                    .select('*')
+                    .order('timestamp', { ascending: false })
+                    .range(from, from + 999);
+                if (error) throw error;
+                const batch = data || [];
+                sessData = sessData.concat(batch);
+                if (batch.length < 1000) break;
+                from += batch.length;
+            }
 
             allInspectionSessions = (sessData || []).map(row => ({
                 sessionId: row.session_id,

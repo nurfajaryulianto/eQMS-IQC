@@ -39,40 +39,76 @@ export async function apiGetMasterData({
     page = 1,
     limit = 500,
 } = {}) {
-    let query = supabase
-        .from('material_master_data')
-        .select('*, material_inspections(*)', { count: 'exact' })
-        .order('created_at', { ascending: false });
+    const buildQuery = (withJoin = true) => {
+        let q = supabase
+            .from('material_master_data')
+            .select(withJoin ? '*, material_inspections(*)' : '*', { count: 'exact' })
+            .order('created_at', { ascending: false });
 
-    if (status && status !== 'all') {
-        query = query.eq('status', status);
-    }
-    if (materialType) {
-        query = query.ilike('material_type', materialType);
-    }
-    if (search) {
-        query = query.or(
-            `po_number.ilike.%${search}%,material_name.ilike.%${search}%,supplier_name.ilike.%${search}%`
-        );
-    }
+        if (status && status !== 'all') {
+            q = q.eq('status', status);
+        }
+        if (materialType) {
+            q = q.ilike('material_type', materialType);
+        }
+        if (search) {
+            q = q.or(
+                `po_number.ilike.%${search}%,material_name.ilike.%${search}%,supplier_name.ilike.%${search}%`
+            );
+        }
+        return q;
+    };
 
     const from = (page - 1) * limit;
     const to   = from + limit - 1;
-    query = query.range(from, to);
 
-    let res = await query;
-    if (res.error) {
-        // Fallback jika nested join error
-        const fb = await supabase
-            .from('material_master_data')
-            .select('*', { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .range(from, to);
-        if (fb.error) throw new Error(fb.error.message);
-        res = fb;
+    let masterRows = [];
+    let totalCount = null;
+
+    if (limit <= 1000) {
+        let query = buildQuery(true).range(from, to);
+        let res = await query;
+        if (res.error) {
+            // Fallback jika nested join error
+            const fb = await buildQuery(false).range(from, to);
+            if (fb.error) throw new Error(fb.error.message);
+            res = fb;
+        }
+        masterRows = res.data || [];
+        totalCount = res.count ?? masterRows.length;
+    } else {
+        // Auto-chunking loop jika limit > 1000 (misal limit: 10000) untuk bypass batas PostgREST 1000
+        let curFrom = from;
+        const targetEnd = to;
+        let useFallback = false;
+
+        while (curFrom <= targetEnd) {
+            const curTo = Math.min(curFrom + 999, targetEnd);
+            let chunkRes = null;
+            if (!useFallback) {
+                chunkRes = await buildQuery(true).range(curFrom, curTo);
+                if (chunkRes.error) {
+                    useFallback = true;
+                }
+            }
+            if (useFallback) {
+                chunkRes = await buildQuery(false).range(curFrom, curTo);
+                if (chunkRes.error) throw new Error(chunkRes.error.message);
+            }
+
+            if (chunkRes.count !== null && totalCount === null) {
+                totalCount = chunkRes.count;
+            }
+
+            const batch = chunkRes.data || [];
+            masterRows = masterRows.concat(batch);
+
+            if (batch.length < (curTo - curFrom + 1)) {
+                break;
+            }
+            curFrom += batch.length;
+        }
     }
-
-    const masterRows = res.data || [];
 
     // Fallback: jika ada master data yang material_inspections-nya kosong, cari berdasarkan po_number
     const unlinkedMaster = masterRows.filter(m => !m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0));
@@ -435,74 +471,81 @@ export async function apiGetInspectionLogs({
         }
     }
 
-    let query = supabase
-        .from('material_inspections')
-        .select('*, material_master_data(*)', { count: 'exact' })
-        .order('inspection_date', { ascending: false });
+    const buildInspQuery = () => {
+        let q = supabase
+            .from('material_inspections')
+            .select('*, material_master_data(*)', { count: 'exact' })
+            .order('inspection_date', { ascending: false });
 
-    if (startDate) {
-        query = query.gte('inspection_date', startDate + 'T00:00:00.000Z');
-    }
-    if (endDate) {
-        query = query.lte('inspection_date', endDate + 'T23:59:59.999Z');
-    }
-    if (inspectionType && inspectionType !== 'all') {
-        query = query.ilike('inspection_type', inspectionType);
-    }
-    if (inspectorNik) {
-        query = query.ilike('inspector_nik', `%${inspectorNik}%`);
-    }
-
-    if (isSearchingDesc) {
-        const tokens = rawDesc
-            .toLowerCase()
-            .split(/[\s,]+/)
-            .map(w => w.replace(/^[^a-zA-Z0-9"'-]+|[^a-zA-Z0-9"'-]+$/g, ''))
-            .filter(w => w.length > 0);
-        const candidateTokens = [...tokens].sort((a, b) => b.length - a.length);
-        const bestKeyword = candidateTokens[0] || rawDesc;
-        const safeToken = bestKeyword.replace(/[,()"]/g, '').trim();
-
-        const orClauses = [];
-        if (safeToken) {
-            orClauses.push(`item_description.ilike.%${safeToken}%`);
-            orClauses.push(`material_name.ilike.%${safeToken}%`);
-            orClauses.push(`po_no.ilike.%${safeToken}%`);
+        if (startDate) {
+            q = q.gte('inspection_date', startDate + 'T00:00:00.000Z');
         }
-        if (matchedMasterIds.length > 0) {
-            orClauses.push(`master_data_id.in.(${matchedMasterIds.slice(0, 50).join(',')})`);
+        if (endDate) {
+            q = q.lte('inspection_date', endDate + 'T23:59:59.999Z');
         }
-        if (matchedPoNumbers.length > 0) {
-            const cleanPos = matchedPoNumbers.slice(0, 50).map(p => p.trim()).filter(Boolean);
-            if (cleanPos.length > 0) {
-                orClauses.push(`po_no.in.(${cleanPos.join(',')})`);
+        if (inspectionType && inspectionType !== 'all') {
+            q = q.ilike('inspection_type', inspectionType);
+        }
+        if (inspectorNik) {
+            q = q.ilike('inspector_nik', `%${inspectorNik}%`);
+        }
+
+        if (isSearchingDesc) {
+            if (orClauses.length > 0) {
+                q = q.or(orClauses.join(','));
+            } else {
+                q = q.eq('id', -999999);
             }
         }
 
-        if (orClauses.length > 0) {
-            query = query.or(orClauses.join(','));
-        } else {
-            query = query.eq('id', -999999);
+        // Filter berkas: has_files / has_bonding / has_evidence / no_files
+        if (fileFilter === 'has_files') {
+            q = q.or('evidence_url.neq.,bonding_test_url.neq.');
+        } else if (fileFilter === 'has_bonding') {
+            q = q.not('bonding_test_url', 'is', null).neq('bonding_test_url', '');
+        } else if (fileFilter === 'has_evidence') {
+            q = q.not('evidence_url', 'is', null).neq('evidence_url', '');
+        } else if (fileFilter === 'no_files') {
+            q = q.is('evidence_url', null).is('bonding_test_url', null);
         }
-    }
 
-    // Filter berkas: has_files / has_bonding / has_evidence / no_files
-    if (fileFilter === 'has_files') {
-        query = query.or('evidence_url.neq.,bonding_test_url.neq.');
-    } else if (fileFilter === 'has_bonding') {
-        query = query.not('bonding_test_url', 'is', null).neq('bonding_test_url', '');
-    } else if (fileFilter === 'has_evidence') {
-        query = query.not('evidence_url', 'is', null).neq('evidence_url', '');
-    } else if (fileFilter === 'no_files') {
-        query = query.is('evidence_url', null).is('bonding_test_url', null);
-    }
+        return q;
+    };
 
     const from = (page - 1) * limit;
     const to   = from + limit - 1;
-    query = query.range(from, to);
 
-    const { data, error, count } = await query;
-    if (error) throw new Error(error.message);
+    let data = [];
+    let count = null;
+
+    if (limit <= 1000) {
+        const res = await buildInspQuery().range(from, to);
+        if (res.error) throw new Error(res.error.message);
+        data = res.data || [];
+        count = res.count ?? data.length;
+    } else {
+        // Auto-chunking loop jika limit > 1000 (misal limit: 9999 untuk Export Excel)
+        let curFrom = from;
+        const targetEnd = to;
+
+        while (curFrom <= targetEnd) {
+            const curTo = Math.min(curFrom + 999, targetEnd);
+            const res = await buildInspQuery().range(curFrom, curTo);
+            if (res.error) throw new Error(res.error.message);
+
+            if (res.count !== null && count === null) {
+                count = res.count;
+            }
+
+            const batch = res.data || [];
+            data = data.concat(batch);
+
+            if (batch.length < (curTo - curFrom + 1)) {
+                break;
+            }
+            curFrom += batch.length;
+        }
+    }
 
     // Fallback enrichment jika ada record lama yang belum ter-link foreign key
     const unlinkedRows = (data || []).filter(d => !d.material_master_data && d.po_no);
@@ -1702,29 +1745,51 @@ export async function apiGetSubcontDefectLogs({
 }
 
 /**
+ * Helper auto-chunking untuk bypass PostgREST max_rows = 1000
+ */
+export async function fetchSupabaseAll(queryBuilderOrFn, maxRows = Infinity, chunkSize = 1000) {
+    let allData = [];
+    let from = 0;
+    while (allData.length < maxRows) {
+        const batchLimit = Math.min(chunkSize, maxRows - allData.length);
+        const to = from + batchLimit - 1;
+        const query = typeof queryBuilderOrFn === 'function' ? queryBuilderOrFn(from, to) : queryBuilderOrFn;
+        const req = query && typeof query.range === 'function' ? query.range(from, to) : query;
+        const { data, error } = await req;
+        if (error) throw error;
+        const rows = data || [];
+        allData = allData.concat(rows);
+        if (rows.length < batchLimit) break;
+        from += rows.length;
+    }
+    return allData;
+}
+
+/**
  * Ambil data lengkap untuk Analytics Dashboard Subcont
  */
 export async function apiGetSubcontDashboardData({ startDate = '', endDate = '' } = {}) {
-    let qSessions = supabase.from('subcont_inspections').select('*').order('date', { ascending: true });
-    let qDefects = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: true });
+    const qSessionsFn = () => {
+        let q = supabase.from('subcont_inspections').select('*').order('date', { ascending: true });
+        if (startDate) q = q.gte('date', startDate);
+        if (endDate) q = q.lte('date', endDate);
+        return q;
+    };
+    const qDefectsFn = () => {
+        let q = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: true });
+        if (startDate) q = q.gte('date', startDate);
+        if (endDate) q = q.lte('date', endDate);
+        return q;
+    };
 
-    if (startDate) {
-        qSessions = qSessions.gte('date', startDate);
-        qDefects = qDefects.gte('date', startDate);
-    }
-    if (endDate) {
-        qSessions = qSessions.lte('date', endDate);
-        qDefects = qDefects.lte('date', endDate);
-    }
-
-    const [resSessions, resDefects] = await Promise.all([qSessions, qDefects]);
-
-    if (resSessions.error) throw new Error(resSessions.error.message);
-    if (resDefects.error) throw new Error(resDefects.error.message);
+    const [sessions, defects] = await Promise.all([
+        fetchSupabaseAll(qSessionsFn),
+        fetchSupabaseAll(qDefectsFn)
+    ]);
 
     return {
-        sessions: resSessions.data || [],
-        defects: resDefects.data || [],
+        sessions: sessions || [],
+        defects: defects || [],
     };
 }
 

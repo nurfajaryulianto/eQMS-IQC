@@ -1379,31 +1379,49 @@ window.loadSubcontInspectionLog = async function() {
         const statusVal = document.getElementById('subcont-log-status-filter')?.value || 'all';
         const fileVal = document.getElementById('subcont-log-file-filter')?.value || 'all';
 
-        // Query Supabase subcont_inspections (Sheet 1)
-        let qSess = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false });
-        if (dateStart) qSess = qSess.gte('tanggal_insp', dateStart);
-        if (dateEnd) qSess = qSess.lte('tanggal_insp', dateEnd);
-        if (vendorVal !== 'all') qSess = qSess.ilike('vendor', `%${vendorVal}%`);
-        if (statusVal !== 'all') qSess = qSess.eq('status', statusVal);
-        if (fileVal === 'has_evidence') {
-            qSess = qSess.not('evidence_url', 'is', null).neq('evidence_url', '');
-        } else if (fileVal === 'no_evidence') {
-            qSess = qSess.or('evidence_url.is.null,evidence_url.eq.');
-        }
+        // Helper auto-chunking bypass PostgREST max_rows = 1000
+        const fetchSubcontChunked = async (buildFn) => {
+            let list = [], from = 0;
+            while (true) {
+                const { data, error } = await buildFn().range(from, from + 999);
+                if (error) throw error;
+                const batch = data || [];
+                list = list.concat(batch);
+                if (batch.length < 1000) break;
+                from += batch.length;
+            }
+            return list;
+        };
 
-        // Query Supabase subcont_defect_logs (Sheet 2)
-        let qDef = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).order('id', { ascending: false });
-        if (dateStart) qDef = qDef.gte('date', dateStart);
-        if (dateEnd) qDef = qDef.lte('date', dateEnd);
-        if (vendorVal !== 'all') qDef = qDef.ilike('vendor', `%${vendorVal}%`);
+        const buildQSess = () => {
+            let q = supabase.from('subcont_inspections').select('*').order('timestamp', { ascending: false });
+            if (dateStart) q = q.gte('tanggal_insp', dateStart);
+            if (dateEnd) q = q.lte('tanggal_insp', dateEnd);
+            if (vendorVal !== 'all') q = q.ilike('vendor', `%${vendorVal}%`);
+            if (statusVal !== 'all') q = q.eq('status', statusVal);
+            if (fileVal === 'has_evidence') {
+                q = q.not('evidence_url', 'is', null).neq('evidence_url', '');
+            } else if (fileVal === 'no_evidence') {
+                q = q.or('evidence_url.is.null,evidence_url.eq.');
+            }
+            return q;
+        };
 
-        const [resSess, resDef] = await Promise.all([qSess, qDef]);
+        const buildQDef = () => {
+            let q = supabase.from('subcont_defect_logs').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+            if (dateStart) q = q.gte('date', dateStart);
+            if (dateEnd) q = q.lte('date', dateEnd);
+            if (vendorVal !== 'all') q = q.ilike('vendor', `%${vendorVal}%`);
+            return q;
+        };
 
-        if (resSess.error) throw resSess.error;
-        if (resDef.error) throw resDef.error;
+        const [sessData, defData] = await Promise.all([
+            fetchSubcontChunked(buildQSess),
+            fetchSubcontChunked(buildQDef)
+        ]);
 
-        currentSubcontLogSessions = resSess.data || [];
-        currentSubcontLogDefects = resDef.data || [];
+        currentSubcontLogSessions = sessData || [];
+        currentSubcontLogDefects = defData || [];
 
         sessionsCurrentPage = 1;
         defectsCurrentPage = 1;

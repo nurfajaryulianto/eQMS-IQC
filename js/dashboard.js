@@ -157,17 +157,28 @@ async function fetchData() {
 
     loadingOverlay.style.display = 'flex';
     try {
-        // Query directly from Supabase subcont_inspections & subcont_defect_logs (<100ms)
-        const [resSess, resDef] = await Promise.all([
-            supabase.from('subcont_inspections').select('*').order('date', { ascending: true }),
-            supabase.from('subcont_defect_logs').select('*').order('date', { ascending: true })
+        // Query directly from Supabase with auto-chunking (bypass 1000 row PostgREST limit)
+        const fetchAllSubcont = async (table) => {
+            let list = [], from = 0;
+            while (true) {
+                const { data, error } = await supabase
+                    .from(table)
+                    .select('*')
+                    .order('date', { ascending: true })
+                    .range(from, from + 999);
+                if (error) throw error;
+                const batch = data || [];
+                list = list.concat(batch);
+                if (batch.length < 1000) break;
+                from += batch.length;
+            }
+            return list;
+        };
+
+        const [rawSessions, rawDefects] = await Promise.all([
+            fetchAllSubcont('subcont_inspections'),
+            fetchAllSubcont('subcont_defect_logs')
         ]);
-
-        if (resSess.error) throw resSess.error;
-        if (resDef.error) throw resDef.error;
-
-        const rawSessions = resSess.data || [];
-        const rawDefects = resDef.data || [];
 
         allInspections = rawSessions.map(item => {
             const qtyInspect = Number(item.qty_inspect) || 0;
