@@ -150,7 +150,7 @@ export async function apiGetMasterData({
 
     return {
         data: masterRows.map(normalizeRow),
-        total: res.count || 0,
+        total: totalCount ?? masterRows.length,
         page,
         limit,
     };

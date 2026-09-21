@@ -1554,7 +1554,7 @@
 
     <!-- SheetJS CDN for Excel parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="../js/material/admin.js?v=20260921a"></script>
+    <script type="module" src="../js/material/admin.js?v=20260921b"></script>
     <script type="module">
         import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
         import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
@@ -1575,7 +1575,7 @@
             const btn = document.getElementById('claims-export-btn');
             if (btn) { btn.disabled = true; }
             try {
-                const { apiGetClaims } = await import('../js/material/api.js?v=20260921a');
+                const { apiGetClaims } = await import('../js/material/api.js?v=20260921b');
                 const result = await apiGetClaims({ limit: 9999 });
                 exportClaimsToExcel(result.data || []);
             } catch (e) { alert('Gagal export: ' + e.message); }
