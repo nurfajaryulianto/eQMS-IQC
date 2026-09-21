@@ -222,7 +222,22 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
             uploaded_by:          uploaderNik,
             created_at:           now,
         };
-    }).filter(r => r.po_number && r.material_name);
+    });
+
+    const insertRows = [];
+    const invalidRows = [];
+
+    mappedRows.forEach((r, idx) => {
+        if (r.po_number && r.material_name) {
+            insertRows.push(r);
+        } else {
+            invalidRows.push({
+                rowIdx: idx + 2,
+                po_number: r.po_number || '(Kosong)',
+                material_name: r.material_name || '(Kosong)'
+            });
+        }
+    });
 
     if (insertRows.length === 0) {
         throw new Error('Tidak ada baris yang valid ditemukan. Pastikan file memiliki kolom Nomor PO dan Nama Material.');
@@ -279,6 +294,7 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
 
     const rejected = rejectedList.length;
     let inserted = 0;
+    const newMasterIds = [];
 
     if (newRows.length > 0) {
         // Cek auth session aktif
@@ -315,15 +331,20 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
                     .select('id');
                 if (error) throw error;
                 inserted += data?.length || batch.length;
+                if (data && Array.isArray(data)) {
+                    data.forEach(item => { if (item?.id) newMasterIds.push(item.id); });
+                }
             } catch (batchErr) {
                 // Fallback jika ada duplikat lolos di unique constraint: simpan per baris
                 if (batchErr.message && (batchErr.message.includes('unique constraint') || batchErr.code === '23505')) {
                     for (const singleRow of batch) {
-                        const { error: sErr } = await supabase
+                        const { data: sData, error: sErr } = await supabase
                             .from('material_master_data')
-                            .insert([singleRow]);
+                            .insert([singleRow])
+                            .select('id');
                         if (!sErr) {
                             inserted++;
+                            if (sData?.[0]?.id) newMasterIds.push(sData[0].id);
                         } else if (sErr.message && (sErr.message.includes('unique constraint') || sErr.code === '23505')) {
                             rejectedList.push(`${singleRow.po_number} (${singleRow.material_name})`);
                         } else {
@@ -342,7 +363,14 @@ export async function apiBulkUpsertMasterData(rows, uploaderNik = '') {
         inserted,
         rejected,
         rejectedList,
-        message: `Upload selesai: ${inserted} baru disimpan, ${rejected} duplikat dilewati.`,
+        totalExcelRows: rows.length,
+        validCount: insertRows.length,
+        invalidCount: invalidRows.length,
+        invalidList: invalidRows.slice(0, 10),
+        newPoList: [...new Set(newRows.map(r => r.po_number))],
+        newMasterIds,
+        batchTimestamp: now,
+        message: `Upload selesai: ${inserted} baru disimpan, ${rejected} duplikat dilewati, ${invalidRows.length} baris tidak valid dilewati.`,
     };
 }
 
@@ -991,6 +1019,36 @@ export async function apiPassAll(rowIds, adminNik, adminName, reason = '') {
         p_reason:   reason || 'Sertifikat CoA / Lab Test Vendor Valid',
     });
     if (error) throw new Error(error.message);
+
+    // Client-side self-healing: Sinkronisasikan item_description & supplier_name pada material_inspections yang baru dibuat
+    try {
+        if (rowIds && rowIds.length > 0) {
+            const { data: mdRows } = await supabase
+                .from('material_master_data')
+                .select('id, material_name, material_description, supplier_name, supplier')
+                .in('id', rowIds);
+
+            if (mdRows && mdRows.length > 0) {
+                for (const md of mdRows) {
+                    const desc = md.material_description || md.material_name || '';
+                    const sup = md.supplier_name || md.supplier || '';
+                    if (desc || sup) {
+                        await supabase
+                            .from('material_inspections')
+                            .update({
+                                item_description: desc,
+                                supplier_name: sup
+                            })
+                            .eq('master_data_id', md.id)
+                            .or('item_description.is.null,item_description.eq.');
+                    }
+                }
+            }
+        }
+    } catch (syncErr) {
+        console.warn('[PassAll] Background sync warning:', syncErr);
+    }
+
     return data;
 }
 

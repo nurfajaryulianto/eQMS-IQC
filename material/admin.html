@@ -676,7 +676,12 @@
                         </div>
                     </div>
 
-                    <!-- Date Filter Controls -->
+                    <!-- Status Breakdown Bar -->
+                    <div id="passall-status-breakdown" style="margin-bottom:16px;">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Date & Batch Filter Controls -->
                     <div
                         style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
                         <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;flex:1;">
@@ -699,15 +704,27 @@
                                 <option value="all">Semua Material Type</option>
                             </select>
                         </div>
-                        <div style="display:flex;gap:8px;">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <button onclick="applyPassAllDateFilter()" class="btn-gradient"
                                 style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                                 <span class="material-symbols-outlined" style="font-size:16px;">filter_list</span>Filter
                             </button>
+                            <button type="button" id="btn-passall-last-batch" onclick="filterPassAllLastBatch()" class="btn-secondary"
+                                style="padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;"
+                                title="Pilih otomatis baris dari file yang baru saja diupload">
+                                <span class="material-symbols-outlined" style="font-size:16px;">bolt</span>Batch Upload Terakhir
+                            </button>
                             <button onclick="resetPassAllDateFilter()" class="btn-secondary"
-                                style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
+                                style="padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;height:38px;white-space:nowrap;">
                                 <span class="material-symbols-outlined" style="font-size:16px;">restart_alt</span>Reset
                             </button>
+                        </div>
+                        <div style="width:100%;display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04);margin-top:4px;">
+                            <label style="font-size:12px;color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                                <input type="checkbox" id="passall-include-progress" onchange="applyPassAllDateFilter()" style="cursor:pointer;width:15px;height:15px;">
+                                Sertakan item status <strong>In-Progress</strong> (override parsial)
+                            </label>
+                            <span style="font-size:11px;color:rgba(255,255,255,0.4);">Item dengan sertifikat CoA vendor lengkap</span>
                         </div>
                     </div>
 

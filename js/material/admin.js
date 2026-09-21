@@ -566,14 +566,41 @@ window.confirmUpload = async function () {
             inserted = result.inserted || 0;
             rejected = result.rejectedList || [];
             setLoading(false);
-        }
 
-        // Show status dialog popUp
-        let alertMessage = `${inserted} data PO baru berhasil dimasukkan ke database.`;
-        let alertType = 'success';
-        if (rejected.length > 0) {
-            alertMessage += `\n\n⚠️ ${rejected.length} data duplikat ditolak oleh sistem karena Nomor PO sudah ada di database:\n${rejected.join(', ')}`;
-            alertType = 'warning';
+            // Simpan riwayat batch upload ke memori session untuk quick filter di Pass All
+            if (result.newPoList && result.newPoList.length > 0) {
+                window.__lastUploadedBatch = {
+                    time: Date.now(),
+                    poList: result.newPoList,
+                    masterIds: result.newMasterIds || [],
+                    count: inserted,
+                    totalExcel: result.totalExcelRows || parsedFileData.length,
+                };
+            }
+
+            // Susun dialog rekonsiliasi audit data yang transparan
+            let alertMessage = `📊 Rekonsiliasi Upload Master Data:\n\n` +
+                `• Total baris dalam file Excel : ${result.totalExcelRows || parsedFileData.length} baris\n` +
+                `• Berhasil dimasukkan ke database : ${inserted} baris\n`;
+
+            if (rejected.length > 0) {
+                alertMessage += `• Ditolak (Duplikat PO/Item di DB) : ${rejected.length} baris\n`;
+            }
+            if (result.invalidCount > 0) {
+                alertMessage += `• Ditolak (Format Tanpa No. PO/Nama) : ${result.invalidCount} baris\n`;
+            }
+
+            if (rejected.length > 0) {
+                const sampleDups = rejected.slice(0, 10).join(', ');
+                alertMessage += `\n⚠️ Daftar Nomor PO Duplikat:\n${sampleDups}${rejected.length > 10 ? ` ...dan ${rejected.length - 10} lainnya` : ''}`;
+            }
+
+            let alertType = inserted > 0 ? (rejected.length > 0 ? 'warning' : 'success') : 'error';
+
+            clearFile();
+            await loadMasterData();
+            await showAlert(alertMessage, alertType, 'Status Upload Master Data');
+            return;
         }
 
         clearFile();
@@ -583,7 +610,8 @@ window.confirmUpload = async function () {
             await loadMasterData();
         }
 
-        await showAlert(alertMessage, alertType, 'Status Upload Master Data');
+        let alertMessage = `${inserted} data PO baru berhasil dimasukkan ke database.`;
+        await showAlert(alertMessage, 'success', 'Status Upload Master Data');
 
     } catch (err) {
         setLoading(false);
@@ -635,6 +663,29 @@ function parseReceiveDate(dateVal) {
     return isNaN(d.getTime()) ? null : d;
 }
 
+window.__passAllBatchFilterActive = false;
+
+window.filterPassAllLastBatch = function () {
+    if (!window.__lastUploadedBatch || !window.__lastUploadedBatch.poList?.length) {
+        showToast('Belum ada riwayat batch upload pada sesi ini. Silakan upload file Master Data terlebih dahulu.', 'info');
+        return;
+    }
+    window.__passAllBatchFilterActive = true;
+    const btn = document.getElementById('btn-passall-last-batch');
+    if (btn) {
+        btn.classList.add('btn-gradient');
+        btn.classList.remove('btn-secondary');
+        btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">check_circle</span>Batch Terakhir (${window.__lastUploadedBatch.count} baris)`;
+    }
+    // Reset tanggal agar tidak membatasi batch baru
+    const startInput = document.getElementById('passall-filter-start');
+    const endInput = document.getElementById('passall-filter-end');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+
+    window.applyPassAllDateFilter();
+};
+
 window.loadPassAllPreview = async function () {
     await loadMasterData();
     window.applyPassAllDateFilter();
@@ -644,35 +695,77 @@ window.applyPassAllDateFilter = function () {
     const startVal = document.getElementById('passall-filter-start')?.value;
     const endVal = document.getElementById('passall-filter-end')?.value;
     const materialTypeVal = document.getElementById('passall-filter-material-type')?.value || 'all';
+    const includeProgress = document.getElementById('passall-include-progress')?.checked || false;
 
-    let filteredPending = allMasterData.filter(d => d.status === 'pending');
-
-    // Filter by date
-    const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
-    const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
-
-    if (startDate || endDate) {
-        filteredPending = filteredPending.filter(d => {
-            const rDate = parseReceiveDate(d.receive_date);
-            if (!rDate) return false;
-            const rDateClear = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate());
-            if (startDate) {
-                const startClear = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-                if (rDateClear < startClear) return false;
-            }
-            if (endDate) {
-                const endClear = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-                if (rDateClear > endClear) return false;
-            }
-            return true;
-        });
-    }
-
-    // Filter by material type
+    // Filter lingkup Material Type
+    let scopeData = allMasterData;
     if (materialTypeVal && materialTypeVal !== 'all') {
-        filteredPending = filteredPending.filter(d =>
+        scopeData = scopeData.filter(d =>
             (d.material_type || '').toLowerCase().trim() === materialTypeVal.toLowerCase().trim()
         );
+    }
+
+    // Hitung status breakdown untuk visibilitas admin
+    const totalCount = scopeData.length;
+    const pendingCount = scopeData.filter(d => (d.status || '').toLowerCase() === 'pending').length;
+    const inProgressCount = scopeData.filter(d => (d.status || '').toLowerCase() === 'in-progress').length;
+    const doneCount = scopeData.filter(d => (d.status || '').toLowerCase() === 'done').length;
+
+    // Render Status Breakdown Bar
+    const breakdownEl = document.getElementById('passall-status-breakdown');
+    if (breakdownEl) {
+        breakdownEl.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;">
+                <div style="padding:6px 12px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:white;">
+                    Total Master Data: <strong>${totalCount.toLocaleString('id-ID')}</strong>
+                </div>
+                <div style="padding:6px 12px;border-radius:8px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);color:#34d399;">
+                    ✓ Siap Pass (Pending): <strong>${pendingCount.toLocaleString('id-ID')}</strong>
+                </div>
+                <div style="padding:6px 12px;border-radius:8px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;">
+                    ⏳ Sedang Diperiksa (In-Progress): <strong>${inProgressCount.toLocaleString('id-ID')}</strong>
+                </div>
+                <div style="padding:6px 12px;border-radius:8px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;">
+                    ✅ Sudah Selesai (Done): <strong>${doneCount.toLocaleString('id-ID')}</strong>
+                </div>
+            </div>
+        `;
+    }
+
+    // Filter status yang akan ditampilkan untuk di-Pass
+    let filteredPending = scopeData.filter(d => {
+        const s = (d.status || '').toLowerCase();
+        if (includeProgress) {
+            return s === 'pending' || s === 'in-progress';
+        }
+        return s === 'pending';
+    });
+
+    // Jika filter batch upload terakhir aktif
+    if (window.__passAllBatchFilterActive && window.__lastUploadedBatch?.poList?.length > 0) {
+        const lastPoSet = new Set(window.__lastUploadedBatch.poList.map(p => String(p).trim().toLowerCase()));
+        filteredPending = filteredPending.filter(d => lastPoSet.has(String(d.po_number || '').trim().toLowerCase()));
+    } else {
+        // Filter by date (hanya jika tanggal diisi manual oleh admin)
+        const startDate = startVal ? new Date(startVal + 'T00:00:00') : null;
+        const endDate = endVal ? new Date(endVal + 'T23:59:59') : null;
+
+        if (startDate || endDate) {
+            filteredPending = filteredPending.filter(d => {
+                const rDate = parseReceiveDate(d.receive_date);
+                if (!rDate) return false;
+                const rDateClear = new Date(rDate.getFullYear(), rDate.getMonth(), rDate.getDate());
+                if (startDate) {
+                    const startClear = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                    if (rDateClear < startClear) return false;
+                }
+                if (endDate) {
+                    const endClear = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                    if (rDateClear > endClear) return false;
+                }
+                return true;
+            });
+        }
     }
 
     const countEl = document.getElementById('passall-count');
@@ -761,10 +854,21 @@ window.applyPassAllDateFilter = function () {
 };
 
 window.resetPassAllDateFilter = function () {
+    window.__passAllBatchFilterActive = false;
+    const btn = document.getElementById('btn-passall-last-batch');
+    if (btn) {
+        btn.classList.remove('btn-gradient');
+        btn.classList.add('btn-secondary');
+        btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">bolt</span>Batch Upload Terakhir`;
+    }
     const startInput = document.getElementById('passall-filter-start');
     const endInput = document.getElementById('passall-filter-end');
+    const typeSelect = document.getElementById('passall-filter-material-type');
+    const inclProg = document.getElementById('passall-include-progress');
     if (startInput) startInput.value = '';
     if (endInput) endInput.value = '';
+    if (typeSelect) typeSelect.value = 'all';
+    if (inclProg) inclProg.checked = false;
     window.applyPassAllDateFilter();
 };
 

@@ -267,10 +267,11 @@ function renderInspectionLog(data) {
         const matFullTitle = matCode + (matDesc && matDesc !== matCode ? ` (${matDesc})` : '');
 
         let adminPassAllBadge = '';
-        if (d.executed_by) {
-            const reasonText = d.pass_reason ? `Alasan Pass All: ${d.pass_reason}` : 'Pass All Admin Bypass';
+        if (d.executed_by || d.input_type === 'batch_pass_all') {
+            const execName = d.executed_by || 'Admin';
+            const reasonText = d.pass_reason ? `Alasan Pass All: ${d.pass_reason}` : 'Pass All Admin Bypass (CoA/Lab Test)';
             adminPassAllBadge = `<div style="font-size:9px;color:#c084fc;font-weight:600;margin-top:2px;display:flex;align-items:center;gap:3px;" title="${esc(reasonText)}">
-                <span class="material-symbols-outlined" style="font-size:11px;">verified_user</span>Pass All by ${esc(d.executed_by)}
+                <span class="material-symbols-outlined" style="font-size:11px;">verified_user</span>Pass All by ${esc(execName)}
             </div>`;
         }
 
