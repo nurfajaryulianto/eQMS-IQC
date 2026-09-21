@@ -3364,17 +3364,19 @@ function renderInspectionResultTable(sessions) {
         return;
     }
 
-    // Group filtered sessions by style number & model name
+    // Group filtered sessions by style number, model name & inspector/auditor
     const grouped = {};
     filtered.forEach(s => {
         const styleStr = (s.styleNumber || '—').trim();
         const modelStr = (s.modelName || '—').trim();
-        const key = `${styleStr}|${modelStr}`;
+        const auditorStr = (s.auditor || '—').trim();
+        const key = `${styleStr}|${modelStr}|${auditorStr}`;
 
         if (!grouped[key]) {
             grouped[key] = {
                 styleNumber: styleStr,
                 modelName: modelStr,
+                auditor: auditorStr,
                 vendors: new Set(),
                 materials: new Set(),
                 auditors: new Set(),
@@ -3497,7 +3499,7 @@ function renderInspectionResultTable(sessions) {
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h3 class="text-base font-extrabold text-slate-100 leading-tight mb-0.5">${g.modelName}</h3>
-                            <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${g.styleNumber}</span></p>
+                            <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${g.styleNumber}</span> • Inspector: <span class="text-emerald-400 font-semibold">${g.auditor}</span></p>
                         </div>
                         ${statusBadgeHTML}
                     </div>
@@ -3591,9 +3593,9 @@ function renderInspectionResultTable(sessions) {
 
                 <!-- Footer area -->
                 <div class="px-5 py-3 bg-slate-900/20 border-t border-slate-800/30 flex justify-between items-center text-[11px] text-slate-400">
-                    <div class="flex items-center gap-1.5 font-medium truncate w-full" title="Auditor: ${[...g.auditors].join(', ')}">
-                        <span class="material-symbols-outlined text-[14px]">person</span>
-                        <span class="truncate max-w-[120px]">${[...g.auditors].join(', ')}</span>
+                    <div class="flex items-center gap-1.5 font-medium truncate w-full" title="Auditor: ${g.auditor}">
+                        <span class="material-symbols-outlined text-[14px] text-emerald-400">person</span>
+                        <span class="truncate max-w-[140px] font-semibold text-slate-200">${g.auditor}</span>
                         <span class="text-slate-600">•</span>
                         <span class="truncate">${dateStr}</span>
                     </div>
