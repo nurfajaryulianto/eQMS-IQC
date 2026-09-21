@@ -68,11 +68,30 @@ const STORAGE_KEYS = {
 };
 
 // ─── Multi-Date Inspection State & Helpers ─────────────────────
+// ─── Helper to parse/extract single clean date (YYYY-MM-DD) ────
+function getLatestSingleDate(val) {
+    if (!val) return '';
+    if (Array.isArray(val)) {
+        val = val.filter(Boolean).pop() || '';
+    }
+    const str = String(val).trim();
+    if (str.includes(',')) {
+        const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+        return parts.pop() || '';
+    }
+    if (str.includes('T')) {
+        return str.substring(0, 10);
+    }
+    return str.substring(0, 10);
+}
+
+// ─── Single-Date Inspection State & Helpers ─────────────────────
 let selectedInspectionDates = [];
 
 function renderInspectionTags(skipSave = false) {
     const container = document.getElementById('inspection-tags-container');
     const hiddenInput = document.getElementById('tanggal-inspection');
+    const picker = document.getElementById('inspection-date-picker');
     if (!container) return;
 
     if (!selectedInspectionDates.length) {
@@ -81,76 +100,56 @@ function renderInspectionTags(skipSave = false) {
         return;
     }
 
-    container.innerHTML = selectedInspectionDates.map(dateStr => {
-        const safeDate = String(dateStr).replace(/'/g, "\\'");
-        return `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(16, 185, 129, 0.16);color:#86efac;border:1px solid rgba(16, 185, 129, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
-                <span>${dateStr}</span>
-                <button type="button" onclick="window.removeInspectionDate('${safeDate}')" style="color:#34d399;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
-                    <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
-                </button>
-            </span>
-        `;
-    }).join('');
+    const singleDate = selectedInspectionDates[0];
+    const safeDate = String(singleDate).replace(/'/g, "\'");
+    container.innerHTML = `
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(16, 185, 129, 0.16);color:#86efac;border:1px solid rgba(16, 185, 129, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+            <span>${singleDate}</span>
+            <button type="button" onclick="window.removeInspectionDate('${safeDate}')" style="color:#34d399;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${singleDate}">
+                <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
+            </button>
+        </span>
+    `;
 
-    const joinedStr = selectedInspectionDates.join(', ');
-    if (hiddenInput) hiddenInput.value = joinedStr;
+    if (hiddenInput) hiddenInput.value = singleDate;
+    if (picker && picker.value !== singleDate) {
+        picker.value = singleDate;
+    }
     if (!skipSave && typeof saveToLocalStorage === 'function') {
         saveToLocalStorage();
     }
 }
 
 window.addInspectionDate = function(dateStr) {
-    if (!dateStr || typeof dateStr !== 'string') return;
-    const cleanDate = dateStr.trim();
+    if (!dateStr) return;
+    const cleanDate = getLatestSingleDate(dateStr);
     if (!cleanDate) return;
 
-    if (cleanDate.includes(',')) {
-        cleanDate.split(',').forEach(d => window.addInspectionDate(d));
-        return;
-    }
-
-    if (!selectedInspectionDates.includes(cleanDate)) {
-        selectedInspectionDates.push(cleanDate);
-        selectedInspectionDates.sort();
-        renderInspectionTags();
-    }
+    // Strict single date: replace previous selection
+    selectedInspectionDates = [cleanDate];
+    renderInspectionTags();
 };
 
 window.removeInspectionDate = function(dateStr) {
-    selectedInspectionDates = selectedInspectionDates.filter(d => d !== dateStr);
+    selectedInspectionDates = [];
+    const picker = document.getElementById('inspection-date-picker');
+    if (picker) picker.value = '';
     renderInspectionTags();
 };
 
 window.setInspectionDates = function(val, skipSave = false) {
-    selectedInspectionDates = [];
-    if (!val) {
-        renderInspectionTags(skipSave);
-        return;
-    }
-    if (Array.isArray(val)) {
-        val.forEach(d => {
-            if (d && typeof d === 'string' && !selectedInspectionDates.includes(d.trim())) {
-                selectedInspectionDates.push(d.trim());
-            }
-        });
-    } else if (typeof val === 'string') {
-        val.split(/[,]+/).forEach(d => {
-            const trimmed = d.trim();
-            if (trimmed && !selectedInspectionDates.includes(trimmed)) {
-                selectedInspectionDates.push(trimmed);
-            }
-        });
-    }
+    const cleanDate = getLatestSingleDate(val);
+    selectedInspectionDates = cleanDate ? [cleanDate] : [];
     renderInspectionTags(skipSave);
 };
 
-// ─── Multi-Date Bucket State & Helpers ─────────────────────────
+// ─── Single-Date Bucket State & Helpers ─────────────────────────
 let selectedBucketDates = [];
 
 function renderBucketTags(skipSave = false) {
     const container = document.getElementById('bucket-tags-container');
     const hiddenInput = document.getElementById('tanggal-bucket');
+    const picker = document.getElementById('bucket-date-picker');
     if (!container) return;
 
     if (!selectedBucketDates.length) {
@@ -159,67 +158,46 @@ function renderBucketTags(skipSave = false) {
         return;
     }
 
-    container.innerHTML = selectedBucketDates.map(dateStr => {
-        const safeDate = String(dateStr).replace(/'/g, "\\'");
-        return `
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(59, 130, 246, 0.16);color:#93c5fd;border:1px solid rgba(59, 130, 246, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
-                <span>${dateStr}</span>
-                <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${dateStr}">
-                    <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
-                </button>
-            </span>
-        `;
-    }).join('');
+    const singleDate = selectedBucketDates[0];
+    const safeDate = String(singleDate).replace(/'/g, "\'");
+    container.innerHTML = `
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(59, 130, 246, 0.16);color:#93c5fd;border:1px solid rgba(59, 130, 246, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+            <span>${singleDate}</span>
+            <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${singleDate}">
+                <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
+            </button>
+        </span>
+    `;
 
-    const joinedStr = selectedBucketDates.join(', ');
-    if (hiddenInput) hiddenInput.value = joinedStr;
+    if (hiddenInput) hiddenInput.value = singleDate;
+    if (picker && picker.value !== singleDate) {
+        picker.value = singleDate;
+    }
     if (!skipSave && typeof saveToLocalStorage === 'function') {
         saveToLocalStorage();
     }
 }
 
 window.addBucketDate = function(dateStr) {
-    if (!dateStr || typeof dateStr !== 'string') return;
-    const cleanDate = dateStr.trim();
+    if (!dateStr) return;
+    const cleanDate = getLatestSingleDate(dateStr);
     if (!cleanDate) return;
 
-    if (cleanDate.includes(',')) {
-        cleanDate.split(',').forEach(d => window.addBucketDate(d));
-        return;
-    }
-
-    if (!selectedBucketDates.includes(cleanDate)) {
-        selectedBucketDates.push(cleanDate);
-        selectedBucketDates.sort();
-        renderBucketTags();
-    }
+    // Strict single date: replace previous selection
+    selectedBucketDates = [cleanDate];
+    renderBucketTags();
 };
 
 window.removeBucketDate = function(dateStr) {
-    selectedBucketDates = selectedBucketDates.filter(d => d !== dateStr);
+    selectedBucketDates = [];
+    const picker = document.getElementById('bucket-date-picker');
+    if (picker) picker.value = '';
     renderBucketTags();
 };
 
 window.setBucketDates = function(val, skipSave = false) {
-    selectedBucketDates = [];
-    if (!val) {
-        renderBucketTags(skipSave);
-        return;
-    }
-    if (Array.isArray(val)) {
-        val.forEach(d => {
-            if (d && typeof d === 'string' && !selectedBucketDates.includes(d.trim())) {
-                selectedBucketDates.push(d.trim());
-            }
-        });
-    } else if (typeof val === 'string') {
-        val.split(/[,]+/).forEach(d => {
-            const trimmed = d.trim();
-            if (trimmed && !selectedBucketDates.includes(trimmed)) {
-                selectedBucketDates.push(trimmed);
-            }
-        });
-    }
+    const cleanDate = getLatestSingleDate(val);
+    selectedBucketDates = cleanDate ? [cleanDate] : [];
     renderBucketTags(skipSave);
 };
 
@@ -845,8 +823,8 @@ function saveToLocalStorage() {
             (selectedStyles && selectedStyles.length > 0) ||
             items.length > 0 ||
             matType ||
-            (selectedInspectionDates && selectedInspectionDates.length > 1) ||
-            (selectedBucketDates && selectedBucketDates.length > 1) ||
+            (selectedInspectionDates && selectedInspectionDates.length > 0) ||
+            (selectedBucketDates && selectedBucketDates.length > 0) ||
             leader ||
             editingSessionId
         );
@@ -1736,8 +1714,8 @@ async function saveData() {
                     qty_defect: qDef,
                     ftt: Number(itemFtt.toFixed(4)),
                     redo_rate: Number(itemRedo.toFixed(4)),
-                    tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
-                    bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
+                    tanggal_insp: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
+                    bucket: getLatestSingleDate(dataToSend.tanggalBucket) || null,
                     approved_by: dataToSend.approvedByLeader || '',
                     evidence_url: evidenceUrl,
                     status: dataToSend.status || 'Done',
@@ -1751,7 +1729,7 @@ async function saveData() {
                         if (cnt > 0 && defectName) {
                             defectRowsToInsert.push({
                                 session_id: itemSessId,
-                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
+                                date: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
                                 vendor: dataToSend.vendor || '',
                                 component: it.component || '',
                                 issue_finding: defectName,
@@ -1762,7 +1740,7 @@ async function saveData() {
                 } else if (qDef > 0) {
                     defectRowsToInsert.push({
                                 session_id: itemSessId,
-                                date: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
+                                date: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
                                 vendor: dataToSend.vendor || '',
                                 component: it.component || '',
                                 issue_finding: 'DEFECT GENERAL',
@@ -1789,8 +1767,8 @@ async function saveData() {
                 qty_defect: Number(dataToSend.defect) || 0,
                 ftt: Number(dataToSend.ftt) || 0,
                 redo_rate: Number(dataToSend.redoRate) || 0,
-                tanggal_insp: dataToSend.tanggalInspection ? dataToSend.tanggalInspection.trim() : new Date().toISOString().substring(0, 10),
-                bucket: dataToSend.tanggalBucket ? dataToSend.tanggalBucket.trim() : null,
+                tanggal_insp: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
+                bucket: getLatestSingleDate(dataToSend.tanggalBucket) || null,
                 approved_by: dataToSend.approvedByLeader || '',
                 evidence_url: evidenceUrl,
                 status: dataToSend.status || 'Done',
@@ -3152,8 +3130,8 @@ window.loadInspectionResults = async function () {
                 sessionId: row.session_id,
                 timestamp: row.timestamp || row.created_at,
                 tanggalIncoming: row.date || '',
-                tanggalInspection: row.tanggal_insp || row.date || '',
-                tanggalBucket: row.bucket || '',
+                tanggalInspection: getLatestSingleDate(row.tanggal_insp || row.date),
+                tanggalBucket: getLatestSingleDate(row.bucket),
                 materialType: row.material_type || '',
                 auditor: row.user_login || '',
                 vendor: row.vendor || '',
@@ -3637,15 +3615,18 @@ window.continueInProgressSession = function (sessionId) {
     }
 
     const tinEl = document.getElementById('tanggal-incoming');
-    if (tinEl && session.tanggalIncoming) tinEl.value = session.tanggalIncoming;
+    if (tinEl && session.tanggalIncoming) tinEl.value = getLatestSingleDate(session.tanggalIncoming);
+    const cleanInspDate = getLatestSingleDate(session.tanggalInspection);
     const tinsEl = document.getElementById('tanggal-inspection');
-    if (tinsEl && session.tanggalInspection) tinsEl.value = session.tanggalInspection;
-    if (session.tanggalInspection) {
-        window.setInspectionDates(session.tanggalInspection);
+    if (tinsEl) tinsEl.value = cleanInspDate;
+    if (cleanInspDate) {
+        window.setInspectionDates(cleanInspDate);
     }
-    const bVal = session.tanggalBucket || session.bucket || '';
-    if (bVal) {
-        window.setBucketDates(bVal);
+    const cleanBucketDate = getLatestSingleDate(session.tanggalBucket || session.bucket);
+    const tBuckEl = document.getElementById('tanggal-bucket');
+    if (tBuckEl) tBuckEl.value = cleanBucketDate;
+    if (cleanBucketDate) {
+        window.setBucketDates(cleanBucketDate);
     }
     const styleEl = document.getElementById('style-number');
     if (styleEl && session.styleNumber) styleEl.value = session.styleNumber;

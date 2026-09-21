@@ -1679,13 +1679,26 @@ window.exportSubcontInspectionLog = function() {
 
     const wb = XLSX.utils.book_new();
 
+    const cleanDateVal = (val) => {
+        if (!val) return '';
+        const str = String(val).trim();
+        if (str.includes(',')) {
+            const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+            return parts.pop() || '';
+        }
+        if (str.includes('T')) {
+            return str.substring(0, 10);
+        }
+        return str.substring(0, 10);
+    };
+
     // Sheet 1: Inspection_Sessions
     const sRows = (currentSubcontLogSessions || []).map(s => {
         const isVend = (s.inspection_location || '').toLowerCase().includes('vendor');
         return {
             'SessionID':           s.session_id || '',
-            'timeStamp':           s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
-            'Date':                s.date || '',
+            'Timestamp Input':     s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
+            'Tanggal Incoming':    cleanDateVal(s.date),
             'Material Type':       s.material_type || '',
             'Inspection Location': isVend ? 'In-Vendor Inspection' : 'In-House Inspection',
             'User Login':          s.user_login || '',
@@ -1699,8 +1712,8 @@ window.exportSubcontInspectionLog = function() {
             'Qty Pass':            Number(s.qty_pass) || 0,
             'Qty Defect':          Number(s.qty_defect) || 0,
             'FTT (%)':             s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
-            'TanggalInsp':         s.tanggal_insp || '',
-            'Bucket':              s.bucket || '',
+            'Tanggal Inspeksi':    cleanDateVal(s.tanggal_insp),
+            'Tanggal Bucket':      cleanDateVal(s.bucket),
             'ApprovedBy':          s.approved_by || '',
             'EvidenceUrl':         s.evidence_url || '',
             'Status':              s.status || 'Done',
@@ -1714,14 +1727,14 @@ window.exportSubcontInspectionLog = function() {
     const dRows = (currentSubcontLogDefects || []).map(d => {
         const sess = sessionMap.get(d.session_id);
         return {
-            'SessionId':     d.session_id || '',
-            'Date':          d.date || '',
-            'Vendor':        d.vendor || '',
-            'Model':         d.model || (sess ? sess.model : '') || '',
-            'Style Number':  d.style_number || (sess ? sess.style_number : '') || '',
-            'Component':     d.component || '',
-            'Issue Finding': d.issue_finding || '',
-            'Count':         Number(d.count) || 0,
+            'SessionId':        d.session_id || '',
+            'Tanggal Inspeksi': cleanDateVal(d.date),
+            'Vendor':           d.vendor || '',
+            'Model':            d.model || (sess ? sess.model : '') || '',
+            'Style Number':     d.style_number || (sess ? sess.style_number : '') || '',
+            'Component':        d.component || '',
+            'Issue Finding':    d.issue_finding || '',
+            'Count':            Number(d.count) || 0,
         };
     });
     const ws2 = XLSX.utils.json_to_sheet(dRows);

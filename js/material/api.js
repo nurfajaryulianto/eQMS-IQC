@@ -1804,11 +1804,24 @@ export function exportSubcontLogToMultiSheetExcel(sessions, defects, filenamePre
 
     const wb = XLSX.utils.book_new();
 
+    const cleanDateVal = (val) => {
+        if (!val) return '';
+        const str = String(val).trim();
+        if (str.includes(',')) {
+            const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+            return parts.pop() || '';
+        }
+        if (str.includes('T')) {
+            return str.substring(0, 10);
+        }
+        return str.substring(0, 10);
+    };
+
     // ── Sheet 1: Inspection Sessions ──
     const sessionRows = (sessions || []).map(s => ({
         'SessionID':           s.session_id || '',
-        'timeStamp':           s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
-        'Date':                s.date || '',
+        'Timestamp Input':     s.timestamp ? String(s.timestamp).replace('T', ' ').substring(0, 19) : '',
+        'Tanggal Incoming':    cleanDateVal(s.date),
         'Material Type':       s.material_type || '',
         'Inspection Location': (s.inspection_location || '').toLowerCase().includes('vendor') ? 'In-Vendor Inspection' : 'In-House Inspection',
         'User Login':          s.user_login || '',
@@ -1822,8 +1835,8 @@ export function exportSubcontLogToMultiSheetExcel(sessions, defects, filenamePre
         'Qty Pass':            Number(s.qty_pass) || 0,
         'Qty Defect':          Number(s.qty_defect) || 0,
         'FTT (%)':             s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
-        'TanggalInsp':         s.tanggal_insp || '',
-        'Bucket':              s.bucket || '',
+        'Tanggal Inspeksi':    cleanDateVal(s.tanggal_insp),
+        'Tanggal Bucket':      cleanDateVal(s.bucket),
         'ApprovedBy':          s.approved_by || '',
         'EvidenceUrl':         s.evidence_url || '',
         'Status':              s.status || 'Done',
@@ -1834,12 +1847,12 @@ export function exportSubcontLogToMultiSheetExcel(sessions, defects, filenamePre
 
     // ── Sheet 2: Defect Breakdown ──
     const defectRows = (defects || []).map(d => ({
-        'SessionId':     d.session_id || '',
-        'Date':          d.date || '',
-        'Vendor':        d.vendor || '',
-        'Component':     d.component || '',
-        'Issue Finding': d.issue_finding || '',
-        'Count':         Number(d.count) || 0,
+        'SessionId':        d.session_id || '',
+        'Tanggal Inspeksi': cleanDateVal(d.date),
+        'Vendor':           d.vendor || '',
+        'Component':        d.component || '',
+        'Issue Finding':    d.issue_finding || '',
+        'Count':            Number(d.count) || 0,
     }));
 
     const ws2 = XLSX.utils.json_to_sheet(defectRows);
