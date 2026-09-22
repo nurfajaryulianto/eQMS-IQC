@@ -113,29 +113,78 @@ export async function apiGetMasterData({
     // Fallback: jika ada master data yang material_inspections-nya kosong, cari berdasarkan po_number
     const unlinkedMaster = masterRows.filter(m => !m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0));
     if (unlinkedMaster.length > 0) {
-        const poList = [...new Set(unlinkedMaster.map(m => m.po_number).filter(Boolean))];
+        // Collect single POs and also decompose comma-separated POs
+        const rawPoList = unlinkedMaster.map(m => m.po_number).filter(Boolean);
+        const decomposedPoSet = new Set();
+        rawPoList.forEach(poStr => {
+            String(poStr).split(/[\s,]+/).forEach(p => {
+                const clean = p.trim();
+                if (clean) decomposedPoSet.add(clean);
+            });
+        });
+        const poList = [...decomposedPoSet];
+
         if (poList.length > 0) {
             try {
-                const { data: inspList } = await supabase
-                    .from('material_inspections')
-                    .select('*')
-                    .in('po_no', poList);
-                if (inspList && inspList.length > 0) {
+                // Chunk poList into batches of 100 to prevent HTTP 414 URI Too Long
+                const batchSize = 100;
+                const inspList = [];
+                for (let i = 0; i < poList.length; i += batchSize) {
+                    const chunk = poList.slice(i, i + batchSize);
+                    const { data: batch, error: batchErr } = await supabase
+                        .from('material_inspections')
+                        .select('*')
+                        .in('po_no', chunk);
+                    if (!batchErr && Array.isArray(batch)) {
+                        inspList.push(...batch);
+                    }
+                }
+
+                if (inspList.length > 0) {
                     const inspMapByMdId = {};
+                    const inspMapByPo = {};
                     const inspMapByPoMat = {};
                     inspList.forEach(insp => {
                         if (insp.master_data_id) {
                             if (!inspMapByMdId[insp.master_data_id]) inspMapByMdId[insp.master_data_id] = [];
                             inspMapByMdId[insp.master_data_id].push(insp);
                         }
-                        const poKey = `${(insp.po_no || '').trim().toLowerCase()}_${(insp.material_name || '').trim().toLowerCase()}`;
-                        if (!inspMapByPoMat[poKey]) inspMapByPoMat[poKey] = [];
-                        inspMapByPoMat[poKey].push(insp);
+                        const rawPo = String(insp.po_no || insp.po_number || '').trim().toLowerCase();
+                        if (rawPo) {
+                            if (!inspMapByPo[rawPo]) inspMapByPo[rawPo] = [];
+                            inspMapByPo[rawPo].push(insp);
+                        }
+                        const poMatKey = `${rawPo}_${(insp.material_name || '').trim().toLowerCase()}`;
+                        if (!inspMapByPoMat[poMatKey]) inspMapByPoMat[poMatKey] = [];
+                        inspMapByPoMat[poMatKey].push(insp);
                     });
+
                     masterRows.forEach(m => {
                         if (!m.material_inspections || (Array.isArray(m.material_inspections) && m.material_inspections.length === 0)) {
-                            const poKey = `${(m.po_number || '').trim().toLowerCase()}_${(m.material_name || '').trim().toLowerCase()}`;
-                            const found = (m.id && inspMapByMdId[m.id]) || (poKey !== '_' ? inspMapByPoMat[poKey] : null);
+                            let found = (m.id && inspMapByMdId[m.id]) || [];
+                            if (found.length === 0) {
+                                const poKey = String(m.po_number || '').trim().toLowerCase();
+                                const matKey = String(m.material_name || '').trim().toLowerCase();
+                                const exactKey = `${poKey}_${matKey}`;
+                                if (inspMapByPoMat[exactKey]) {
+                                    found = inspMapByPoMat[exactKey];
+                                } else if (inspMapByPo[poKey]) {
+                                    found = inspMapByPo[poKey];
+                                } else {
+                                    // Handle comma-separated PO numbers
+                                    const subPos = poKey.split(/[\s,]+/).map(p => p.trim()).filter(Boolean);
+                                    const matched = [];
+                                    subPos.forEach(sp => {
+                                        if (inspMapByPo[sp]) matched.push(...inspMapByPo[sp]);
+                                    });
+                                    const seen = new Set();
+                                    found = matched.filter(x => {
+                                        if (seen.has(x.id)) return false;
+                                        seen.add(x.id);
+                                        return true;
+                                    });
+                                }
+                            }
                             if (found && found.length > 0) {
                                 m.material_inspections = found;
                             }
@@ -1420,6 +1469,7 @@ function normalizeRow(row) {
         receive_number:       row.receive_number || '',
         uploaded_by:          row.uploaded_by || '',
         created_at:           row.created_at || '',
+        material_inspections: inspections,
     };
 }
 

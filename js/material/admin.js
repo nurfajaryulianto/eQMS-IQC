@@ -4,7 +4,7 @@
 
 import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES, supabase, nikToEmail } from './auth.js';
 import { showAlert } from '../dialog.js';
-import './inspection-log.js';
+import './inspection-log.js?v=20260922_expand1';
 import {
     apiGetMasterData, apiUpdateMasterData, apiDeleteMasterData, apiBulkUpsertMasterData,
     apiPassAll, apiGetInspectionData,
@@ -12,7 +12,7 @@ import {
     apiGetUsers, apiSaveUser, apiDeleteUser,
     apiSubmitClaim, apiGetClaims,
     getCurrentUserMeta, apiReleaseMaterialToProduction
-} from './api.js?v=20260921c';
+} from './api.js?v=20260922_expand1';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allMasterData = [];
@@ -278,12 +278,13 @@ window.renderMasterTable = function () {
             : '';
         const vendorName = (d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : (d.supplier || d.vendor_name || '—');
 
-        const expandBtn = insps.length > 0
-            ? `<button type="button" onclick="window.toggleMasterRowExpand('${rowKey}')" title="${isExpanded ? 'Tutup riwayat inspeksi' : `Buka ${insps.length} riwayat log inspeksi`}"
-                style="padding:3px 6px;border-radius:6px;background:${isExpanded ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'};border:1px solid ${isExpanded ? 'rgba(16,185,129,0.45)' : 'rgba(255,255,255,0.12)'};color:${isExpanded ? '#34d399' : 'rgba(255,255,255,0.75)'};cursor:pointer;display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;transition:all 0.15s;"
-                onmouseover="this.style.borderColor='#34d399';this.style.color='#34d399'" onmouseout="if(!${isExpanded}){this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.75)'}">
+        const canExpand = insps.length > 0 || d.status === 'done' || hasInspection;
+        const expandBtn = canExpand
+            ? `<button type="button" onclick="window.toggleMasterRowExpand('${rowKey}')" title="${isExpanded ? 'Tutup riwayat inspeksi' : (insps.length > 0 ? `Buka ${insps.length} log inspeksi` : 'Buka detail inspeksi')}"
+                style="padding:3px 7px;border-radius:6px;background:${isExpanded ? 'rgba(16,185,129,0.25)' : 'rgba(16,185,129,0.1)'};border:1px solid ${isExpanded ? 'rgba(16,185,129,0.5)' : 'rgba(16,185,129,0.25)'};color:#34d399;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;transition:all 0.15s;"
+                onmouseover="this.style.background='rgba(16,185,129,0.3)';this.style.borderColor='#34d399'" onmouseout="if(!${isExpanded}){this.style.background='rgba(16,185,129,0.1)';this.style.borderColor='rgba(16,185,129,0.25)'}">
                 <span class="material-symbols-outlined" style="font-size:14px;transition:transform 0.2s;transform:${isExpanded ? 'rotate(90deg)' : 'none'};">chevron_right</span>
-                <span>${insps.length}</span>
+                <span>${insps.length > 0 ? insps.length : 'Log'}</span>
                </button>`
             : `<span style="color:rgba(255,255,255,0.18);font-size:11px;" title="Belum ada riwayat inspeksi">—</span>`;
 
@@ -301,7 +302,7 @@ window.renderMasterTable = function () {
             </td>
         </tr>`;
 
-        if (!isExpanded || insps.length === 0) {
+        if (!isExpanded) {
             return mainRow;
         }
 
@@ -369,6 +370,32 @@ function renderMasterPagination(totalPages, totalRows, startRow, endRow) {
 }
 
 function renderMasterInspectionDetailRow(d, insps) {
+    if (!insps || insps.length === 0) {
+        return `
+        <tr class="master-expand-row" style="background:rgba(10,25,18,0.55);border-bottom:1px solid rgba(255,255,255,0.08);">
+            <td colspan="9" style="padding:12px 18px;">
+                <div style="background:rgba(15,28,46,0.65);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="width:32px;height:32px;border-radius:8px;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;color:#34d399;">
+                            <span class="material-symbols-outlined" style="font-size:20px;">verified</span>
+                        </div>
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#fff;">PO: <span style="color:#34d399;">${esc(d.po_number)}</span> — ${esc(d.material_name)}</div>
+                            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">
+                                Status Material: <strong style="color:#34d399;">${esc((d.status || 'Done').toUpperCase())}</strong>
+                                ${d.released_by ? ` | Siap Kirim oleh: <strong style="color:#fff;">${esc(d.released_by)}</strong>` : ''}
+                                ${d.release_notes ? ` | Catatan: <em>${esc(d.release_notes)}</em>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.45);text-align:right;">
+                        Diproses secara sistem (Pass All / Rilis Langsung)<br>Belum ada form inspeksi defect manual.
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+    }
+
     const totalInspected = insps.reduce((acc, cur) => acc + (Number(cur.ok || 0) + Number(cur.no_qty || 0)), 0);
     const totalOK = insps.reduce((acc, cur) => acc + Number(cur.ok || 0), 0);
     const totalFail = insps.reduce((acc, cur) => acc + Number(cur.no_qty || 0), 0);
