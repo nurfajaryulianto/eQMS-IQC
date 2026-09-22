@@ -73,6 +73,8 @@ function setupLogout() {
 // ─── MASTER DATA TAB & PAGINATION ───────────────────────────
 let masterCurrentPage = 1;
 let masterPageSize = 25;
+let expandedMasterRowIds = new Set();
+let adminUserMap = {};
 
 window.setMasterPage = function (page) {
     masterCurrentPage = page;
@@ -85,11 +87,35 @@ window.setMasterPageSize = function (size) {
     renderMasterTable();
 };
 
+window.toggleMasterRowExpand = function (rowId) {
+    const key = String(rowId);
+    if (expandedMasterRowIds.has(key)) {
+        expandedMasterRowIds.delete(key);
+    } else {
+        expandedMasterRowIds.add(key);
+    }
+    renderMasterTable();
+};
+
 window.loadMasterData = async function () {
     const tbody = document.getElementById('master-tbody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data...</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">Memuat data...</td></tr>`;
 
     try {
+        if (Object.keys(adminUserMap).length === 0) {
+            try {
+                const uRes = await apiGetUsers();
+                const users = uRes.data || [];
+                users.forEach(u => {
+                    const nik = (u.nik || '').trim();
+                    const name = (u.display_name || u.name || u.nik || '').trim();
+                    if (nik) adminUserMap[nik] = name;
+                });
+            } catch (e) {
+                console.warn('Could not load users for inspector lookup:', e);
+            }
+        }
+
         if (MATERIAL_TEST_MODE) {
             allMasterData = MOCK_MASTER_DATA;
         } else {
@@ -102,7 +128,7 @@ window.loadMasterData = async function () {
     } catch (err) {
         console.error(err);
         showToast('Gagal memuat data: ' + err.message, 'error');
-        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:40px;text-align:center;color:#dc2626;font-size:13px;">Gagal memuat data.</td></tr>`;
     }
 };
 
@@ -227,6 +253,10 @@ window.renderMasterTable = function () {
     const pageItems = filtered.slice(startIdx, endIdx);
 
     tbody.innerHTML = pageItems.map(d => {
+        const rowKey = String(d.id || d.row_idx);
+        const insps = Array.isArray(d.material_inspections) ? d.material_inspections : [];
+        const isExpanded = expandedMasterRowIds.has(rowKey);
+
         let badge;
         if (d.status === 'done') {
             badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-done">Done</span>`;
@@ -235,19 +265,30 @@ window.renderMasterTable = function () {
         } else {
             badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-pending">Pending</span>`;
         }
-        const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0;
+        const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0 || insps.length > 0;
         const claimBtn = hasInspection
             ? `<button onclick="window.openClaimModal(${d.row_idx || d.id})" title="Ajukan Klaim" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>flag</span>Klaim</button>`
             : `<span style='color:rgba(255,255,255,0.2);font-size:11px;'>—</span>`;
         const releaseAdminBtn = d.status !== 'done'
             ? `<button onclick="window.adminReleaseMasterRow('${d.id}','${esc(d.po_number)}','${esc(d.material_name)}')" title="Rilis ke Produksi (Ready to Deliver by Admin)" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;" onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'"><span class='material-symbols-outlined' style='font-size:13px;'>local_shipping</span>Rilis</button>`
             : `<span title="Dirilis oleh: ${esc(d.released_by || 'Admin')}&#10;Catatan: ${esc(d.release_notes || '—')}" style="color:#34d399;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:2px;cursor:help;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:14px;'>verified</span>Siap Kirim</span>`;
-        const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
+        const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit Master PO" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>edit</span></button>`;
         const deleteBtn = d.status === 'pending'
-            ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
+            ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus Master PO" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;white-space:nowrap;"><span class='material-symbols-outlined' style='font-size:13px;'>delete</span></button>`
             : '';
         const vendorName = (d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : (d.supplier || d.vendor_name || '—');
-        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s;">
+
+        const expandBtn = insps.length > 0
+            ? `<button type="button" onclick="window.toggleMasterRowExpand('${rowKey}')" title="${isExpanded ? 'Tutup riwayat inspeksi' : `Buka ${insps.length} riwayat log inspeksi`}"
+                style="padding:3px 6px;border-radius:6px;background:${isExpanded ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)'};border:1px solid ${isExpanded ? 'rgba(16,185,129,0.45)' : 'rgba(255,255,255,0.12)'};color:${isExpanded ? '#34d399' : 'rgba(255,255,255,0.75)'};cursor:pointer;display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;transition:all 0.15s;"
+                onmouseover="this.style.borderColor='#34d399';this.style.color='#34d399'" onmouseout="if(!${isExpanded}){this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.75)'}">
+                <span class="material-symbols-outlined" style="font-size:14px;transition:transform 0.2s;transform:${isExpanded ? 'rotate(90deg)' : 'none'};">chevron_right</span>
+                <span>${insps.length}</span>
+               </button>`
+            : `<span style="color:rgba(255,255,255,0.18);font-size:11px;" title="Belum ada riwayat inspeksi">—</span>`;
+
+        let mainRow = `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s; ${isExpanded ? 'background:rgba(16,185,129,0.04);' : ''}">
+            <td style="padding:10px 4px;text-align:center;white-space:nowrap;">${expandBtn}</td>
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 12px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
             <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 12px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
             <td class="truncate" title="${esc(vendorName)}" style="padding:10px 12px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(vendorName)}</td>
@@ -259,6 +300,12 @@ window.renderMasterTable = function () {
                 <div style="display:flex;gap:4px;justify-content:center;align-items:center;white-space:nowrap;">${releaseAdminBtn}${editBtn}${deleteBtn}</div>
             </td>
         </tr>`;
+
+        if (!isExpanded || insps.length === 0) {
+            return mainRow;
+        }
+
+        return mainRow + renderMasterInspectionDetailRow(d, insps);
     }).join('');
 
     renderMasterPagination(totalPages, filtered.length, startIdx + 1, endIdx);
@@ -319,6 +366,173 @@ function renderMasterPagination(totalPages, totalRows, startRow, endRow) {
             </div>
         </div>
     `;
+}
+
+function renderMasterInspectionDetailRow(d, insps) {
+    const totalInspected = insps.reduce((acc, cur) => acc + (Number(cur.ok || 0) + Number(cur.no_qty || 0)), 0);
+    const totalOK = insps.reduce((acc, cur) => acc + Number(cur.ok || 0), 0);
+    const totalFail = insps.reduce((acc, cur) => acc + Number(cur.no_qty || 0), 0);
+    const overallRate = totalInspected > 0 ? ((totalOK / totalInspected) * 100).toFixed(1) + '%' : '100%';
+
+    const subRowsHtml = insps.map((insp) => {
+        const rawDate = insp.inspection_date || insp.created_at || '';
+        let dateFmt = '—';
+        if (rawDate) {
+            const dt = new Date(rawDate);
+            if (!isNaN(dt.getTime())) {
+                dateFmt = dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+                          dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            } else {
+                dateFmt = String(rawDate).slice(0, 16).replace('T', ' ');
+            }
+        }
+
+        const ok = Number(insp.ok) || 0;
+        const noQty = Number(insp.no_qty) || 0;
+        const total = ok + noQty;
+        const rate = total > 0 ? ((ok / total) * 100).toFixed(0) + '%' : '—';
+
+        // Type badge
+        const rawType = (insp.inspection_type || '').trim();
+        const upper = rawType.toUpperCase();
+        let c = '#94a3b8';
+        let label = rawType || 'General';
+        if (upper.includes('RAW')) { c = '#10b981'; label = 'Raw Material'; }
+        else if (upper.includes('ROLLING')) { c = '#06b6d4'; label = 'Rolling Inspection'; }
+        else if (upper.includes('LAMINAT') || upper.includes('LAM')) { c = '#f59e0b'; label = 'Laminating'; }
+        else if (upper.includes('BONDING')) { c = '#f43f5e'; label = 'Bonding Test'; }
+        else if (upper.includes('LEATHER')) { c = '#10b981'; }
+        else if (upper.includes('TEXTILE')) { c = '#a78bfa'; }
+        else if (upper.includes('SYNTHETIC')) { c = '#f59e0b'; }
+        else if (upper.includes('RUBBER')) { c = '#f87171'; }
+        const typeBadge = `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:${c}22;color:${c};border:1px solid ${c}44;white-space:nowrap;">${esc(label)}</span>`;
+
+        // Inspector / Pass all
+        const rawNik = (insp.inspector_nik || '').trim();
+        const resolvedName = adminUserMap[rawNik] || insp.inspector_name || rawNik || '—';
+        let passAllBadge = '';
+        if (insp.executed_by || insp.input_type === 'batch_pass_all') {
+            const execName = insp.executed_by || 'Admin';
+            passAllBadge = `<span style="display:inline-flex;align-items:center;gap:2px;font-size:9px;color:#c084fc;font-weight:600;margin-left:4px;" title="Pass All Bypass by ${esc(execName)}"><span class="material-symbols-outlined" style="font-size:11px;">verified_user</span>Pass All</span>`;
+        }
+
+        // Status badge
+        const st = (insp.status || 'done').toLowerCase();
+        let stColor = '#34d399';
+        let stLabel = 'PASSED';
+        if (st === 'fail' || st === 'failed' || noQty > 0) {
+            stColor = '#f87171';
+            stLabel = 'REJECT/DEFECT';
+        } else if (st === 'in-progress' || st === 'pending') {
+            stColor = '#fbbf24';
+            stLabel = 'IN PROGRESS';
+        }
+
+        // Berkas (Files)
+        const fileIcons = [];
+        if (insp.bonding_test_url) {
+            fileIcons.push(`<a href="${insp.bonding_test_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;text-decoration:none;transition:all 0.15s;"
+                title="Buka File Bonding Test di Google Drive">
+                <span class="material-symbols-outlined" style="font-size:14px;">science</span>
+            </a>`);
+        }
+        if (insp.evidence_url && insp.evidence_url !== insp.bonding_test_url) {
+            fileIcons.push(`<a href="${insp.evidence_url}" target="_blank" rel="noopener noreferrer"
+                style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#34d399;text-decoration:none;transition:all 0.15s;"
+                title="Buka Foto Bukti Kerusakan di Google Drive">
+                <span class="material-symbols-outlined" style="font-size:14px;">image</span>
+            </a>`);
+        }
+        const filesHtml = fileIcons.length > 0
+            ? `<div style="display:inline-flex;gap:4px;align-items:center;">${fileIcons.join('')}</div>`
+            : `<span style="color:rgba(255,255,255,0.25);font-size:11px;">—</span>`;
+
+        // Defect notes
+        const defectNotes = (insp.defect_notes && insp.defect_notes.trim() !== '')
+            ? esc(insp.defect_notes)
+            : `<span style="color:rgba(255,255,255,0.25);font-style:italic;">—</span>`;
+
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);">
+            <td style="padding:8px 10px;color:rgba(255,255,255,0.7);font-size:11px;white-space:nowrap;">${dateFmt}</td>
+            <td style="padding:8px 10px;">${typeBadge}</td>
+            <td style="padding:8px 10px;color:#fff;font-size:11px;">
+                <span style="font-weight:600;">${esc(resolvedName)}</span>${passAllBadge}
+            </td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700;color:#34d399;font-size:11px;">${ok.toLocaleString('id-ID')}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700;color:${noQty > 0 ? '#f87171' : 'rgba(255,255,255,0.3)'};font-size:11px;">${noQty.toLocaleString('id-ID')}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600;color:#94a3b8;font-size:11px;">${rate}</td>
+            <td style="padding:8px 10px;text-align:center;">
+                <span style="font-size:10px;font-weight:700;color:${stColor};padding:2px 6px;border-radius:4px;background:${stColor}15;border:1px solid ${stColor}33;">${stLabel}</span>
+            </td>
+            <td style="padding:8px 10px;color:rgba(255,255,255,0.8);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(insp.defect_notes || '')}">
+                ${defectNotes}
+            </td>
+            <td style="padding:8px 10px;text-align:center;">${filesHtml}</td>
+            <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
+                <div style="display:inline-flex;gap:4px;align-items:center;">
+                    <button type="button" onclick="window.editInspectionRow(${insp.id})" title="Edit Data Inspeksi"
+                        style="background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.35);color:#60a5fa;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.15s;"
+                        onmouseover="this.style.background='rgba(59,130,246,0.3)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
+                        <span class="material-symbols-outlined" style="font-size:13px;">edit</span>
+                    </button>
+                    <button type="button" onclick="window.deleteInspectionRow(${insp.id}, '${esc(d.po_number || '')}')" title="Hapus Data Inspeksi"
+                        style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.15s;"
+                        onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'">
+                        <span class="material-symbols-outlined" style="font-size:13px;">delete</span>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    return `
+    <tr class="master-expand-row" style="background:rgba(10,25,18,0.55);border-bottom:1px solid rgba(255,255,255,0.08);">
+        <td colspan="9" style="padding:10px 16px 14px;">
+            <div style="background:rgba(15,28,46,0.65);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:12px 16px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="width:24px;height:24px;border-radius:6px;background:rgba(16,185,129,0.2);display:flex;align-items:center;justify-content:center;color:#34d399;">
+                            <span class="material-symbols-outlined" style="font-size:15px;">fact_check</span>
+                        </div>
+                        <div>
+                            <span style="font-size:12px;font-weight:700;color:#fff;">Riwayat Inspeksi PO: </span>
+                            <strong style="color:#34d399;font-size:12px;">${esc(d.po_number)}</strong>
+                            <span style="font-size:11px;color:rgba(255,255,255,0.5);margin-left:6px;">(${esc(d.material_name)})</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;font-size:11px;color:rgba(255,255,255,0.6);">
+                        <span>Total Cek: <strong style="color:#fff;">${totalInspected.toLocaleString('id-ID')}</strong> ${esc(d.uom)}</span>
+                        <span>Total OK: <strong style="color:#34d399;">${totalOK.toLocaleString('id-ID')}</strong></span>
+                        <span>Total Fail: <strong style="${totalFail > 0 ? 'color:#f87171;' : 'color:rgba(255,255,255,0.4);'}">${totalFail.toLocaleString('id-ID')}</strong></span>
+                        <span>Overall Pass Rate: <strong style="color:#60a5fa;">${overallRate}</strong></span>
+                    </div>
+                </div>
+
+                <div class="thin-scroll" style="overflow-x:auto;">
+                    <table style="width:100%;min-width:850px;border-collapse:collapse;font-size:11px;">
+                        <thead>
+                            <tr style="color:rgba(255,255,255,0.45);font-size:10px;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid rgba(255,255,255,0.06);">
+                                <th style="padding:6px 10px;text-align:left;">Tgl Inspeksi</th>
+                                <th style="padding:6px 10px;text-align:left;">Jenis Inspeksi</th>
+                                <th style="padding:6px 10px;text-align:left;">Inspector</th>
+                                <th style="padding:6px 10px;text-align:right;">Qty OK</th>
+                                <th style="padding:6px 10px;text-align:right;">Qty Fail</th>
+                                <th style="padding:6px 10px;text-align:right;">Pass Rate</th>
+                                <th style="padding:6px 10px;text-align:center;">Status</th>
+                                <th style="padding:6px 10px;text-align:left;">Catatan Defect</th>
+                                <th style="padding:6px 10px;text-align:center;">Berkas</th>
+                                <th style="padding:6px 10px;text-align:center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${subRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </td>
+    </tr>`;
 }
 
 // ─── MASTER DATA EDIT & DELETE ACTIONS ────────────────────────

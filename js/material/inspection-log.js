@@ -426,7 +426,18 @@ function esc(str) {
 
 // ─── EDIT & DELETE INSPECTION ACTIONS ─────────────────────────
 window.editInspectionRow = function(id) {
-    const item = (allInspectionLog || []).find(x => x.id === id);
+    let item = (allInspectionLog || []).find(x => x.id === id);
+    if (!item && Array.isArray(window.__allMasterData)) {
+        for (const m of window.__allMasterData) {
+            if (Array.isArray(m.material_inspections)) {
+                const found = m.material_inspections.find(x => x.id === id);
+                if (found) {
+                    item = found;
+                    break;
+                }
+            }
+        }
+    }
     if (!item) {
         alert('Data inspeksi tidak ditemukan.');
         return;
@@ -490,6 +501,9 @@ window.saveEditInspection = async function(e) {
         alert('Data inspeksi berhasil diperbarui!');
         window.closeEditInspectionModal();
         await loadInspectionLog(false);
+        if (typeof window.loadMasterData === 'function') {
+            await window.loadMasterData();
+        }
     } catch (err) {
         console.error(err);
         alert('Gagal memperbarui data inspeksi: ' + err.message);
@@ -505,6 +519,9 @@ window.deleteInspectionRow = async function(id, poNo) {
         await apiDeleteInspection(id);
         alert('Data inspeksi berhasil dihapus!');
         await loadInspectionLog(false);
+        if (typeof window.loadMasterData === 'function') {
+            await window.loadMasterData();
+        }
     } catch (err) {
         console.error(err);
         alert('Gagal menghapus data inspeksi: ' + err.message);

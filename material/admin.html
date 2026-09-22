@@ -398,7 +398,7 @@
             style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);padding:4px;border-radius:12px;margin-bottom:20px;width:fit-content;backdrop-filter:blur(8px);">
             <button class="tab-btn active" id="tab-master" onclick="switchTab('master')">
                 <span class="material-symbols-outlined" style="font-size:16px;">table_view</span>
-                Master Data
+                Master Data & Inspeksi
             </button>
             <button class="tab-btn" id="tab-upload" onclick="switchTab('upload')">
                 <span class="material-symbols-outlined" style="font-size:16px;">upload_file</span>
@@ -417,7 +417,7 @@
                 Leader Monitor
             </button>
 
-            <button class="tab-btn" id="tab-inspectionlog" onclick="switchTab('inspectionlog')">
+            <button class="tab-btn" id="tab-inspectionlog" onclick="switchTab('inspectionlog')" style="display:none;">
                 <span class="material-symbols-outlined" style="font-size:16px;">fact_check</span>
                 Inspection Log
             </button>
@@ -434,14 +434,19 @@
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span class="material-symbols-outlined"
                             style="font-size:18px;color:rgba(255,255,255,0.4);">table_view</span>
-                        <span style="font-size:14px;font-weight:700;color:white;">Daftar PO / Master Data</span>
+                        <span style="font-size:14px;font-weight:700;color:white;">Daftar PO & Log Inspeksi</span>
                         <span id="master-count"
                             style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05);padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,0.06);">—</span>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <button onclick="window.exportMasterDataBtn()" class="btn-secondary"
                             style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#34d399;border-color:rgba(52,211,153,0.3);">
-                            <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export Excel
+                            <span class="material-symbols-outlined" style="font-size:15px;">download</span>Export PO
+                        </button>
+                        <button onclick="window.exportInspectionLogFromMaster()" class="btn-secondary"
+                            style="display:flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;font-size:12px;color:#60a5fa;border-color:rgba(96,165,250,0.3);"
+                            title="Export semua log inspeksi ke file Excel">
+                            <span class="material-symbols-outlined" style="font-size:15px;">fact_check</span>Export Log
                         </button>
                         <button onclick="syncOrphanedStatus()" class="btn-secondary"
                             title="Reset semua baris 'Done' yang tidak memiliki data inspeksi kembali ke 'Pending'"
@@ -528,19 +533,24 @@
                 </div>
 
                 <div class="thin-scroll" style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%;min-width:1100px;table-layout:fixed;border-collapse:collapse;">
+                    <table class="data-table" style="width:100%;min-width:1150px;table-layout:fixed;border-collapse:collapse;">
                         <colgroup>
-                            <col style="width: 14%; min-width: 125px;"> <!-- PO Number -->
-                            <col style="width: 22%; min-width: 180px;"> <!-- Material -->
-                            <col style="width: 18%; min-width: 150px;"> <!-- Vendor -->
-                            <col style="width: 6%; min-width: 55px;">  <!-- UOM -->
-                            <col style="width: 8%; min-width: 75px;">  <!-- Planned Qty -->
-                            <col style="width: 12%; min-width: 115px;"> <!-- Status (Lebar cukup agar In Progress tidak terpotong) -->
-                            <col style="width: 8%; min-width: 80px;">  <!-- Klaim -->
-                            <col style="width: 12%; min-width: 120px;"> <!-- Actions -->
+                            <col style="width: 46px;">                   <!-- Expand / Collapse -->
+                            <col style="width: 13%; min-width: 120px;"> <!-- PO Number -->
+                            <col style="width: 21%; min-width: 170px;"> <!-- Material -->
+                            <col style="width: 17%; min-width: 140px;"> <!-- Vendor -->
+                            <col style="width: 5%; min-width: 50px;">   <!-- UOM -->
+                            <col style="width: 8%; min-width: 75px;">   <!-- Planned Qty -->
+                            <col style="width: 11%; min-width: 105px;"> <!-- Status -->
+                            <col style="width: 8%; min-width: 75px;">   <!-- Klaim -->
+                            <col style="width: 13%; min-width: 120px;"> <!-- Actions -->
                         </colgroup>
                         <thead>
                             <tr>
+                                <th
+                                    style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); text-align:center; padding:10px 4px;">
+                                    <span class="material-symbols-outlined" style="font-size:16px; color:rgba(255,255,255,0.4);" title="Riwayat Log Inspeksi">unfold_more</span>
+                                </th>
                                 <th
                                     style="position:sticky; top:0; z-index:10; background:rgba(15,28,46,0.95); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); white-space:nowrap;">
                                     PO Number</th>
@@ -569,7 +579,7 @@
                         </thead>
                         <tbody id="master-tbody">
                             <tr>
-                                <td colspan="7" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
+                                <td colspan="9" style="padding:48px;text-align:center;color:rgba(255,255,255,0.45);">
                                     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
                                         <svg class="animate-spin" style="width:24px;height:24px;color:#34d399;"
                                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1612,6 +1622,18 @@
         window.exportMasterDataBtn = function () {
             const data = window.__filteredMasterData || window.__allMasterData || [];
             exportMasterDataToExcel(data);
+        };
+        window.exportInspectionLogFromMaster = async function () {
+            if (typeof window.exportInspectionLog === 'function') {
+                await window.exportInspectionLog();
+            } else {
+                const mod = await import('../js/material/inspection-log.js');
+                if (typeof window.exportInspectionLog === 'function') {
+                    await window.exportInspectionLog();
+                } else if (mod && typeof mod.exportInspectionLog === 'function') {
+                    await mod.exportInspectionLog();
+                }
+            }
         };
         window.exportClaimsBtn = async function () {
             const btn = document.getElementById('claims-export-btn');
