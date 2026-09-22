@@ -255,21 +255,7 @@ function populateFilters(filters) {
     populate('vendorFilter', (filters.vendors || []).sort());
     populate('modelFilter', (filters.models || []).sort());
 
-    // Populate the table auditor filter dynamically from actual data
-    const auditorTableSelect = document.getElementById('auditorTableFilter');
-    if (auditorTableSelect) {
-        const currentVal = auditorTableSelect.value;
-        auditorTableSelect.innerHTML = '<option value="all">All Auditor</option>';
-        (filters.auditors || []).slice().sort().forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            auditorTableSelect.appendChild(opt);
-        });
-        if (currentVal && currentVal !== 'all') {
-            auditorTableSelect.value = currentVal;
-        }
-    }
+
 }
 
 function resetFilters() {
@@ -348,7 +334,7 @@ function updateDashboard() {
     updateDefectChart(filteredDefects);
     updateModelPerformanceChart(filteredInspections, modelFttSortOrder);
     updateNcvsFttChart(filteredInspections, ncvsFttSortOrder);
-    updateInspectionTable(filteredInspections);
+    
 }
 
 function updateMetrics(data) {
@@ -626,112 +612,6 @@ function updateNcvsFttChart(data, sortOrder) {
         }
     });
 }
-
-let dashTablePage = 1;
-let dashTableLimit = 25;
-
-function updateInspectionTable(data) {
-    window.__lastDashData = data;
-    const tbody = document.getElementById('inspectionTableBody');
-    const paginEl = document.getElementById('dashboard-table-pagination');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    // Direct unification: Gunakan data yang sudah difilter oleh filter global di atas
-    const sortedData = (data || []).slice().sort((a, b) => b.Timestamp.getTime() - a.Timestamp.getTime());
-    const total = sortedData.length;
-
-    if (!total) {
-        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">Tidak ada data inspeksi yang sesuai filter di atas.</td></tr>`;
-        if (paginEl) paginEl.innerHTML = '';
-        return;
-    }
-
-    const totalPages = Math.ceil(total / dashTableLimit) || 1;
-    if (dashTablePage > totalPages) dashTablePage = totalPages;
-    if (dashTablePage < 1) dashTablePage = 1;
-
-    const fromIdx = (dashTablePage - 1) * dashTableLimit;
-    const toIdx = Math.min(fromIdx + dashTableLimit, total);
-    const pageData = sortedData.slice(fromIdx, toIdx);
-
-    pageData.forEach(item => {
-        const fttPct = item.Qty_Inspect > 0 ? ((item.Pass / item.Qty_Inspect) * 100).toFixed(1) : '0.0';
-        const fttColor = parseFloat(fttPct) >= 92 ? 'text-green-600' : parseFloat(fttPct) >= 80 ? 'text-yellow-600' : 'text-red-600';
-        const materialBadge = item.MaterialType === 'upper'
-            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">Upper</span>'
-            : item.MaterialType === 'bottom'
-                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Bottom</span>'
-                : '<span class="text-slate-400">—</span>';
-        const row = document.createElement('tr');
-        row.className = 'border-b border-slate-100 hover:bg-slate-50 transition-colors';
-        row.innerHTML = `
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-500">${item.Timestamp.toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalIncoming || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.TanggalInspection || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-700">${item.Bucket || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${item.Auditor}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">${item.Vendor || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap">${materialBadge}</td>
-            <td class="px-4 py-3 text-xs text-slate-600 max-w-[140px] truncate">${item.Component || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-xs font-mono text-slate-700">${item['Style Number'] || '—'}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.QtyIncoming.toLocaleString('id-ID')}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums">${item.Qty_Inspect.toLocaleString('id-ID')}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-green-600 font-medium">${item.Pass.toLocaleString('id-ID')}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right tabular-nums text-red-500 font-medium">${item.Defect.toLocaleString('id-ID')}</td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-bold tabular-nums ${fttColor}">${fttPct}%</td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    if (paginEl) {
-        const pages = [];
-        const prevDisabled = dashTablePage <= 1;
-        pages.push(`<button onclick="window.dashTableGoPage(${dashTablePage - 1})" ${prevDisabled ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition">‹ Prev</button>`);
-
-        let startP = Math.max(1, dashTablePage - 2);
-        let endP = Math.min(totalPages, dashTablePage + 2);
-        if (dashTablePage <= 3) endP = Math.min(5, totalPages);
-        if (dashTablePage >= totalPages - 2) startP = Math.max(1, totalPages - 4);
-
-        for (let p = startP; p <= endP; p++) {
-            const active = p === dashTablePage;
-            pages.push(`<button onclick="window.dashTableGoPage(${p})" class="px-2.5 py-1 rounded border font-semibold ${active ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}">${p}</button>`);
-        }
-
-        const nextDisabled = dashTablePage >= totalPages;
-        pages.push(`<button onclick="window.dashTableGoPage(${dashTablePage + 1})" ${nextDisabled ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-slate-200 bg-white text-slate-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition">Next ›</button>`);
-
-        paginEl.innerHTML = `
-            <div class="font-medium">
-                Menampilkan <strong class="text-slate-900">${fromIdx + 1} - ${toIdx}</strong> dari <strong class="text-blue-600">${total}</strong> data
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="flex items-center gap-1.5">
-                    <span>Baris per halaman:</span>
-                    <select onchange="window.dashTableSetLimit(this.value)" class="border border-slate-200 rounded px-2 py-1 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer">
-                        <option value="10" ${dashTableLimit === 10 ? 'selected' : ''}>10</option>
-                        <option value="25" ${dashTableLimit === 25 ? 'selected' : ''}>25</option>
-                        <option value="50" ${dashTableLimit === 50 ? 'selected' : ''}>50</option>
-                        <option value="100" ${dashTableLimit === 100 ? 'selected' : ''}>100</option>
-                    </select>
-                </div>
-                <div class="flex items-center gap-1">${pages.join('')}</div>
-            </div>
-        `;
-    }
-}
-
-window.dashTableGoPage = function (p) {
-    dashTablePage = p;
-    if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
-};
-
-window.dashTableSetLimit = function (lim) {
-    dashTableLimit = parseInt(lim, 10) || 25;
-    dashTablePage = 1;
-    if (window.__lastDashData) updateInspectionTable(window.__lastDashData);
-};
 
 function parseDateString(str) {
     if (!str) return null;
