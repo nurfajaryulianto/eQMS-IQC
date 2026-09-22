@@ -1055,8 +1055,16 @@ export async function apiDeleteInspection(id) {
  * @param {string}  reason
  */
 export async function apiPassAll(rowIds, adminNik, adminName, reason = '') {
+    const cleanIds = (Array.isArray(rowIds) ? rowIds : [])
+        .map(id => Number(id))
+        .filter(id => Number.isInteger(id) && id > 0);
+
+    if (cleanIds.length === 0) {
+        return { success: true, passed_count: 0, message: '0 item diproses (tidak ada ID valid).' };
+    }
+
     const { data, error } = await supabase.rpc('fn_pass_all_materials', {
-        target_ids: rowIds,
+        target_ids: cleanIds,
         admin_nik:  adminNik,
         admin_name: adminName,
         p_reason:   reason || 'Sertifikat CoA / Lab Test Vendor Valid',

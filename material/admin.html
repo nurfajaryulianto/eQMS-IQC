@@ -416,10 +416,7 @@
                 <span class="material-symbols-outlined" style="font-size:16px;">monitoring</span>
                 Leader Monitor
             </button>
-            <button class="tab-btn" id="tab-spreadsheet" onclick="switchTab('spreadsheet')">
-                <span class="material-symbols-outlined" style="font-size:16px;">database</span>
-                DB Status
-            </button>
+
             <button class="tab-btn" id="tab-inspectionlog" onclick="switchTab('inspectionlog')">
                 <span class="material-symbols-outlined" style="font-size:16px;">fact_check</span>
                 Inspection Log
@@ -1118,27 +1115,7 @@
             </div>
         </div>
 
-        <!-- ── TAB: SPREADSHEET (DB Status) ── -->
-        <div id="panel-spreadsheet" style="display:none;">
-            <div class="card" style="max-width: 600px;">
-                <div class="card-header">
-                    <span class="material-symbols-outlined"
-                        style="font-size:18px;color:rgba(255,255,255,0.45);">database</span>
-                    <span style="font-size:14px;font-weight:700;color:white;">Supabase Database Status</span>
-                </div>
-                <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
-                    <div id="admin-spreadsheet-info" style="font-size:13px;font-weight:600;color:white;">
-                        Menghubungkan ke Supabase...
-                    </div>
-                    <div style="display:flex;gap:12px;">
-                        <a id="admin-open-spreadsheet-btn" target="_blank" href="#" class="btn-gradient"
-                            style="padding:11px 24px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;display:none;align-items:center;gap:8px;justify-content:center;">
-                            <span class="material-symbols-outlined" style="font-size:18px;">open_in_new</span>
-                            Buka Supabase Dashboard
-                        </a>
-                    </div>
-                </div>
-            </div>
+        
         </div>
 
         <!-- ── TAB: INSPECTION LOG ── -->
@@ -1619,7 +1596,7 @@
 
     <!-- SheetJS CDN for Excel parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="../js/material/admin.js?v=20260921c"></script>
+    <script type="module" src="../js/material/admin.js?v=20260922a"></script>
     <script type="module">
         import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
         import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
@@ -1668,7 +1645,7 @@
                 tab = 'leadermonitor';
             }
 
-            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'spreadsheet', 'inspectionlog', 'claims', 'assignment'].forEach(t => {
+            ['master', 'upload', 'passall', 'users', 'leadermonitor', 'inspectionlog', 'claims', 'assignment'].forEach(t => {
                 const panel = document.getElementById('panel-' + t);
                 const btn = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = t === tab ? 'block' : 'none';
@@ -1680,9 +1657,7 @@
             if (tab === 'leadermonitor' && typeof window.loadLeaderMonitorLog === 'function') {
                 window.loadLeaderMonitorLog();
             }
-            if (tab === 'spreadsheet' && typeof window.loadSpreadsheetStatus === 'function') {
-                window.loadSpreadsheetStatus();
-            }
+
             if (tab === 'inspectionlog' && typeof window.loadInspectionLogTab === 'function') {
                 window.loadInspectionLogTab();
             }

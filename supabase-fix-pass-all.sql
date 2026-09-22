@@ -17,6 +17,8 @@ ALTER TABLE public.material_master_data ADD COLUMN IF NOT EXISTS release_notes T
 -- TAMBAH KOLOM TRACEABILITY DUAL-ACTOR PADA material_inspections
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS executed_by VARCHAR(255);
 ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS pass_reason TEXT;
+ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS supplier_name TEXT;
+ALTER TABLE public.material_inspections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- 2. HAPUS FUNGSI OVERLOAD LAMA fn_pass_all_materials YANG ERROR
 DROP FUNCTION IF EXISTS public.fn_pass_all_materials(bigint[], text, text);

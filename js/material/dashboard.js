@@ -192,21 +192,26 @@ window.setPeriod = function (period) {
 // ─── KPI CARDS ────────────────────────────────────────────────
 
 function updateKPICards() {
-    const totalInspect = filteredData.reduce((s, d) => s + d.qty_inspect, 0);
-    const totalFail = filteredData.reduce((s, d) => s + d.qty_fail, 0);
+    const totalInspect = filteredData.reduce((s, d) => s + (Number(d.qty_inspect) || 0), 0);
+    const totalFail = filteredData.reduce((s, d) => s + (Number(d.qty_fail) || 0), 0);
     const totalPass = totalInspect - totalFail;
 
     const ftt = totalInspect > 0 ? (totalPass / totalInspect) * 100 : 0;
     const rejectRate = totalInspect > 0 ? (totalFail / totalInspect) * 100 : 0;
-    const dpmo = totalInspect > 0 ? (totalFail / totalInspect) * 1_000_000 : 0;
+
+    const totalPoInspected = filteredData.length;
+    const passPoCount = filteredData.filter(d => (Number(d.qty_fail) || 0) === 0).length;
+    const failPoCount = totalPoInspected - passPoCount;
 
     const fttColor = ftt >= 95 ? '#16a34a' : ftt >= 85 ? '#d97706' : '#dc2626';
     const rejectColor = rejectRate <= 2 ? '#16a34a' : rejectRate <= 5 ? '#d97706' : '#dc2626';
 
-    setKPI('kpi-ftt', `${ftt.toFixed(1)}%`, `${filteredData.length} sesi inspeksi`, fttColor);
-    setKPI('kpi-reject', `${rejectRate.toFixed(2)}%`, `${totalFail.toLocaleString()} unit fail`, rejectColor);
-    setKPI('kpi-dpmo', Math.round(dpmo).toLocaleString(), `Dari ${totalInspect.toLocaleString()} unit diperiksa`, null);
-    setKPI('kpi-qty', totalInspect.toLocaleString(), `Pass: ${totalPass.toLocaleString()} | Fail: ${totalFail.toLocaleString()}`, null);
+    setKPI('kpi-ftt', `${ftt.toFixed(1)}%`, `${totalPoInspected.toLocaleString('id-ID')} baris PO`, fttColor);
+    setKPI('kpi-reject', `${rejectRate.toFixed(2)}%`, `${totalFail.toLocaleString('id-ID')} unit fail`, rejectColor);
+
+    const poSub = `${totalInspect.toLocaleString('id-ID')} total unit (${passPoCount} Pass | ${failPoCount} Fail)`;
+    setKPI('kpi-po', totalPoInspected.toLocaleString('id-ID'), poSub, null);
+    setKPI('kpi-qty', totalPoInspected.toLocaleString('id-ID'), poSub, null);
 }
 
 function setKPI(id, value, sub, color) {

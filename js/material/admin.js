@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.__currentUserRole = currentUser.role;
 
     if (currentUser.role === 'supervisor' || currentUser.role === 'manager') {
-        ['tab-master', 'tab-upload', 'tab-passall', 'tab-users', 'tab-spreadsheet'].forEach(id => {
+        ['tab-master', 'tab-upload', 'tab-passall', 'tab-users'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
@@ -47,9 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNavbar(currentUser);
     setupLogout();
     await loadMasterData();
-    if (typeof window.loadSpreadsheetStatus === 'function') {
-        await window.loadSpreadsheetStatus();
-    }
+
 
     // Show mock ADF loader in test mode
     if (MATERIAL_TEST_MODE) {
@@ -914,7 +912,7 @@ window.applyPassAllDateFilter = function () {
         const picName = findPicForPO(d);
         return `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx}" data-id="${d.id}" data-materialtype="${esc(d.material_type||'')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx || ''}" data-id="${d.id || ''}" data-materialtype="${esc(d.material_type||'')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ffffff;display:flex;align-items:center;gap:8px;">
@@ -990,15 +988,14 @@ window.updatePassAllSelectedCount = function () {
 
 window.confirmPassAll = async function () {
     const checkboxes = document.querySelectorAll('.passall-item-checkbox');
-    const selectedItems = Array.from(checkboxes)
+    const targetIds = Array.from(checkboxes)
         .filter(cb => cb.checked)
-        .map(cb => ({
-            po:           cb.dataset.po,
-            id:           cb.dataset.id ? Number(cb.dataset.id) : (cb.dataset.rowidx ? Number(cb.dataset.rowidx) : null),
-            materialType: (cb.dataset.materialtype || '').trim(),
-        }));
-
-    const targetIds = selectedItems.map(item => item.id).filter(id => id != null);
+        .map(cb => {
+            const raw = cb.dataset.id || cb.dataset.rowidx;
+            const n = Number(raw);
+            return (Number.isInteger(n) && n > 0) ? n : null;
+        })
+        .filter(id => id != null);
     const reason = document.getElementById('passall-reason')?.value || 'Sertifikat CoA / Lab Test Vendor Valid';
 
     if (!targetIds.length) {
