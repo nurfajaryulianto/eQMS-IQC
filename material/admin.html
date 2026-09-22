@@ -533,17 +533,17 @@
                 </div>
 
                 <div class="thin-scroll" style="overflow-x:auto;">
-                    <table class="data-table" style="width:100%;min-width:1150px;table-layout:fixed;border-collapse:collapse;">
+                    <table class="data-table" style="width:100%;min-width:1100px;table-layout:fixed;border-collapse:collapse;">
                         <colgroup>
-                            <col style="width: 46px;">                   <!-- Expand / Collapse -->
-                            <col style="width: 13%; min-width: 120px;"> <!-- PO Number -->
-                            <col style="width: 21%; min-width: 170px;"> <!-- Material -->
-                            <col style="width: 17%; min-width: 140px;"> <!-- Vendor -->
+                            <col style="width: 44px;">                   <!-- Expand / Collapse -->
+                            <col style="width: 14%; min-width: 120px;"> <!-- PO Number -->
+                            <col style="width: 23%; min-width: 180px;"> <!-- Material -->
+                            <col style="width: 18%; min-width: 140px;"> <!-- Vendor -->
                             <col style="width: 5%; min-width: 50px;">   <!-- UOM -->
                             <col style="width: 8%; min-width: 75px;">   <!-- Planned Qty -->
-                            <col style="width: 11%; min-width: 105px;"> <!-- Status -->
-                            <col style="width: 8%; min-width: 75px;">   <!-- Klaim -->
-                            <col style="width: 13%; min-width: 120px;"> <!-- Actions -->
+                            <col style="width: 11%; min-width: 100px;"> <!-- Status -->
+                            <col style="width: 5%; min-width: 55px;">   <!-- Klaim (Icon Only) -->
+                            <col style="width: 9%; min-width: 85px;">   <!-- Actions (Icon Only) -->
                         </colgroup>
                         <thead>
                             <tr>
@@ -1606,7 +1606,7 @@
 
     <!-- SheetJS CDN for Excel parsing & export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script type="module" src="../js/material/admin.js?v=20260922_expand1"></script>
+    <script type="module" src="../js/material/admin.js?v=20260922_icononly"></script>
     <script type="module">
         import { initInspectionLog, loadInspectionLog } from '../js/material/inspection-log.js';
         import { exportMasterDataToExcel, exportClaimsToExcel } from '../js/material/export.js';
