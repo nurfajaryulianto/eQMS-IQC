@@ -1399,22 +1399,27 @@ function normalizeRow(row) {
         checkedQty += total;
 
         const itype = String(insp.inspection_type || '').toLowerCase();
-        if (itype.includes('rolling') || String(insp.rolling_inspection || '').toLowerCase() === 'yes' || String(insp.roll_inspection_flag || '').toLowerCase() === 'yes') {
-            rollingDone = true;
-        }
-        if (itype.includes('laminating')) {
-            lamDone = true;
-        }
-        if (itype.includes('bonding') || (insp.bonding_test_url && String(insp.bonding_test_url).trim() !== '')) {
-            bondDone = true;
-        }
-        const colorStatus = String(insp.color_check_status || '').trim().toUpperCase();
-        const pkgStatus = String(insp.packaging_status || '').trim().toUpperCase();
-        if (colorStatus === 'YES' || colorStatus === 'NO' || pkgStatus === 'YES' || pkgStatus === 'NO') {
-            lamDone = true;
-        }
-        if (itype.includes('raw') || total > 0 || (insp.evidence_url && String(insp.evidence_url).trim() !== '')) {
-            rawDone = true;
+        // Hanya tandai Done jika inspeksi statusnya 'done' (bukan 'in-progress' / Simpan Progress)
+        const inspIsDone = String(insp.status || '').toLowerCase() === 'done';
+
+        if (inspIsDone) {
+            if (itype.includes('rolling') || String(insp.rolling_inspection || '').toLowerCase() === 'yes' || String(insp.roll_inspection_flag || '').toLowerCase() === 'yes') {
+                rollingDone = true;
+            }
+            if (itype.includes('laminating')) {
+                lamDone = true;
+            }
+            if (itype.includes('bonding') || (insp.bonding_test_url && String(insp.bonding_test_url).trim() !== '')) {
+                bondDone = true;
+            }
+            const colorStatus = String(insp.color_check_status || '').trim().toUpperCase();
+            const pkgStatus = String(insp.packaging_status || '').trim().toUpperCase();
+            if (colorStatus === 'YES' || colorStatus === 'NO' || pkgStatus === 'YES' || pkgStatus === 'NO') {
+                lamDone = true;
+            }
+            if (itype.includes('raw') || total > 0 || (insp.evidence_url && String(insp.evidence_url).trim() !== '')) {
+                rawDone = true;
+            }
         }
     });
 
