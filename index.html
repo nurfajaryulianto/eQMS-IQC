@@ -1210,12 +1210,21 @@
                                                     style="font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">
                                                     Bucket Date
                                                 </label>
-                                                
+                                                <span style="font-size:11px;color:#94a3b8;font-weight:400;">Bisa > 1 bucket</span>
                                             </div>
-                                            <div style="margin-bottom:6px;">
-                                                <input type="date" id="bucket-date-picker"
-                                                    style="width:100%;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;font-size:14px;padding:8px 12px;outline:none;"
-                                                    title="Pilih tanggal untuk menambahkan ke daftar Bucket">
+                                            <div style="display:flex;gap:6px;margin-bottom:6px;">
+                                                <div style="flex:1;position:relative;">
+                                                    <input type="date" id="bucket-date-picker"
+                                                        style="width:100%;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#0f172a;font-size:13px;padding:8px 12px;outline:none;"
+                                                        title="Pilih tanggal untuk menambahkan ke daftar Bucket">
+                                                </div>
+                                                <button type="button" id="btn-add-bucket"
+                                                    style="background:#2563eb;color:#ffffff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;flex-shrink:0;transition:background 0.15s;"
+                                                    title="Tambahkan Bucket Date ke sesi">
+                                                    <span class="material-symbols-outlined"
+                                                        style="font-size:16px;">add</span>
+                                                    <span>Tambah</span>
+                                                </button>
                                             </div>
                                             <div id="bucket-tags-container"
                                                 style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px;padding:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;align-items:center;">

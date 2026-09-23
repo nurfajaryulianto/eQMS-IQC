@@ -14,7 +14,7 @@ let currentUser = null;   // user yang sedang login
 let currentInspectionType = 'raw'; // 'raw' | 'rolling' | 'laminating' | 'bonding'
 let lamColorChoice = 'YES'; // 'YES' | 'NO'
 let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
-let pendingIsFinalRelease = false; // flag apakah submit tombol Selesaikan & Rilis ke Produksi
+let pendingIsStepDone = false; // flag apakah submit tombol Selesai Inspect (true) atau Simpan Progress (false)
 
 // ─── STEP CHECKERS & STATUS HELPERS ─────────────────────────
 export function countCompletedSteps(po) {
@@ -239,7 +239,7 @@ window.switchInspectionTab = function (type) {
 
     // ── Update Action Buttons ──
     const btnSaveProgress = document.getElementById('btn-save-progress');
-    const btnSubmitRelease = document.getElementById('btn-submit-release');
+    const btnFinishInspect = document.getElementById('btn-finish-inspect');
     const legacySubmit = document.getElementById('submit-btn');
 
     if (btnSaveProgress) {
@@ -247,26 +247,25 @@ window.switchInspectionTab = function (type) {
             btnSaveProgress.disabled = true;
             btnSaveProgress.style.opacity = '0.4';
             btnSaveProgress.style.pointerEvents = 'none';
-            btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span> Tahap Selesai';
         } else {
             btnSaveProgress.disabled = false;
             btnSaveProgress.style.opacity = '1';
             btnSaveProgress.style.pointerEvents = 'auto';
-            btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">bookmark_added</span> Simpan Progres';
         }
+        btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">bookmark_added</span> Simpan Progress';
     }
 
-    if (btnSubmitRelease) {
-        if (isPOAlreadyDone) {
-            btnSubmitRelease.disabled = true;
-            btnSubmitRelease.style.opacity = '0.5';
-            btnSubmitRelease.style.pointerEvents = 'none';
-            btnSubmitRelease.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">verified</span> Sudah Dirilis ke Produksi';
+    if (btnFinishInspect) {
+        if (isStageDone || isPOAlreadyDone) {
+            btnFinishInspect.disabled = true;
+            btnFinishInspect.style.opacity = '0.4';
+            btnFinishInspect.style.pointerEvents = 'none';
+            btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span> Tahap Selesai';
         } else {
-            btnSubmitRelease.disabled = false;
-            btnSubmitRelease.style.opacity = '1';
-            btnSubmitRelease.style.pointerEvents = 'auto';
-            btnSubmitRelease.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;">local_shipping</span> Selesaikan & Rilis ke Produksi';
+            btnFinishInspect.disabled = false;
+            btnFinishInspect.style.opacity = '1';
+            btnFinishInspect.style.pointerEvents = 'auto';
+            btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">task_alt</span> Selesai Inspect';
         }
     }
 
@@ -997,8 +996,14 @@ window.updateCalculations = function () {
 
 // ─── VALIDATION & SUBMIT ──────────────────────────────────────
 
-window.openValidationDialog = function (isFinalRelease = false) {
-    pendingIsFinalRelease = Boolean(isFinalRelease);
+window.openValidationDialog = function (isStepDone = false) {
+    pendingIsStepDone = Boolean(isStepDone);
+
+    // Sync hidden checking-status
+    const checkingStatusEl = document.getElementById('checking-status');
+    if (checkingStatusEl) {
+        checkingStatusEl.value = pendingIsStepDone ? 'done' : 'in-progress';
+    }
 
     const inspect = parseInt(document.getElementById('qty-inspect')?.value, 10) || 0;
     const fail = parseInt(document.getElementById('qty-fail')?.value, 10) || 0;
@@ -1014,9 +1019,13 @@ window.openValidationDialog = function (isFinalRelease = false) {
         const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
         const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
 
-        if (inspect <= 0) {
-            errors.push('Qty Inspect harus lebih dari 0.');
-        } else if (inspect > maxAllowed) {
+        if (pendingIsStepDone && inspect <= 0) {
+            errors.push('Qty Inspect harus lebih dari 0 untuk menyelesaikan tahap ini.');
+        } else if (!pendingIsStepDone && inspect < 0) {
+            errors.push('Qty Inspect tidak boleh negatif.');
+        }
+
+        if (inspect > maxAllowed) {
             errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`);
         }
         if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
@@ -1024,8 +1033,10 @@ window.openValidationDialog = function (isFinalRelease = false) {
     } else if (currentInspectionType === 'rolling') {
         const rollStatus = document.getElementById('rolling-inspect-status')?.value;
         const rollPct = document.getElementById('rolling-inspect-percentage')?.value.trim();
-        if (!rollStatus) errors.push('Pilih Status Roll Visual.');
-        if (!rollPct) errors.push('Isi Roll Sample Percentage (%).');
+        if (pendingIsStepDone) {
+            if (!rollStatus) errors.push('Pilih Status Roll Visual.');
+            if (!rollPct) errors.push('Isi Roll Sample Percentage (%).');
+        }
     } else if (currentInspectionType === 'laminating') {
         if (lamPackagingChoice === 'NO') {
             const reason = document.getElementById('lam-packaging-reason')?.value.trim();
@@ -1042,27 +1053,13 @@ window.openValidationDialog = function (isFinalRelease = false) {
         }
     } else if (currentInspectionType === 'bonding') {
         const bondingFileEl = document.getElementById('bonding-file');
-        if (!bondingFileEl || !bondingFileEl.files || bondingFileEl.files.length === 0) {
-            errors.push('Harap upload file evidence / dokumen Bonding Test.');
-        }
-    }
-
-    if (isFinalRelease) {
-        let willBeDone = countCompletedSteps(selectedPO);
-        if (currentInspectionType === 'raw' && !selectedPO.raw_done) willBeDone++;
-        if (currentInspectionType === 'rolling' && !selectedPO.rolling_done) willBeDone++;
-        if (currentInspectionType === 'laminating' && !selectedPO.laminating_done) willBeDone++;
-        if (currentInspectionType === 'bonding' && !selectedPO.bonding_done) willBeDone++;
-
-        const isAdminOrSpv = currentUser?.role === 'admin' || currentUser?.role === 'supervisor' || currentUser?.role === 'manager';
-        if (!isAdminOrSpv && willBeDone < 3) {
-            showToast(`Tidak dapat merilis ke produksi: Minimal 3 dari 4 tahapan inspeksi (Raw, Rolling, Laminating, Bonding) harus diselesaikan sebelum rilis. Saat ini baru ${willBeDone}/4 tahapan. Silakan gunakan tombol "Simpan Progres" atau minta otorisasi Admin.`, 'warning');
-            return;
+        if (pendingIsStepDone && (!bondingFileEl || !bondingFileEl.files || bondingFileEl.files.length === 0)) {
+            errors.push('Harap upload file evidence / dokumen Bonding Test untuk menyelesaikan tahap ini.');
         }
     }
 
     if (leaderSelect && leaderSelect.value) {
-        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        if (pendingIsStepDone && (!fileInput || !fileInput.files || fileInput.files.length === 0)) {
             errors.push('Harap upload evidence / bukti persetujuan leader.');
         }
     }
@@ -1076,28 +1073,28 @@ window.openValidationDialog = function (isFinalRelease = false) {
     const modalIconBox = document.getElementById('validation-modal-icon-box');
     const confirmBtn = document.getElementById('validation-confirm-btn');
 
-    // Adapt modal title, desc & confirm button based on release vs save progress
+    // Adapt modal title, desc & confirm button based on Selesai Inspect vs Simpan Progress
     if (modalTitle) {
-        modalTitle.textContent = pendingIsFinalRelease ? 'Konfirmasi Selesai & Rilis ke Produksi' : 'Konfirmasi Simpan Progres Tahap';
+        modalTitle.textContent = pendingIsStepDone ? 'Konfirmasi Selesai Inspeksi Tahap' : 'Konfirmasi Simpan Progress Tahap';
     }
     if (modalDesc) {
-        modalDesc.textContent = pendingIsFinalRelease 
-            ? 'Material akan diselesaikan & dinyatakan Siap Kirim (Ready to Deliver) ke Produksi'
-            : 'Periksa kembali target PO & rincian data sebelum disimpan sebagai progres berjalan';
+        modalDesc.textContent = pendingIsStepDone 
+            ? 'Tahapan inspeksi ini akan divalidasi dan ditandai SELESAI (Done).'
+            : 'Periksa kembali data sebelum disimpan sebagai progres berjalan (In-Progress).';
     }
     if (modalIcon) {
-        modalIcon.textContent = pendingIsFinalRelease ? 'local_shipping' : 'bookmark_added';
+        modalIcon.textContent = pendingIsStepDone ? 'task_alt' : 'bookmark_added';
     }
     if (modalIconBox) {
-        modalIconBox.style.background = pendingIsFinalRelease ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
-        modalIconBox.style.borderColor = pendingIsFinalRelease ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)';
+        modalIconBox.style.background = pendingIsStepDone ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+        modalIconBox.style.borderColor = pendingIsStepDone ? 'rgba(16, 185, 129, 0.4)' : 'rgba(59, 130, 246, 0.4)';
     }
     if (confirmBtn) {
-        if (pendingIsFinalRelease) {
-            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">local_shipping</span> Selesaikan & Rilis';
+        if (pendingIsStepDone) {
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">task_alt</span> Selesaikan Tahap';
             confirmBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
         } else {
-            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span> Simpan Progres';
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">bookmark_added</span> Simpan Progress';
             confirmBtn.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
         }
     }
@@ -1122,7 +1119,7 @@ window.openValidationDialog = function (isFinalRelease = false) {
 
         const leaderVal = leaderSelect && leaderSelect.value ? leaderSelect.value : 'Tidak Ada';
         const evidenceFileText = fileInput && fileInput.files.length > 0 ? fileInput.files[0].name : '—';
-        const actionStatusText = pendingIsFinalRelease ? 'Selesai & Rilis ke Produksi (DONE)' : 'Simpan Progres Tahap Ini (In-Progress)';
+        const actionStatusText = pendingIsStepDone ? 'Selesai Inspect (Tahapan Selesai / Done)' : 'Simpan Progress (Tahapan Berjalan / In-Progress)';
 
         let summaryHtml = `
             ${summaryRow('Tindakan', actionStatusText, true)}
@@ -1341,16 +1338,17 @@ async function submitInspection() {
             file_name:                fileName,
             file_type:                fileType,
             inspection_date:          new Date().toISOString(),
-            status:                   pendingIsFinalRelease ? 'done' : 'in-progress',
-            is_final_release:         pendingIsFinalRelease,
-            released_by:              pendingIsFinalRelease ? (inspectorName + ((currentUser?.role === 'admin' || currentUser?.role === 'supervisor') ? ' (Admin)' : '')) : '',
-            release_notes:            pendingIsFinalRelease ? ((currentUser?.role === 'admin' || currentUser?.role === 'supervisor') ? 'Dirilis oleh Admin/Supervisor' : 'Dirilis setelah memenuhi minimal 3 tahapan inspeksi') : '',
+            status:                   pendingIsStepDone ? 'done' : 'in-progress',
+            is_step_done:             pendingIsStepDone,
+            is_final_release:         false,
+            released_by:              '',
+            release_notes:            '',
         });
 
         if (result.status === 'ok') {
-            const msg = result.message || (pendingIsFinalRelease 
-                ? `Material PO ${selectedPO.po_number} berhasil diinspeksi & dirilis ke produksi!` 
-                : `Data inspeksi ${selectedPO.po_number} berhasil disimpan!`);
+            const msg = result.message || (pendingIsStepDone 
+                ? `Inspeksi tahap ${inspectTypeStr} pada PO ${selectedPO.po_number} berhasil diselesaikan!` 
+                : `Progress inspeksi tahap ${inspectTypeStr} pada PO ${selectedPO.po_number} berhasil disimpan!`);
             showToast(msg, 'success');
             const curPoNum = selectedPO.po_number;
             const curPoId = selectedPO.id;

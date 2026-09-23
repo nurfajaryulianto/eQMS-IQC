@@ -950,10 +950,13 @@ export async function apiSubmitInspection(payload) {
         const mdPatch = {
             updated_at: new Date().toISOString()
         };
-        if (isRaw) mdPatch.raw_done = true;
-        if (isRolling) mdPatch.rolling_done = true;
-        if (isLam) mdPatch.laminating_done = true;
-        if (isBonding) mdPatch.bonding_done = true;
+        const isStepDone = payload.is_step_done !== false && (payload.status === 'done' || payload.is_final_release);
+        if (isStepDone) {
+            if (isRaw) mdPatch.raw_done = true;
+            if (isRolling) mdPatch.rolling_done = true;
+            if (isLam) mdPatch.laminating_done = true;
+            if (isBonding) mdPatch.bonding_done = true;
+        }
 
         const { data: curMd } = await supabase
             .from('material_master_data')
@@ -961,10 +964,10 @@ export async function apiSubmitInspection(payload) {
             .eq('id', payload.master_data_id)
             .maybeSingle();
 
-        const rDone = isRaw || Boolean(curMd?.raw_done);
-        const rollDone = isRolling || Boolean(curMd?.rolling_done);
-        const lDone = isLam || Boolean(curMd?.laminating_done);
-        const bDone = isBonding || Boolean(curMd?.bonding_done);
+        const rDone = (isStepDone && isRaw) || Boolean(curMd?.raw_done);
+        const rollDone = (isStepDone && isRolling) || Boolean(curMd?.rolling_done);
+        const lDone = (isStepDone && isLam) || Boolean(curMd?.laminating_done);
+        const bDone = (isStepDone && isBonding) || Boolean(curMd?.bonding_done);
         const totalSteps = (rDone ? 1 : 0) + (rollDone ? 1 : 0) + (lDone ? 1 : 0) + (bDone ? 1 : 0);
         const relBy = payload.released_by || curMd?.released_by || '';
         const isAdminRel = Boolean(relBy && (

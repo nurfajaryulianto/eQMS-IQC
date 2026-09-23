@@ -1713,7 +1713,7 @@ window.exportSubcontInspectionLog = function() {
             'Qty Defect':          Number(s.qty_defect) || 0,
             'FTT (%)':             s.ftt ? (Number(s.ftt) * 100).toFixed(1) + '%' : '',
             'Tanggal Inspeksi':    cleanDateVal(s.tanggal_insp),
-            'Tanggal Bucket':      cleanDateVal(s.bucket),
+            'Tanggal Bucket':      s.bucket ? String(s.bucket).trim() : '',
             'ApprovedBy':          s.approved_by || '',
             'EvidenceUrl':         s.evidence_url || '',
             'Status':              s.status || 'Done',

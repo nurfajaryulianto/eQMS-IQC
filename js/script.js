@@ -143,36 +143,30 @@ window.setInspectionDates = function(val, skipSave = false) {
     renderInspectionTags(skipSave);
 };
 
-// ─── Single-Date Bucket State & Helpers ─────────────────────────
+// ─── Multi-Date Bucket State & Helpers ─────────────────────────
 let selectedBucketDates = [];
 
 function renderBucketTags(skipSave = false) {
     const container = document.getElementById('bucket-tags-container');
     const hiddenInput = document.getElementById('tanggal-bucket');
-    const picker = document.getElementById('bucket-date-picker');
     if (!container) return;
 
     if (!selectedBucketDates.length) {
         container.innerHTML = '<span style="font-size:12px;color:#94a3b8;font-style:italic;padding:2px 4px;">Belum ada tanggal bucket dipilih</span>';
         if (hiddenInput) hiddenInput.value = '';
+        if (!skipSave && typeof saveToLocalStorage === 'function') saveToLocalStorage();
         return;
     }
 
-    const singleDate = selectedBucketDates[0];
-    const safeDate = String(singleDate).replace(/'/g, "\'");
-    container.innerHTML = `
-        <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(59, 130, 246, 0.16);color:#93c5fd;border:1px solid rgba(59, 130, 246, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
-            <span>${singleDate}</span>
-            <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus tanggal ${singleDate}">
-                <span class="material-symbols-outlined" style="font-size:14px;font-weight:bold;">close</span>
-            </button>
-        </span>
-    `;
+    container.innerHTML = selectedBucketDates.map(dateVal => {
+        const safeDate = String(dateVal).replace(/'/g, "\\'");
+        return `<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;background:rgba(59, 130, 246, 0.16);color:#93c5fd;border:1px solid rgba(59, 130, 246, 0.4);box-shadow:0 1px 3px rgba(0,0,0,0.2);">
+            <span>${dateVal}</span>
+            <button type="button" onclick="window.removeBucketDate('${safeDate}')" style="color:#60a5fa;background:transparent;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-size:14px;line-height:1;" title="Hapus ${dateVal}">&times;</button>
+        </span>`;
+    }).join('');
 
-    if (hiddenInput) hiddenInput.value = singleDate;
-    if (picker && picker.value !== singleDate) {
-        picker.value = singleDate;
-    }
+    if (hiddenInput) hiddenInput.value = selectedBucketDates.join(', ');
     if (!skipSave && typeof saveToLocalStorage === 'function') {
         saveToLocalStorage();
     }
@@ -183,21 +177,38 @@ window.addBucketDate = function(dateStr) {
     const cleanDate = getLatestSingleDate(dateStr);
     if (!cleanDate) return;
 
-    // Strict single date: replace previous selection
-    selectedBucketDates = [cleanDate];
+    // Hindari duplikasi
+    if (selectedBucketDates.includes(cleanDate)) return;
+    selectedBucketDates.push(cleanDate);
     renderBucketTags();
+
+    // Clear picker setelah ditambahkan
+    const picker = document.getElementById('bucket-date-picker');
+    if (picker) picker.value = '';
 };
 
 window.removeBucketDate = function(dateStr) {
-    selectedBucketDates = [];
-    const picker = document.getElementById('bucket-date-picker');
-    if (picker) picker.value = '';
+    selectedBucketDates = selectedBucketDates.filter(d => d !== dateStr);
     renderBucketTags();
 };
 
 window.setBucketDates = function(val, skipSave = false) {
-    const cleanDate = getLatestSingleDate(val);
-    selectedBucketDates = cleanDate ? [cleanDate] : [];
+    selectedBucketDates = [];
+    if (!val) {
+        renderBucketTags(skipSave);
+        return;
+    }
+    if (Array.isArray(val)) {
+        val.forEach(v => {
+            const c = getLatestSingleDate(v);
+            if (c && !selectedBucketDates.includes(c)) selectedBucketDates.push(c);
+        });
+    } else if (typeof val === 'string') {
+        val.split(',').forEach(v => {
+            const c = getLatestSingleDate(v.trim());
+            if (c && !selectedBucketDates.includes(c)) selectedBucketDates.push(c);
+        });
+    }
     renderBucketTags(skipSave);
 };
 
@@ -206,11 +217,6 @@ function initBucketComponent() {
     const bucketDatePicker = document.getElementById('bucket-date-picker');
     if (bucketDatePicker) {
         if (!bucketDatePicker.value) bucketDatePicker.value = todayStr;
-        bucketDatePicker.onchange = () => {
-            if (bucketDatePicker.value) {
-                window.addBucketDate(bucketDatePicker.value);
-            }
-        };
     }
     if (!selectedBucketDates.length) {
         window.setBucketDates(todayStr, true);
@@ -1715,7 +1721,7 @@ async function saveData() {
                     ftt: Number(itemFtt.toFixed(4)),
                     redo_rate: Number(itemRedo.toFixed(4)),
                     tanggal_insp: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
-                    bucket: getLatestSingleDate(dataToSend.tanggalBucket) || null,
+                    bucket: dataToSend.tanggalBucket || null,
                     approved_by: dataToSend.approvedByLeader || '',
                     evidence_url: evidenceUrl,
                     status: dataToSend.status || 'Done',
@@ -1768,7 +1774,7 @@ async function saveData() {
                 ftt: Number(dataToSend.ftt) || 0,
                 redo_rate: Number(dataToSend.redoRate) || 0,
                 tanggal_insp: getLatestSingleDate(dataToSend.tanggalInspection) || new Date().toISOString().substring(0, 10),
-                bucket: getLatestSingleDate(dataToSend.tanggalBucket) || null,
+                bucket: dataToSend.tanggalBucket || null,
                 approved_by: dataToSend.approvedByLeader || '',
                 evidence_url: evidenceUrl,
                 status: dataToSend.status || 'Done',
@@ -2860,9 +2866,20 @@ async function initApp() {
     const bucketDatePicker = document.getElementById('bucket-date-picker');
     if (bucketDatePicker) {
         bucketDatePicker.value = todayStr;
-        bucketDatePicker.addEventListener('change', () => {
-            if (bucketDatePicker.value) {
+        bucketDatePicker.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (bucketDatePicker.value) window.addBucketDate(bucketDatePicker.value);
+            }
+        });
+    }
+    const btnAddBucket = document.getElementById('btn-add-bucket');
+    if (btnAddBucket) {
+        btnAddBucket.addEventListener('click', () => {
+            if (bucketDatePicker && bucketDatePicker.value) {
                 window.addBucketDate(bucketDatePicker.value);
+            } else if (bucketDatePicker) {
+                bucketDatePicker.focus();
             }
         });
     }
@@ -3131,7 +3148,7 @@ window.loadInspectionResults = async function () {
                 timestamp: row.timestamp || row.created_at,
                 tanggalIncoming: row.date || '',
                 tanggalInspection: getLatestSingleDate(row.tanggal_insp || row.date),
-                tanggalBucket: getLatestSingleDate(row.bucket),
+                tanggalBucket: row.bucket || '',
                 materialType: row.material_type || '',
                 auditor: row.user_login || '',
                 vendor: row.vendor || '',
@@ -3622,12 +3639,8 @@ window.continueInProgressSession = function (sessionId) {
     if (cleanInspDate) {
         window.setInspectionDates(cleanInspDate);
     }
-    const cleanBucketDate = getLatestSingleDate(session.tanggalBucket || session.bucket);
-    const tBuckEl = document.getElementById('tanggal-bucket');
-    if (tBuckEl) tBuckEl.value = cleanBucketDate;
-    if (cleanBucketDate) {
-        window.setBucketDates(cleanBucketDate);
-    }
+    const rawBucket = session.tanggalBucket || session.bucket || '';
+    window.setBucketDates(rawBucket);
     const styleEl = document.getElementById('style-number');
     if (styleEl && session.styleNumber) styleEl.value = session.styleNumber;
     const modelEl = document.getElementById('model-name');
