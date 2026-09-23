@@ -830,12 +830,17 @@ export async function apiSubmitInspection(payload) {
 
     if (existing) {
         // UPDATE: Gabungkan data ke baris yang sama
-        const updatedOk = isRaw ? (Number(payload.qty_inspect ? ok : existing.ok) || 0) : (Number(existing.ok) || 0);
-        const updatedNoQ = isRaw ? (Number(payload.qty_inspect ? noQ : existing.no_qty) || 0) : (Number(existing.no_qty) || 0);
+        const hasInspectInput = payload.qty_inspect !== undefined && payload.qty_inspect !== '' && payload.qty_inspect !== null;
+        const updatedOk = isRaw ? (hasInspectInput ? ok : (Number(existing.ok) || 0)) : (Number(existing.ok) || 0);
+        const updatedNoQ = isRaw ? (hasInspectInput ? noQ : (Number(existing.no_qty) || 0)) : (Number(existing.no_qty) || 0);
 
         let newNotes = existing.defect_notes || '';
-        if (payload.defect_notes && !newNotes.includes(payload.defect_notes)) {
-            newNotes = newNotes ? `${newNotes}; ${payload.defect_notes}` : payload.defect_notes;
+        if (payload.defect_notes !== undefined && payload.defect_notes !== null) {
+            if (String(existing.status || '').toLowerCase() === 'in-progress') {
+                newNotes = payload.defect_notes;
+            } else if (!newNotes.includes(payload.defect_notes)) {
+                newNotes = newNotes ? `${newNotes}; ${payload.defect_notes}` : payload.defect_notes;
+            }
         }
 
         const patch = {
@@ -905,10 +910,9 @@ export async function apiSubmitInspection(payload) {
                 mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
                 mdPatch.released_at = new Date().toISOString();
                 if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
-            } else if (isStepDone) {
+            } else if (isStepDone || (curMd?.status || '').toLowerCase() === 'pending') {
                 mdPatch.status = 'in-progress';
             }
-            // Jika bukan step_done (Simpan Progress), tidak ubah status master_data
 
             await supabase
                 .from('material_master_data')
@@ -992,10 +996,9 @@ export async function apiSubmitInspection(payload) {
             mdPatch.released_by = payload.released_by || payload.inspector_name || payload.inspector_nik || 'Inspector';
             mdPatch.released_at = new Date().toISOString();
             if (payload.release_notes) mdPatch.release_notes = payload.release_notes;
-        } else if (isStepDone) {
+        } else if (isStepDone || (curMd?.status || '').toLowerCase() === 'pending') {
             mdPatch.status = 'in-progress';
         }
-        // Jika bukan step_done (Simpan Progress), tidak ubah status master_data
 
         await supabase
             .from('material_master_data')

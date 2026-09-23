@@ -185,8 +185,8 @@ window.renderMasterTable = function () {
             const insps = Array.isArray(d.material_inspections) ? d.material_inspections : [];
             const hasInspType = insps.some(i => (i.inspection_type || '').toLowerCase().includes(filterType));
             const hasStepDone = (filterType.includes('raw') && d.raw_done) ||
-                                (filterType.includes('laminat') && d.laminating_done) ||
-                                (filterType.includes('bond') && d.bonding_done);
+                (filterType.includes('laminat') && d.laminating_done) ||
+                (filterType.includes('bond') && d.bonding_done);
             if (!matType.includes(filterType) && !hasInspType && !hasStepDone) {
                 return false;
             }
@@ -408,7 +408,7 @@ function renderMasterInspectionDetailRow(d, insps) {
             const dt = new Date(rawDate);
             if (!isNaN(dt.getTime())) {
                 dateFmt = dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
-                          dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
             } else {
                 dateFmt = String(rawDate).slice(0, 16).replace('T', ' ');
             }
@@ -1153,7 +1153,7 @@ window.applyPassAllDateFilter = function () {
         const picName = findPicForPO(d);
         return `
         <div style="padding:10px 14px;display:flex;align-items:center;gap:12px;${i < filteredPending.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,0.06);' : ''}">
-            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx || ''}" data-id="${d.id || ''}" data-materialtype="${esc(d.material_type||'')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
+            <input type="checkbox" class="passall-item-checkbox" data-po="${esc(d.po_number)}" data-rowidx="${d.row_idx || ''}" data-id="${d.id || ''}" data-materialtype="${esc(d.material_type || '')}" checked onchange="window.updatePassAllSelectedCount()" style="width:16px;height:16px;cursor:pointer;">
             <div style="flex-grow:1;display:flex;align-items:center;justify-content:space-between;gap:8px;">
                 <div>
                     <div style="font-size:13px;font-weight:600;color:#ffffff;display:flex;align-items:center;gap:8px;">
@@ -1461,11 +1461,11 @@ window.handleAssignmentSubmit = async function (e) {
         }
 
         await apiSaveAssignment({
-            id:            editingAssignmentId || null,
-            materialType:  materialType,
-            inspectorNik:  inspectorNik,
+            id: editingAssignmentId || null,
+            materialType: materialType,
+            inspectorNik: inspectorNik,
             inspectorName: inspectorName,
-            updatedBy:     currentUser?.name || currentUser?.nik || 'Admin',
+            updatedBy: currentUser?.name || currentUser?.nik || 'Admin',
         });
 
         setLoading(false);
@@ -2127,11 +2127,11 @@ window.renderLeaderMonitorLog = function () {
     }).join('');
 };
 
-window.approveMaterialLeader = async function(id) {
+window.approveMaterialLeader = async function (id) {
     let sessionUser = {};
     try {
         sessionUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    } catch (_) {}
+    } catch (_) { }
 
     let leaderName = (sessionUser.displayName || sessionUser.name || sessionUser.nik || '').trim();
     if (!leaderName || leaderName.toUpperCase().includes('OPERATOR')) {

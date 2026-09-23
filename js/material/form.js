@@ -53,6 +53,25 @@ export function isPOInProgress(po) {
 
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
 
+// ─── Helper: periksa apakah PO memiliki inspeksi in-progress untuk tab tertentu ───
+function getInProgressInspectionForPO(po, type) {
+    if (!po || !Array.isArray(po.material_inspections) || po.material_inspections.length === 0) {
+        return null;
+    }
+    const typeMap = { raw: 'raw material', rolling: 'rolling', laminating: 'laminating', bonding: 'bonding' };
+    const keyword = typeMap[type] || type;
+    return po.material_inspections.find(insp => {
+        const itype = String(insp.inspection_type || '').toLowerCase();
+        const status = String(insp.status || '').toLowerCase().trim();
+        const isMatch = itype.includes(keyword) || 
+            (keyword === 'raw material' && (itype.includes('raw') || (!itype && !insp.rolling_inspection && !insp.bonding_test_url))) ||
+            (keyword === 'rolling' && (itype.includes('roll') || String(insp.rolling_inspection || '').toLowerCase() === 'yes')) ||
+            (keyword === 'laminating' && itype.includes('lam')) ||
+            (keyword === 'bonding' && (itype.includes('bond') || Boolean(insp.bonding_test_url)));
+        return isMatch && (status === 'in-progress' || status === 'in progress');
+    }) || null;
+}
+
 window.updateTabBadges = function (po) {
     const badgeRaw = document.getElementById('badge-tab-raw');
     const badgeRolling = document.getElementById('badge-tab-rolling');
@@ -69,86 +88,83 @@ window.updateTabBadges = function (po) {
                 b.textContent = 'Pending';
                 b.style.background = 'rgba(255,255,255,0.08)';
                 b.style.color = 'rgba(255,255,255,0.6)';
+                b.style.border = 'none';
             }
         });
         return;
     }
 
-    if (badgeRaw) {
-        if (po.raw_done) {
-            badgeRaw.textContent = '✓ Selesai';
-            badgeRaw.style.background = 'rgba(16, 185, 129, 0.25)';
-            badgeRaw.style.color = '#34d399';
-            badgeRaw.style.border = '1px solid rgba(16, 185, 129, 0.4)';
-            if (tabRaw) tabRaw.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    const setBadge = (badgeEl, tabEl, isDone, isInProgress, doneColor, doneBg) => {
+        if (!badgeEl) return;
+        if (isDone) {
+            badgeEl.textContent = '✓ Selesai';
+            badgeEl.style.background = doneBg;
+            badgeEl.style.color = doneColor;
+            badgeEl.style.border = `1px solid ${doneColor}66`;
+            if (tabEl) tabEl.style.borderColor = `${doneColor}4D`;
+        } else if (isInProgress) {
+            badgeEl.textContent = 'In-Progress';
+            badgeEl.style.background = 'rgba(59, 130, 246, 0.2)';
+            badgeEl.style.color = '#60a5fa';
+            badgeEl.style.border = '1px solid rgba(59, 130, 246, 0.4)';
+            if (tabEl) tabEl.style.borderColor = 'rgba(59, 130, 246, 0.35)';
         } else {
-            badgeRaw.textContent = 'Pending';
-            badgeRaw.style.background = 'rgba(255,255,255,0.08)';
-            badgeRaw.style.color = 'rgba(255,255,255,0.6)';
-            badgeRaw.style.border = 'none';
+            badgeEl.textContent = 'Pending';
+            badgeEl.style.background = 'rgba(255,255,255,0.08)';
+            badgeEl.style.color = 'rgba(255,255,255,0.6)';
+            badgeEl.style.border = 'none';
+            if (tabEl) tabEl.style.borderColor = 'rgba(255,255,255,0.08)';
         }
-    }
+    };
 
-    if (badgeRolling) {
-        if (po.rolling_done) {
-            badgeRolling.textContent = '✓ Selesai';
-            badgeRolling.style.background = 'rgba(6, 182, 212, 0.25)';
-            badgeRolling.style.color = '#22d3ee';
-            badgeRolling.style.border = '1px solid rgba(6, 182, 212, 0.4)';
-            if (tabRolling) tabRolling.style.borderColor = 'rgba(6, 182, 212, 0.3)';
-        } else {
-            badgeRolling.textContent = 'Pending';
-            badgeRolling.style.background = 'rgba(255,255,255,0.08)';
-            badgeRolling.style.color = 'rgba(255,255,255,0.6)';
-            badgeRolling.style.border = 'none';
-        }
-    }
+    const hasInProg = (type) => Boolean(getInProgressInspectionForPO(po, type));
 
-    if (badgeLam) {
-        if (po.laminating_done) {
-            badgeLam.textContent = '✓ Selesai';
-            badgeLam.style.background = 'rgba(245, 158, 11, 0.25)';
-            badgeLam.style.color = '#fbbf24';
-            badgeLam.style.border = '1px solid rgba(245, 158, 11, 0.4)';
-            if (tabLam) tabLam.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-        } else {
-            badgeLam.textContent = 'Pending';
-            badgeLam.style.background = 'rgba(255,255,255,0.08)';
-            badgeLam.style.color = 'rgba(255,255,255,0.6)';
-            badgeLam.style.border = 'none';
-        }
-    }
-
-    if (badgeBond) {
-        if (po.bonding_done) {
-            badgeBond.textContent = '✓ Selesai';
-            badgeBond.style.background = 'rgba(244, 63, 94, 0.25)';
-            badgeBond.style.color = '#fb7185';
-            badgeBond.style.border = '1px solid rgba(244, 63, 94, 0.4)';
-            if (tabBond) tabBond.style.borderColor = 'rgba(244, 63, 94, 0.3)';
-        } else {
-            badgeBond.textContent = 'Pending';
-            badgeBond.style.background = 'rgba(255,255,255,0.08)';
-            badgeBond.style.color = 'rgba(255,255,255,0.6)';
-            badgeBond.style.border = 'none';
-        }
-    }
+    setBadge(badgeRaw, tabRaw, po.raw_done, hasInProg('raw'), '#34d399', 'rgba(16, 185, 129, 0.25)');
+    setBadge(badgeRolling, tabRolling, po.rolling_done, hasInProg('rolling'), '#22d3ee', 'rgba(6, 182, 212, 0.25)');
+    setBadge(badgeLam, tabLam, po.laminating_done, hasInProg('laminating'), '#fbbf24', 'rgba(245, 158, 11, 0.25)');
+    setBadge(badgeBond, tabBond, po.bonding_done, hasInProg('bonding'), '#fb7185', 'rgba(244, 63, 94, 0.25)');
 };
 
 // ─── Helper: cari inspeksi in-progress untuk tab type saat ini ───
 function getInProgressInspection(type) {
-    if (!selectedPO || !Array.isArray(selectedPO.material_inspections)) {
-        console.log('[getInProgressInsp] no selectedPO or no material_inspections array', selectedPO?.material_inspections);
+    if (!selectedPO || !Array.isArray(selectedPO.material_inspections) || selectedPO.material_inspections.length === 0) {
         return null;
     }
     const typeMap = { raw: 'raw material', rolling: 'rolling', laminating: 'laminating', bonding: 'bonding' };
     const keyword = typeMap[type] || type;
-    console.log('[getInProgressInsp] type:', type, 'keyword:', keyword, 'inspections:', selectedPO.material_inspections.map(i => ({ type: i.inspection_type, status: i.status })));
-    return selectedPO.material_inspections.find(insp => {
+    const matches = selectedPO.material_inspections.filter(insp => {
         const itype = String(insp.inspection_type || '').toLowerCase();
-        const status = String(insp.status || '').toLowerCase();
-        return itype.includes(keyword) && status === 'in-progress';
-    }) || null;
+        const status = String(insp.status || '').toLowerCase().trim();
+        const isMatch = itype.includes(keyword) || 
+            (keyword === 'raw material' && (itype.includes('raw') || (!itype && !insp.rolling_inspection && !insp.bonding_test_url))) ||
+            (keyword === 'rolling' && (itype.includes('roll') || String(insp.rolling_inspection || '').toLowerCase() === 'yes')) ||
+            (keyword === 'laminating' && itype.includes('lam')) ||
+            (keyword === 'bonding' && (itype.includes('bond') || Boolean(insp.bonding_test_url)));
+        return isMatch && (status === 'in-progress' || status === 'in progress');
+    });
+    if (matches.length === 0) return null;
+    return matches.sort((a, b) => new Date(b.created_at || b.inspection_date || 0) - new Date(a.created_at || a.inspection_date || 0))[0];
+}
+
+// ─── Helper: cari inspeksi done untuk tab type saat ini ───
+function getDoneInspection(type) {
+    if (!selectedPO || !Array.isArray(selectedPO.material_inspections) || selectedPO.material_inspections.length === 0) {
+        return null;
+    }
+    const typeMap = { raw: 'raw material', rolling: 'rolling', laminating: 'laminating', bonding: 'bonding' };
+    const keyword = typeMap[type] || type;
+    const matches = selectedPO.material_inspections.filter(insp => {
+        const itype = String(insp.inspection_type || '').toLowerCase();
+        const status = String(insp.status || '').toLowerCase().trim();
+        const isMatch = itype.includes(keyword) || 
+            (keyword === 'raw material' && (itype.includes('raw') || (!itype && !insp.rolling_inspection && !insp.bonding_test_url))) ||
+            (keyword === 'rolling' && (itype.includes('roll') || String(insp.rolling_inspection || '').toLowerCase() === 'yes')) ||
+            (keyword === 'laminating' && itype.includes('lam')) ||
+            (keyword === 'bonding' && (itype.includes('bond') || Boolean(insp.bonding_test_url)));
+        return isMatch && status === 'done';
+    });
+    if (matches.length === 0) return null;
+    return matches.sort((a, b) => new Date(b.created_at || b.inspection_date || 0) - new Date(a.created_at || a.inspection_date || 0))[0];
 }
 
 // ─── Helper: pre-fill form dari data inspeksi sebelumnya ─────────
@@ -161,40 +177,145 @@ function prefillFormFromInspection(insp, type) {
         const notesEl = document.getElementById('defect-notes');
         const ok = Number(insp.ok) || 0;
         const noQ = Number(insp.no_qty) || 0;
-        if (qtyInspEl) qtyInspEl.value = ok + noQ;
+        if (qtyInspEl) {
+            qtyInspEl.value = ok + noQ;
+            const maxAllowed = getMaxAllowedInspect(selectedPO, insp);
+            qtyInspEl.max = maxAllowed;
+            qtyInspEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
+        }
         if (qtyFailEl) qtyFailEl.value = noQ;
-        if (colorEl && insp.color_check_result) colorEl.value = insp.color_check_result;
+        if (colorEl && (insp.color_check_result || insp.check_color)) colorEl.value = insp.color_check_result || insp.check_color;
         if (notesEl && insp.defect_notes) notesEl.value = insp.defect_notes;
         // Trigger qty change event to recalculate pass/fail rate
-        if (qtyInspEl) qtyInspEl.dispatchEvent(new Event('input'));
-        if (qtyFailEl) qtyFailEl.dispatchEvent(new Event('input'));
+        updateCalculations();
     } else if (type === 'rolling') {
         const statusEl = document.getElementById('rolling-inspect-status');
         const pctEl = document.getElementById('rolling-inspect-percentage');
         const notesEl = document.getElementById('rolling-inspect-notes');
-        if (statusEl && insp.roll_inspection_flag) statusEl.value = insp.roll_inspection_flag;
+        if (statusEl && (insp.roll_inspection_flag || insp.rolling_inspection)) {
+            statusEl.value = insp.roll_inspection_flag || insp.rolling_inspection;
+        }
         if (pctEl && insp.roll_inspection_percentage) pctEl.value = insp.roll_inspection_percentage;
         if (notesEl && insp.defect_notes) notesEl.value = insp.defect_notes;
+        const mainNotesEl = document.getElementById('defect-notes');
+        if (mainNotesEl && insp.defect_notes) mainNotesEl.value = insp.defect_notes;
     } else if (type === 'laminating') {
         const colorResEl = document.getElementById('lam-color-result');
         const pkgReasonEl = document.getElementById('lam-packaging-reason');
         const rollChkEl = document.getElementById('lam-roll-checkbox');
         const rollPctEl = document.getElementById('lam-roll-percentage');
-        if (insp.color_check_status) window.setLamColorChoice(insp.color_check_status);
-        if (colorResEl && insp.color_check_result) colorResEl.value = insp.color_check_result;
-        if (insp.packaging_status) window.setLamPackagingChoice(insp.packaging_status);
+        if (insp.color_check_status && window.setLamColorChoice) window.setLamColorChoice(insp.color_check_status);
+        if (colorResEl && (insp.color_check_result || insp.check_color)) colorResEl.value = insp.color_check_result || insp.check_color;
+        if (insp.packaging_status && window.setLamPackagingChoice) window.setLamPackagingChoice(insp.packaging_status);
         if (pkgReasonEl && insp.packaging_reject_reason) pkgReasonEl.value = insp.packaging_reject_reason;
         if (rollChkEl) {
-            const hasRoll = insp.roll_inspection_flag === 'Yes' || insp.roll_inspection_percentage;
+            const hasRoll = insp.roll_inspection_flag === 'Yes' || insp.rolling_inspection === 'Yes' || insp.roll_inspection_percentage;
             rollChkEl.checked = Boolean(hasRoll);
             rollChkEl.dispatchEvent(new Event('change'));
         }
         if (rollPctEl && insp.roll_inspection_percentage) rollPctEl.value = insp.roll_inspection_percentage;
+        const mainNotesEl = document.getElementById('defect-notes');
+        if (mainNotesEl && insp.defect_notes) mainNotesEl.value = insp.defect_notes;
     }
     // Leader prefill
     const leaderEl = document.getElementById('approved-by-leader');
     if (leaderEl && insp.approved_by_leader) leaderEl.value = insp.approved_by_leader;
 }
+
+// ─── Helper: set state tombol aksi (Simpan Progress / Selesai Inspect / Edit) ───
+function setActionButtonsState(state) {
+    const container = document.getElementById('form-action-buttons-container');
+    if (!container) return;
+    if (state === 'locked_inprogress') {
+        container.innerHTML = `
+            <button type="button" id="btn-bottom-unlock-edit" onclick="window.unlockInProgressEdit()"
+                style="width: 100%; padding: 14px 18px; border-radius: 12px; border: none; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4); transition: all 0.2s;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">edit</span>
+                Edit / Lanjutkan Inspeksi
+            </button>
+        `;
+    } else if (state === 'locked_done') {
+        container.innerHTML = `
+            <div style="text-align: center; font-size: 12px; color: rgba(255,255,255,0.45); padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.12);">
+                Tahapan ini telah selesai (Done). Tidak dapat diisi ulang.
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <div id="form-action-buttons-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button type="button" id="btn-save-progress" onclick="openValidationDialog(false)"
+                    style="padding: 13px 14px; border-radius: 12px; border: 1.5px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.12); color: #93c5fd; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;"
+                    title="Simpan progress inspeksi yang masih perlu konfirmasi leader atau belum selesai">
+                    <span class="material-symbols-outlined" style="font-size: 19px;">bookmark_added</span>
+                    Simpan Progress
+                </button>
+                <button type="button" id="btn-finish-inspect" onclick="openValidationDialog(true)"
+                    style="padding: 13px 14px; border-radius: 12px; border: none; background: linear-gradient(135deg, #10b981, #059669); color: white; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.25s; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);"
+                    title="Validasi dan selesaikan tahapan inspeksi ini">
+                    <span class="material-symbols-outlined" style="font-size: 19px;">task_alt</span>
+                    Selesai Inspect
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ─── Buka form mode edit untuk in-progress ───
+window.unlockInProgressEdit = function () {
+    const type = currentInspectionType;
+    const bodyRaw = document.getElementById('form-raw-material-body');
+    const bodyRolling = document.getElementById('form-rolling-inspection-body');
+    const bodyLam = document.getElementById('form-laminating-material-body');
+    const bodyBond = document.getElementById('form-bonding-test-body');
+    const commonFields = document.getElementById('common-fields-body');
+    const doneNotice = document.getElementById('done-po-notice');
+    const bodyMap = { raw: bodyRaw, rolling: bodyRolling, laminating: bodyLam, bonding: bodyBond };
+    const activeBody = bodyMap[type];
+
+    // Lepas blok hitam & aktifkan interaksi
+    if (activeBody) {
+        activeBody.style.opacity = '1';
+        activeBody.style.pointerEvents = 'auto';
+        activeBody.style.filter = 'none';
+    }
+    if (commonFields && type !== 'bonding') {
+        commonFields.style.opacity = '1';
+        commonFields.style.pointerEvents = 'auto';
+        commonFields.style.filter = 'none';
+    }
+
+    // Banner status Mode Edit Aktif
+    if (doneNotice) {
+        doneNotice.style.display = 'flex';
+        doneNotice.style.flexDirection = 'row';
+        doneNotice.style.alignItems = 'center';
+        doneNotice.style.gap = '8px';
+        doneNotice.style.background = 'rgba(16, 185, 129, 0.12)';
+        doneNotice.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        doneNotice.innerHTML = `
+            <span class="material-symbols-outlined" style="font-size:20px; color:#34d399; flex-shrink:0;">edit_note</span>
+            <div style="flex:1;">
+                <span style="color:#6ee7b7; font-weight:700; font-size:13px;">Mode Edit Aktif</span>
+                <span style="color:rgba(255,255,255,0.7); font-size:12px; margin-left:6px;">Silakan perbarui hasil inspeksi, lalu klik <strong>Simpan Progress</strong> atau <strong>Selesai Inspect</strong>.</span>
+            </div>
+        `;
+    }
+
+    // Kembalikan tombol aksi normal (Simpan Progress & Selesai Inspect)
+    setActionButtonsState('normal');
+
+    // Fokus ke field utama
+    if (type === 'raw') {
+        const qtyInspEl = document.getElementById('qty-inspect');
+        if (qtyInspEl) qtyInspEl.focus();
+    } else if (type === 'rolling') {
+        const statusEl = document.getElementById('rolling-inspect-status');
+        if (statusEl) statusEl.focus();
+    } else if (type === 'laminating') {
+        const colorResEl = document.getElementById('lam-color-result');
+        if (colorResEl) colorResEl.focus();
+    }
+};
 
 window.switchInspectionTab = function (type) {
     currentInspectionType = type;
@@ -218,7 +339,6 @@ window.switchInspectionTab = function (type) {
                         (type === 'rolling' && isRollingDone) ||
                         (type === 'laminating' && isLamDone) ||
                         (type === 'bonding' && isBondDone);
-    const isPOAlreadyDone = selectedPO && isPOFullyDone(selectedPO);
 
     // Deteksi in-progress inspection untuk tab ini
     const inProgressInsp = !isStageDone ? getInProgressInspection(type) : null;
@@ -251,17 +371,36 @@ window.switchInspectionTab = function (type) {
     if (sectionTitle) sectionTitle.textContent = titleMap[type] || '';
 
     if (isStageDone) {
-        // ── DONE: Tab terkunci permanen ──
+        // ── DONE: Pre-fill data yang sudah selesai & kunci permanen ──
+        const doneInsp = getDoneInspection(type);
+        if (doneInsp) {
+            prefillFormFromInspection(doneInsp, type);
+        }
         if (doneNotice) {
             doneNotice.style.display = 'flex';
+            doneNotice.style.flexDirection = 'row';
+            doneNotice.style.alignItems = 'center';
+            doneNotice.style.gap = '8px';
             doneNotice.style.background = 'rgba(245, 158, 11, 0.10)';
             doneNotice.style.borderColor = 'rgba(245, 158, 11, 0.35)';
             doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#fbbf24;">lock</span><span>Pengecekan <strong>${labelMap[type]}</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
         }
-        if (activeBody) { activeBody.style.opacity = '0.35'; activeBody.style.pointerEvents = 'none'; }
-        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
+        if (activeBody) {
+            activeBody.style.opacity = '0.35';
+            activeBody.style.pointerEvents = 'none';
+            activeBody.style.filter = 'none';
+        }
+        if (commonFields && type !== 'bonding') {
+            commonFields.style.opacity = '0.35';
+            commonFields.style.pointerEvents = 'none';
+            commonFields.style.filter = 'none';
+        }
+        setActionButtonsState('locked_done');
+
     } else if (inProgressInsp) {
-        // ── IN-PROGRESS: Tampilkan notice + tombol Edit ──
+        // ── IN-PROGRESS: Pre-fill input yang tersimpan & BLOK HITAM DULU + tombol Edit ──
+        prefillFormFromInspection(inProgressInsp, type);
+
         const ok = Number(inProgressInsp.ok) || 0;
         const noQ = Number(inProgressInsp.no_qty) || 0;
         const totalInsp = ok + noQ;
@@ -273,70 +412,67 @@ window.switchInspectionTab = function (type) {
         let summaryExtra = '';
         if (type === 'raw') {
             summaryExtra = `
-                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1);">
                     <span style="font-size:12px;color:#94a3b8;">Qty Inspect: <strong style="color:#e2e8f0;">${totalInsp}</strong></span>
                     <span style="font-size:12px;color:#94a3b8;">Qty Fail: <strong style="color:#fca5a5;">${noQ}</strong></span>
                     <span style="font-size:12px;color:#94a3b8;">Pass Rate: <strong style="color:#6ee7b7;">${passRate}%</strong></span>
+                    ${inProgressInsp.color_check_result ? `<span style="font-size:12px;color:#94a3b8;">Color: <strong style="color:#e2e8f0;">${esc(inProgressInsp.color_check_result)}</strong></span>` : ''}
                 </div>`;
         } else if (type === 'rolling') {
             summaryExtra = `
-                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
-                    <span style="font-size:12px;color:#94a3b8;">Status: <strong style="color:#e2e8f0;">${inProgressInsp.roll_inspection_flag || '—'}</strong></span>
-                    <span style="font-size:12px;color:#94a3b8;">Sample: <strong style="color:#e2e8f0;">${inProgressInsp.roll_inspection_percentage || '—'}</strong></span>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1);">
+                    <span style="font-size:12px;color:#94a3b8;">Status: <strong style="color:#e2e8f0;">${esc(inProgressInsp.roll_inspection_flag || '—')}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Sample: <strong style="color:#e2e8f0;">${esc(inProgressInsp.roll_inspection_percentage || '—')}</strong></span>
                 </div>`;
         } else if (type === 'laminating') {
             summaryExtra = `
-                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
-                    <span style="font-size:12px;color:#94a3b8;">Color: <strong style="color:#e2e8f0;">${inProgressInsp.color_check_status || '—'}</strong></span>
-                    <span style="font-size:12px;color:#94a3b8;">Packaging: <strong style="color:#e2e8f0;">${inProgressInsp.packaging_status || '—'}</strong></span>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1);">
+                    <span style="font-size:12px;color:#94a3b8;">Color: <strong style="color:#e2e8f0;">${esc(inProgressInsp.color_check_status || '—')}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Packaging: <strong style="color:#e2e8f0;">${esc(inProgressInsp.packaging_status || '—')}</strong></span>
                 </div>`;
         }
 
         if (doneNotice) {
             doneNotice.style.display = 'flex';
             doneNotice.style.flexDirection = 'column';
-            doneNotice.style.alignItems = 'flex-start';
+            doneNotice.style.alignItems = 'stretch';
             doneNotice.style.gap = '10px';
-            doneNotice.style.background = 'rgba(59, 130, 246, 0.10)';
-            doneNotice.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+            doneNotice.style.background = 'rgba(15, 23, 42, 0.95)';
+            doneNotice.style.border = '1.5px solid rgba(59, 130, 246, 0.45)';
             doneNotice.innerHTML = `
-                <div style="display:flex;align-items:center;gap:8px;width:100%;">
-                    <span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#60a5fa;">edit_note</span>
-                    <div style="flex:1;">
-                        <div style="font-size:13px;font-weight:700;color:#93c5fd;">Inspeksi <strong>${labelMap[type]}</strong> tersimpan sebagai <strong>In-Progress</strong></div>
-                        <div style="font-size:11px;color:#64748b;margin-top:2px;">Disimpan: ${inspDate} · oleh ${inProgressInsp.inspector_nik || '—'}</div>
-                        ${summaryExtra}
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="material-symbols-outlined" style="font-size:22px;flex-shrink:0;color:#60a5fa;">lock_clock</span>
+                        <div>
+                            <div style="font-size:13px;font-weight:800;color:#93c5fd;">Inspeksi ${labelMap[type]} Tersimpan (In-Progress)</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Disimpan: ${inspDate} &bull; Form sedang di-kunci. Klik Edit untuk melanjutkan atau merubah input.</div>
+                        </div>
                     </div>
-                    <button type="button" id="btn-edit-inprogress"
-                        style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(59,130,246,0.4);flex-shrink:0;">
-                        <span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit
+                    <button type="button" id="btn-edit-inprogress" onclick="window.unlockInProgressEdit()"
+                        style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;cursor:pointer;white-space:nowrap;box-shadow:0 3px 10px rgba(59,130,246,0.4);flex-shrink:0;transition:all 0.2s;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit / Lanjutkan
                     </button>
-                </div>`;
-
-            // Bind tombol Edit
-            const editBtn = document.getElementById('btn-edit-inprogress');
-            if (editBtn) {
-                editBtn.addEventListener('click', () => {
-                    // Unlock form
-                    if (activeBody) { activeBody.style.opacity = '1'; activeBody.style.pointerEvents = 'auto'; }
-                    if (commonFields && type !== 'bonding') { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-                    // Sembunyikan notice
-                    if (doneNotice) doneNotice.style.display = 'none';
-                    // Pre-fill data dari inspeksi sebelumnya
-                    prefillFormFromInspection(inProgressInsp, type);
-                    // Aktifkan tombol aksi
-                    const btnSP = document.getElementById('btn-save-progress');
-                    const btnFI = document.getElementById('btn-finish-inspect');
-                    if (btnSP) { btnSP.disabled = false; btnSP.style.opacity = '1'; btnSP.style.pointerEvents = 'auto'; }
-                    if (btnFI) { btnFI.disabled = false; btnFI.style.opacity = '1'; btnFI.style.pointerEvents = 'auto'; }
-                });
-            }
+                </div>
+                ${summaryExtra}`;
         }
-        // Form terkunci sampai user klik Edit
-        if (activeBody) { activeBody.style.opacity = '0.25'; activeBody.style.pointerEvents = 'none'; }
-        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '0.25'; commonFields.style.pointerEvents = 'none'; }
+
+        // Blok hitam & kunci interaksi form sementara
+        if (activeBody) {
+            activeBody.style.opacity = '0.45';
+            activeBody.style.pointerEvents = 'none';
+            activeBody.style.filter = 'contrast(0.9) brightness(0.7)';
+        }
+        if (commonFields && type !== 'bonding') {
+            commonFields.style.opacity = '0.45';
+            commonFields.style.pointerEvents = 'none';
+            commonFields.style.filter = 'contrast(0.9) brightness(0.7)';
+        }
+
+        // Tampilkan tombol "Edit / Lanjutkan Inspeksi" di bagian bawah form
+        setActionButtonsState('locked_inprogress');
+
     } else {
-        // ── CLEAN / BELUM ADA DATA: Form terbuka normal ──
+        // ── CLEAN / BELUM ADA DATA: Form terbuka normal & reset default ──
         if (doneNotice) {
             doneNotice.style.display = 'none';
             doneNotice.style.flexDirection = '';
@@ -344,41 +480,60 @@ window.switchInspectionTab = function (type) {
             doneNotice.style.background = '';
             doneNotice.style.borderColor = '';
         }
-        if (activeBody) { activeBody.style.opacity = '1'; activeBody.style.pointerEvents = 'auto'; }
-        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-    }
-
-    // ── Update Action Buttons ──
-    const btnSaveProgress = document.getElementById('btn-save-progress');
-    const btnFinishInspect = document.getElementById('btn-finish-inspect');
-    const legacySubmit = document.getElementById('submit-btn');
-
-    const lockButtons = isStageDone || isPOAlreadyDone || Boolean(inProgressInsp);
-
-    if (btnSaveProgress) {
-        btnSaveProgress.disabled = lockButtons;
-        btnSaveProgress.style.opacity = lockButtons ? '0.4' : '1';
-        btnSaveProgress.style.pointerEvents = lockButtons ? 'none' : 'auto';
-        btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">bookmark_added</span> Simpan Progress';
-    }
-
-    if (btnFinishInspect) {
-        if (isStageDone || isPOAlreadyDone) {
-            btnFinishInspect.disabled = true;
-            btnFinishInspect.style.opacity = '0.4';
-            btnFinishInspect.style.pointerEvents = 'none';
-            btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span> Tahap Selesai';
-        } else {
-            btnFinishInspect.disabled = Boolean(inProgressInsp); // terkunci sampai Edit diklik
-            btnFinishInspect.style.opacity = inProgressInsp ? '0.4' : '1';
-            btnFinishInspect.style.pointerEvents = inProgressInsp ? 'none' : 'auto';
-            btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">task_alt</span> Selesai Inspect';
+        if (activeBody) {
+            activeBody.style.opacity = '1';
+            activeBody.style.pointerEvents = 'auto';
+            activeBody.style.filter = 'none';
         }
-    }
+        if (commonFields && type !== 'bonding') {
+            commonFields.style.opacity = '1';
+            commonFields.style.pointerEvents = 'auto';
+            commonFields.style.filter = 'none';
+        }
 
-    if (legacySubmit) {
-        legacySubmit.disabled = isStageDone && isPOAlreadyDone;
-        legacySubmit.style.opacity = legacySubmit.disabled ? '0.4' : '1';
+        // Reset field jika belum ada data in-progress
+        if (type === 'raw') {
+            const qtyInspEl = document.getElementById('qty-inspect');
+            const qtyFailEl = document.getElementById('qty-fail');
+            const colorEl = document.getElementById('check-color');
+            const notesEl = document.getElementById('defect-notes');
+            const maxAllowed = getMaxAllowedInspect(selectedPO, null);
+            if (qtyInspEl) {
+                qtyInspEl.value = '';
+                qtyInspEl.max = maxAllowed;
+                qtyInspEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
+            }
+            if (qtyFailEl) {
+                qtyFailEl.value = '';
+                qtyFailEl.max = maxAllowed;
+                qtyFailEl.placeholder = 'Maks. Qty Inspect';
+            }
+            if (colorEl) colorEl.value = 'OK';
+            if (notesEl) notesEl.value = '';
+            updateCalculations();
+        } else if (type === 'rolling') {
+            const statusEl = document.getElementById('rolling-inspect-status');
+            const pctEl = document.getElementById('rolling-inspect-percentage');
+            const notesEl = document.getElementById('rolling-inspect-notes');
+            if (statusEl) statusEl.value = 'OK';
+            if (pctEl) pctEl.value = '10%';
+            if (notesEl) notesEl.value = '';
+        } else if (type === 'laminating') {
+            if (window.setLamColorChoice) window.setLamColorChoice('YES');
+            if (window.setLamPackagingChoice) window.setLamPackagingChoice('YES');
+            const colorResEl = document.getElementById('lam-color-result');
+            const pkgReasonEl = document.getElementById('lam-packaging-reason');
+            const rollChkEl = document.getElementById('lam-roll-checkbox');
+            const rollPctEl = document.getElementById('lam-roll-percentage');
+            if (colorResEl) colorResEl.value = 'OK';
+            if (pkgReasonEl) pkgReasonEl.value = '';
+            if (rollChkEl) { rollChkEl.checked = false; rollChkEl.dispatchEvent(new Event('change')); }
+            if (rollPctEl) rollPctEl.value = '';
+        }
+        const leaderEl = document.getElementById('approved-by-leader');
+        if (leaderEl) leaderEl.value = '';
+
+        setActionButtonsState('normal');
     }
 };
 
@@ -640,6 +795,7 @@ async function fetchMasterData() {
             released_by:    row.released_by || '',
             released_at:    row.released_at || '',
             release_notes:  row.release_notes || '',
+            material_inspections: Array.isArray(row.material_inspections) ? row.material_inspections : [],
         }));
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
@@ -956,26 +1112,6 @@ async function selectPO(po, cardEl) {
     } else {
         switchInspectionTab('raw');
     }
-
-    // Reset inputs & set max attributes for error proofing
-    const qtyFailEl = document.getElementById('qty-fail');
-    const notesEl = document.getElementById('defect-notes');
-    const checkColorEl = document.getElementById('check-color');
-
-    const maxAllowed = getMaxAllowedInspect(po);
-    if (qtyInspectEl) {
-        qtyInspectEl.value = '';
-        qtyInspectEl.max = maxAllowed;
-        qtyInspectEl.placeholder = `Maks. ${maxAllowed.toLocaleString('id-ID')}`;
-    }
-    if (qtyFailEl) {
-        qtyFailEl.value = '';
-        qtyFailEl.max = maxAllowed;
-        qtyFailEl.placeholder = `Maks. Qty Inspect`;
-    }
-    if (notesEl) notesEl.value = '';
-    if (checkColorEl) checkColorEl.value = 'OK';
-    updateCalculations();
 }
 
 function row(label, value) {
@@ -1044,10 +1180,15 @@ window.clearPOFilterDate = function () {
     filterPOList();
 };
 
-function getMaxAllowedInspect(po) {
+function getMaxAllowedInspect(po, currentInspection = null) {
     if (!po) return 0;
+    const currentInspQty = currentInspection ? ((Number(currentInspection.ok) || 0) + (Number(currentInspection.no_qty) || 0)) : 0;
+    const balance = po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - (po.checked_qty || 0));
+    if (currentInspection) {
+        return Math.min(po.planned_qty, balance + currentInspQty);
+    }
     if (po.checked_qty > 0 || po.status === 'in-progress' || po.status === 'in progress') {
-        return po.balance_qty != null ? po.balance_qty : Math.max(0, po.planned_qty - (po.checked_qty || 0));
+        return balance;
     }
     return po.planned_qty;
 }
@@ -1061,13 +1202,14 @@ window.updateCalculations = function () {
     let inspect = parseInt(qtyInspectEl?.value, 10) || 0;
     let fail = parseInt(qtyFailEl?.value, 10) || 0;
 
-    // Error proofing: Clamp inspect to maxAllowed (Qty Balance if in-progress, Qty Received if pending)
+    // Error proofing: Clamp inspect to maxAllowed
     if (selectedPO) {
-        const maxAllowed = getMaxAllowedInspect(selectedPO);
+        const inProgressInsp = getInProgressInspection(currentInspectionType);
+        const maxAllowed = getMaxAllowedInspect(selectedPO, inProgressInsp);
         const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
-        const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
+        const labelType = (isProgress && !inProgressInsp) ? 'Qty Balance' : 'Qty Planned / Maksimal';
 
-        if (inspect > maxAllowed) {
+        if (inspect > maxAllowed && maxAllowed > 0) {
             inspect = maxAllowed;
             if (qtyInspectEl) qtyInspectEl.value = maxAllowed;
             showToast(`Qty Inspect tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`, 'error');
@@ -1101,8 +1243,6 @@ window.updateCalculations = function () {
 
 // ─── VALIDATION & SUBMIT ──────────────────────────────────────
 
-// ─── VALIDATION & SUBMIT ──────────────────────────────────────
-
 window.openValidationDialog = function (isStepDone = false) {
     pendingIsStepDone = Boolean(isStepDone);
 
@@ -1122,9 +1262,10 @@ window.openValidationDialog = function (isStepDone = false) {
     if (!selectedPO) {
         errors.push('Silakan pilih PO/Material terlebih dahulu.');
     } else if (currentInspectionType === 'raw') {
-        const maxAllowed = getMaxAllowedInspect(selectedPO);
+        const inProgressInsp = getInProgressInspection(currentInspectionType);
+        const maxAllowed = getMaxAllowedInspect(selectedPO, inProgressInsp);
         const isProgress = (selectedPO.checked_qty > 0 || selectedPO.status === 'in-progress' || selectedPO.status === 'in progress');
-        const labelType = isProgress ? 'Qty Balance' : 'Qty Received / Planned Qty';
+        const labelType = (isProgress && !inProgressInsp) ? 'Qty Balance' : 'Qty Planned / Maksimal';
 
         if (pendingIsStepDone && inspect <= 0) {
             errors.push('Qty Inspect harus lebih dari 0 untuk menyelesaikan tahap ini.');
@@ -1132,7 +1273,7 @@ window.openValidationDialog = function (isStepDone = false) {
             errors.push('Qty Inspect tidak boleh negatif.');
         }
 
-        if (inspect > maxAllowed) {
+        if (inspect > maxAllowed && maxAllowed > 0) {
             errors.push(`Qty Inspect (${inspect}) tidak boleh melebihi ${labelType} (${maxAllowed.toLocaleString('id-ID')} ${selectedPO.uom}).`);
         }
         if (fail < 0) errors.push('Qty Fail tidak boleh negatif.');
