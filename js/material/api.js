@@ -167,15 +167,15 @@ export async function apiGetMasterData({
                                 const matKey = String(m.material_name || '').trim().toLowerCase();
                                 const exactKey = `${poKey}_${matKey}`;
                                 if (inspMapByPoMat[exactKey]) {
+                                    // Exact match: po + material — prioritas tertinggi
                                     found = inspMapByPoMat[exactKey];
-                                } else if (inspMapByPo[poKey]) {
-                                    found = inspMapByPo[poKey];
                                 } else {
-                                    // Handle comma-separated PO numbers
+                                    // Handle comma-separated PO numbers — WAJIB filter by material_name agar tidak cross-contaminate
                                     const subPos = poKey.split(/[\s,]+/).map(p => p.trim()).filter(Boolean);
                                     const matched = [];
                                     subPos.forEach(sp => {
-                                        if (inspMapByPo[sp]) matched.push(...inspMapByPo[sp]);
+                                        const subKey = `${sp}_${matKey}`;
+                                        if (inspMapByPoMat[subKey]) matched.push(...inspMapByPoMat[subKey]);
                                     });
                                     const seen = new Set();
                                     found = matched.filter(x => {
@@ -801,22 +801,27 @@ export async function apiSubmitInspection(payload) {
 
     // Cek apakah sudah ada baris inspeksi untuk master_data_id ini (atau PO + Material)
     let existing = null;
+    const inspTypeForLookup = isBonding ? 'Bonding Test' : isLam ? 'Laminating' : isRolling ? 'Rolling Inspection' : 'Raw Material';
+
     if (payload.master_data_id) {
         const { data } = await supabase
             .from('material_inspections')
             .select('*')
             .eq('master_data_id', payload.master_data_id)
+            .eq('inspection_type', inspTypeForLookup)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
         existing = data;
     }
+    // Fallback: cari by po_no + material_name + inspection_type (semua harus cocok)
     if (!existing && payload.po_number && payload.material_name) {
         const { data } = await supabase
             .from('material_inspections')
             .select('*')
             .eq('po_no', payload.po_number)
             .eq('material_name', payload.material_name)
+            .eq('inspection_type', inspTypeForLookup)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
