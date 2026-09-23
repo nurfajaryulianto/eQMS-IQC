@@ -135,6 +135,63 @@ window.updateTabBadges = function (po) {
     }
 };
 
+// ─── Helper: cari inspeksi in-progress untuk tab type saat ini ───
+function getInProgressInspection(type) {
+    if (!selectedPO || !Array.isArray(selectedPO.material_inspections)) return null;
+    const typeMap = { raw: 'raw material', rolling: 'rolling', laminating: 'laminating', bonding: 'bonding' };
+    const keyword = typeMap[type] || type;
+    return selectedPO.material_inspections.find(insp => {
+        const itype = String(insp.inspection_type || '').toLowerCase();
+        const status = String(insp.status || '').toLowerCase();
+        return itype.includes(keyword) && status === 'in-progress';
+    }) || null;
+}
+
+// ─── Helper: pre-fill form dari data inspeksi sebelumnya ─────────
+function prefillFormFromInspection(insp, type) {
+    if (!insp) return;
+    if (type === 'raw') {
+        const qtyInspEl = document.getElementById('qty-inspect');
+        const qtyFailEl = document.getElementById('qty-fail');
+        const colorEl = document.getElementById('check-color');
+        const notesEl = document.getElementById('defect-notes');
+        const ok = Number(insp.ok) || 0;
+        const noQ = Number(insp.no_qty) || 0;
+        if (qtyInspEl) qtyInspEl.value = ok + noQ;
+        if (qtyFailEl) qtyFailEl.value = noQ;
+        if (colorEl && insp.color_check_result) colorEl.value = insp.color_check_result;
+        if (notesEl && insp.defect_notes) notesEl.value = insp.defect_notes;
+        // Trigger qty change event to recalculate pass/fail rate
+        if (qtyInspEl) qtyInspEl.dispatchEvent(new Event('input'));
+        if (qtyFailEl) qtyFailEl.dispatchEvent(new Event('input'));
+    } else if (type === 'rolling') {
+        const statusEl = document.getElementById('rolling-inspect-status');
+        const pctEl = document.getElementById('rolling-inspect-percentage');
+        const notesEl = document.getElementById('rolling-inspect-notes');
+        if (statusEl && insp.roll_inspection_flag) statusEl.value = insp.roll_inspection_flag;
+        if (pctEl && insp.roll_inspection_percentage) pctEl.value = insp.roll_inspection_percentage;
+        if (notesEl && insp.defect_notes) notesEl.value = insp.defect_notes;
+    } else if (type === 'laminating') {
+        const colorResEl = document.getElementById('lam-color-result');
+        const pkgReasonEl = document.getElementById('lam-packaging-reason');
+        const rollChkEl = document.getElementById('lam-roll-checkbox');
+        const rollPctEl = document.getElementById('lam-roll-percentage');
+        if (insp.color_check_status) window.setLamColorChoice(insp.color_check_status);
+        if (colorResEl && insp.color_check_result) colorResEl.value = insp.color_check_result;
+        if (insp.packaging_status) window.setLamPackagingChoice(insp.packaging_status);
+        if (pkgReasonEl && insp.packaging_reject_reason) pkgReasonEl.value = insp.packaging_reject_reason;
+        if (rollChkEl) {
+            const hasRoll = insp.roll_inspection_flag === 'Yes' || insp.roll_inspection_percentage;
+            rollChkEl.checked = Boolean(hasRoll);
+            rollChkEl.dispatchEvent(new Event('change'));
+        }
+        if (rollPctEl && insp.roll_inspection_percentage) rollPctEl.value = insp.roll_inspection_percentage;
+    }
+    // Leader prefill
+    const leaderEl = document.getElementById('approved-by-leader');
+    if (leaderEl && insp.approved_by_leader) leaderEl.value = insp.approved_by_leader;
+}
+
 window.switchInspectionTab = function (type) {
     currentInspectionType = type;
     const tabRaw = document.getElementById('tab-check-raw');
@@ -159,82 +216,132 @@ window.switchInspectionTab = function (type) {
                         (type === 'bonding' && isBondDone);
     const isPOAlreadyDone = selectedPO && isPOFullyDone(selectedPO);
 
+    // Deteksi in-progress inspection untuk tab ini
+    const inProgressInsp = !isStageDone ? getInProgressInspection(type) : null;
+
     [tabRaw, tabRolling, tabLam, tabBond].forEach(t => t && t.classList.remove('active'));
     if (bodyRaw) bodyRaw.style.display = 'none';
     if (bodyRolling) bodyRolling.style.display = 'none';
     if (bodyLam) bodyLam.style.display = 'none';
     if (bodyBond) bodyBond.style.display = 'none';
 
-    if (type === 'raw') {
-        if (tabRaw) tabRaw.classList.add('active');
-        if (bodyRaw) bodyRaw.style.display = 'flex';
-        if (commonFields) commonFields.style.display = 'flex';
-        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Raw Material';
+    const labelMap = {
+        raw: 'Raw Material',
+        rolling: 'Rolling Inspection (Raw)',
+        laminating: 'Laminating Material',
+        bonding: 'Bonding Test',
+    };
+    const bodyMap = { raw: bodyRaw, rolling: bodyRolling, laminating: bodyLam, bonding: bodyBond };
+    const titleMap = {
+        raw: 'Input Hasil Inspeksi - Raw Material',
+        rolling: 'Input Hasil Inspeksi - Rolling Inspection (Raw)',
+        laminating: 'Input Hasil Inspeksi - Laminating Material',
+        bonding: 'Upload Hasil - Bonding Test',
+    };
 
-        if (isRawDone) {
-            if (doneNotice) {
-                doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Raw Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
-            }
-            if (bodyRaw) { bodyRaw.style.opacity = '0.35'; bodyRaw.style.pointerEvents = 'none'; }
-            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-        } else {
-            if (doneNotice) doneNotice.style.display = 'none';
-            if (bodyRaw) { bodyRaw.style.opacity = '1'; bodyRaw.style.pointerEvents = 'auto'; }
-            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
-        }
-    } else if (type === 'rolling') {
-        if (tabRolling) tabRolling.classList.add('active');
-        if (bodyRolling) bodyRolling.style.display = 'flex';
-        if (commonFields) commonFields.style.display = 'flex';
-        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Rolling Inspection (Raw)';
+    const activeTab = { raw: tabRaw, rolling: tabRolling, laminating: tabLam, bonding: tabBond }[type];
+    const activeBody = bodyMap[type];
+    if (activeTab) activeTab.classList.add('active');
+    if (activeBody) activeBody.style.display = 'flex';
+    if (commonFields) commonFields.style.display = (type === 'bonding') ? 'none' : 'flex';
+    if (sectionTitle) sectionTitle.textContent = titleMap[type] || '';
 
-        if (isRollingDone) {
-            if (doneNotice) {
-                doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pemeriksaan <strong>Rolling Inspection (Raw)</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
-            }
-            if (bodyRolling) { bodyRolling.style.opacity = '0.35'; bodyRolling.style.pointerEvents = 'none'; }
-            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-        } else {
-            if (doneNotice) doneNotice.style.display = 'none';
-            if (bodyRolling) { bodyRolling.style.opacity = '1'; bodyRolling.style.pointerEvents = 'auto'; }
-            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+    if (isStageDone) {
+        // ── DONE: Tab terkunci permanen ──
+        if (doneNotice) {
+            doneNotice.style.display = 'flex';
+            doneNotice.style.background = 'rgba(245, 158, 11, 0.10)';
+            doneNotice.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+            doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#fbbf24;">lock</span><span>Pengecekan <strong>${labelMap[type]}</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
         }
-    } else if (type === 'laminating') {
-        if (tabLam) tabLam.classList.add('active');
-        if (bodyLam) bodyLam.style.display = 'flex';
-        if (commonFields) commonFields.style.display = 'flex';
-        if (sectionTitle) sectionTitle.textContent = 'Input Hasil Inspeksi - Laminating Material';
+        if (activeBody) { activeBody.style.opacity = '0.35'; activeBody.style.pointerEvents = 'none'; }
+        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
+    } else if (inProgressInsp) {
+        // ── IN-PROGRESS: Tampilkan notice + tombol Edit ──
+        const ok = Number(inProgressInsp.ok) || 0;
+        const noQ = Number(inProgressInsp.no_qty) || 0;
+        const totalInsp = ok + noQ;
+        const passRate = totalInsp > 0 ? ((ok / totalInsp) * 100).toFixed(1) : '—';
+        const inspDate = inProgressInsp.inspection_date
+            ? new Date(inProgressInsp.inspection_date).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
 
-        if (isLamDone) {
-            if (doneNotice) {
-                doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengecekan <strong>Laminating Material</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
-            }
-            if (bodyLam) { bodyLam.style.opacity = '0.35'; bodyLam.style.pointerEvents = 'none'; }
-            if (commonFields) { commonFields.style.opacity = '0.35'; commonFields.style.pointerEvents = 'none'; }
-        } else {
-            if (doneNotice) doneNotice.style.display = 'none';
-            if (bodyLam) { bodyLam.style.opacity = '1'; bodyLam.style.pointerEvents = 'auto'; }
-            if (commonFields) { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+        let summaryExtra = '';
+        if (type === 'raw') {
+            summaryExtra = `
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+                    <span style="font-size:12px;color:#94a3b8;">Qty Inspect: <strong style="color:#e2e8f0;">${totalInsp}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Qty Fail: <strong style="color:#fca5a5;">${noQ}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Pass Rate: <strong style="color:#6ee7b7;">${passRate}%</strong></span>
+                </div>`;
+        } else if (type === 'rolling') {
+            summaryExtra = `
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+                    <span style="font-size:12px;color:#94a3b8;">Status: <strong style="color:#e2e8f0;">${inProgressInsp.roll_inspection_flag || '—'}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Sample: <strong style="color:#e2e8f0;">${inProgressInsp.roll_inspection_percentage || '—'}</strong></span>
+                </div>`;
+        } else if (type === 'laminating') {
+            summaryExtra = `
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+                    <span style="font-size:12px;color:#94a3b8;">Color: <strong style="color:#e2e8f0;">${inProgressInsp.color_check_status || '—'}</strong></span>
+                    <span style="font-size:12px;color:#94a3b8;">Packaging: <strong style="color:#e2e8f0;">${inProgressInsp.packaging_status || '—'}</strong></span>
+                </div>`;
         }
-    } else if (type === 'bonding') {
-        if (tabBond) tabBond.classList.add('active');
-        if (bodyBond) bodyBond.style.display = 'flex';
-        if (commonFields) commonFields.style.display = 'none';
-        if (sectionTitle) sectionTitle.textContent = 'Upload Hasil - Bonding Test';
 
-        if (isBondDone) {
-            if (doneNotice) {
-                doneNotice.style.display = 'flex';
-                doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;">lock</span><span>Pengujian <strong>Bonding Test</strong> untuk PO ini telah <strong>Selesai (Done)</strong>.</span>`;
+        if (doneNotice) {
+            doneNotice.style.display = 'flex';
+            doneNotice.style.flexDirection = 'column';
+            doneNotice.style.alignItems = 'flex-start';
+            doneNotice.style.gap = '10px';
+            doneNotice.style.background = 'rgba(59, 130, 246, 0.10)';
+            doneNotice.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+            doneNotice.innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;width:100%;">
+                    <span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#60a5fa;">edit_note</span>
+                    <div style="flex:1;">
+                        <div style="font-size:13px;font-weight:700;color:#93c5fd;">Inspeksi <strong>${labelMap[type]}</strong> tersimpan sebagai <strong>In-Progress</strong></div>
+                        <div style="font-size:11px;color:#64748b;margin-top:2px;">Disimpan: ${inspDate} · oleh ${inProgressInsp.inspector_nik || '—'}</div>
+                        ${summaryExtra}
+                    </div>
+                    <button type="button" id="btn-edit-inprogress"
+                        style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(59,130,246,0.4);flex-shrink:0;">
+                        <span class="material-symbols-outlined" style="font-size:16px;">edit</span> Edit
+                    </button>
+                </div>`;
+
+            // Bind tombol Edit
+            const editBtn = document.getElementById('btn-edit-inprogress');
+            if (editBtn) {
+                editBtn.addEventListener('click', () => {
+                    // Unlock form
+                    if (activeBody) { activeBody.style.opacity = '1'; activeBody.style.pointerEvents = 'auto'; }
+                    if (commonFields && type !== 'bonding') { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
+                    // Sembunyikan notice
+                    if (doneNotice) doneNotice.style.display = 'none';
+                    // Pre-fill data dari inspeksi sebelumnya
+                    prefillFormFromInspection(inProgressInsp, type);
+                    // Aktifkan tombol aksi
+                    const btnSP = document.getElementById('btn-save-progress');
+                    const btnFI = document.getElementById('btn-finish-inspect');
+                    if (btnSP) { btnSP.disabled = false; btnSP.style.opacity = '1'; btnSP.style.pointerEvents = 'auto'; }
+                    if (btnFI) { btnFI.disabled = false; btnFI.style.opacity = '1'; btnFI.style.pointerEvents = 'auto'; }
+                });
             }
-            if (bodyBond) { bodyBond.style.opacity = '0.35'; bodyBond.style.pointerEvents = 'none'; }
-        } else {
-            if (doneNotice) doneNotice.style.display = 'none';
-            if (bodyBond) { bodyBond.style.opacity = '1'; bodyBond.style.pointerEvents = 'auto'; }
         }
+        // Form terkunci sampai user klik Edit
+        if (activeBody) { activeBody.style.opacity = '0.25'; activeBody.style.pointerEvents = 'none'; }
+        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '0.25'; commonFields.style.pointerEvents = 'none'; }
+    } else {
+        // ── CLEAN / BELUM ADA DATA: Form terbuka normal ──
+        if (doneNotice) {
+            doneNotice.style.display = 'none';
+            doneNotice.style.flexDirection = '';
+            doneNotice.style.alignItems = '';
+            doneNotice.style.background = '';
+            doneNotice.style.borderColor = '';
+        }
+        if (activeBody) { activeBody.style.opacity = '1'; activeBody.style.pointerEvents = 'auto'; }
+        if (commonFields && type !== 'bonding') { commonFields.style.opacity = '1'; commonFields.style.pointerEvents = 'auto'; }
     }
 
     // ── Update Action Buttons ──
@@ -242,16 +349,12 @@ window.switchInspectionTab = function (type) {
     const btnFinishInspect = document.getElementById('btn-finish-inspect');
     const legacySubmit = document.getElementById('submit-btn');
 
+    const lockButtons = isStageDone || isPOAlreadyDone || Boolean(inProgressInsp);
+
     if (btnSaveProgress) {
-        if (isStageDone || isPOAlreadyDone) {
-            btnSaveProgress.disabled = true;
-            btnSaveProgress.style.opacity = '0.4';
-            btnSaveProgress.style.pointerEvents = 'none';
-        } else {
-            btnSaveProgress.disabled = false;
-            btnSaveProgress.style.opacity = '1';
-            btnSaveProgress.style.pointerEvents = 'auto';
-        }
+        btnSaveProgress.disabled = lockButtons;
+        btnSaveProgress.style.opacity = lockButtons ? '0.4' : '1';
+        btnSaveProgress.style.pointerEvents = lockButtons ? 'none' : 'auto';
         btnSaveProgress.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">bookmark_added</span> Simpan Progress';
     }
 
@@ -262,9 +365,9 @@ window.switchInspectionTab = function (type) {
             btnFinishInspect.style.pointerEvents = 'none';
             btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">check_circle</span> Tahap Selesai';
         } else {
-            btnFinishInspect.disabled = false;
-            btnFinishInspect.style.opacity = '1';
-            btnFinishInspect.style.pointerEvents = 'auto';
+            btnFinishInspect.disabled = Boolean(inProgressInsp); // terkunci sampai Edit diklik
+            btnFinishInspect.style.opacity = inProgressInsp ? '0.4' : '1';
+            btnFinishInspect.style.pointerEvents = inProgressInsp ? 'none' : 'auto';
             btnFinishInspect.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">task_alt</span> Selesai Inspect';
         }
     }
