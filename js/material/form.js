@@ -137,9 +137,13 @@ window.updateTabBadges = function (po) {
 
 // ─── Helper: cari inspeksi in-progress untuk tab type saat ini ───
 function getInProgressInspection(type) {
-    if (!selectedPO || !Array.isArray(selectedPO.material_inspections)) return null;
+    if (!selectedPO || !Array.isArray(selectedPO.material_inspections)) {
+        console.log('[getInProgressInsp] no selectedPO or no material_inspections array', selectedPO?.material_inspections);
+        return null;
+    }
     const typeMap = { raw: 'raw material', rolling: 'rolling', laminating: 'laminating', bonding: 'bonding' };
     const keyword = typeMap[type] || type;
+    console.log('[getInProgressInsp] type:', type, 'keyword:', keyword, 'inspections:', selectedPO.material_inspections.map(i => ({ type: i.inspection_type, status: i.status })));
     return selectedPO.material_inspections.find(insp => {
         const itype = String(insp.inspection_type || '').toLowerCase();
         const status = String(insp.status || '').toLowerCase();
