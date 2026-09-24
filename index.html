@@ -260,6 +260,24 @@
             border-color: #2563eb;
         }
 
+        /* Sort filter toggle buttons (Highest / Lowest) */
+        #ncvs-sort-filter .btn,
+        #model-sort-filter .btn {
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+        }
+        #ncvs-sort-filter .btn.active,
+        #model-sort-filter .btn.active {
+            background: #1e293b !important;
+            color: #ffffff !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+            transform: scale(1.04);
+        }
+        #ncvs-sort-filter .btn:not(.active):hover,
+        #model-sort-filter .btn:not(.active):hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
         .stat-card {
             background: white;
             border-radius: 0.5rem;
@@ -1726,68 +1744,8 @@
                                 <div class="chart-container" style="position:relative;height:280px;"><canvas
                                         id="modelFttChart"></canvas></div>
                             </div>
-
-                            <!-- Inspection Table (Full Width) -->
-                            <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
-                                <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                                    <h3 class="text-base font-semibold text-slate-900">Full Inspection Data</h3>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
-                                        <thead>
-                                            <tr class="bg-slate-50 border-b border-slate-200">
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Timestamp</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Tgl Incoming</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Tgl Inspect</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Bucket</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Auditor</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Vendor</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Material</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Component</th>
-                                                <th
-                                                    class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Style #</th>
-                                                <th
-                                                    class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Qty In</th>
-                                                <th
-                                                    class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Inspected</th>
-                                                <th
-                                                    class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Pass</th>
-                                                <th
-                                                    class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    Defect</th>
-                                                <th
-                                                    class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                                                    FTT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="inspectionTableBody"></tbody>
-                                    </table>
-                                </div>
-                                <div id="dashboard-table-pagination"
-                                    class="px-4 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-wrap gap-3 text-xs text-slate-500">
-                                </div>
-                            </div>
                         </div>
+
                     </div>
                 </div>
 

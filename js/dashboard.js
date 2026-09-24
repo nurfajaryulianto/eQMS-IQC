@@ -376,18 +376,22 @@ const fttDataLabelsPlugin = {
         chart.data.datasets.forEach((dataset, i) => {
             const meta = chart.getDatasetMeta(i);
             if (meta.hidden) return;
+            // Derive label color from dataset bar color (fallback to chart foreground)
+            const barColor = Array.isArray(dataset.backgroundColor)
+                ? (dataset.backgroundColor[0] || '#38bdf8')
+                : (dataset.backgroundColor || '#38bdf8');
             meta.data.forEach((point, index) => {
                 const val = dataset.data[index];
                 if (val == null) return;
                 const numVal = typeof val === 'number' ? val : parseFloat(val);
                 const text = `${numVal.toFixed(1)}%`;
 
-                ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#38bdf8';
+                ctx.fillStyle = barColor;
 
-                const yPos = Math.max(point.y - 6, 14);
+                const yPos = Math.max(point.y - 4, 14);
                 ctx.fillText(text, point.x, yPos);
             });
         });
@@ -552,15 +556,16 @@ function updateModelPerformanceChart(data, sortOrder) {
     }, {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 20 } },
         plugins: {
             legend: { display: false },
             tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
         },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } },
+            y: { beginAtZero: true, max: 110, ticks: { callback: v => v <= 100 ? `${v}%` : '' } },
             x: { ticks: { maxRotation: 25, minRotation: 0 } }
         }
-    });
+    }, [fttDataLabelsPlugin]);
 }
 
 function updateNcvsFttChart(data, sortOrder) {
@@ -602,15 +607,16 @@ function updateNcvsFttChart(data, sortOrder) {
     }, {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 20 } },
         plugins: {
             legend: { display: false },
             tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
         },
         scales: {
-            y: { beginAtZero: true, max: 100, ticks: { callback: v => `${v}%` } },
+            y: { beginAtZero: true, max: 110, ticks: { callback: v => v <= 100 ? `${v}%` : '' } },
             x: { ticks: { maxRotation: 25, minRotation: 0 } }
         }
-    });
+    }, [fttDataLabelsPlugin]);
 }
 
 function parseDateString(str) {
