@@ -263,6 +263,9 @@
         /* Sort filter toggle buttons (Highest / Lowest) */
         #ncvs-sort-filter .btn,
         #model-sort-filter .btn {
+            color: #64748b;
+            background: transparent;
+            border: none;
             transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
         }
         #ncvs-sort-filter .btn.active,
@@ -1712,12 +1715,8 @@
                                             subcont vendors</p>
                                     </div>
                                     <div id="ncvs-sort-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                        <button type="button"
-                                            class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
-                                            data-sort="desc">Highest</button>
-                                        <button type="button"
-                                            class="btn px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded"
-                                            data-sort="asc">Lowest</button>
+                                        <button type="button" class="btn px-3 py-1 text-xs font-semibold rounded active" data-sort="desc">Highest</button>
+                                        <button type="button" class="btn px-3 py-1 text-xs font-semibold rounded" data-sort="asc">Lowest</button>
                                     </div>
                                 </div>
                                 <div class="chart-container" style="position:relative;height:280px;"><canvas
@@ -1733,12 +1732,8 @@
                                             shoe model</p>
                                     </div>
                                     <div id="model-sort-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
-                                        <button type="button"
-                                            class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
-                                            data-sort="desc">Highest</button>
-                                        <button type="button"
-                                            class="btn px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded"
-                                            data-sort="asc">Lowest</button>
+                                        <button type="button" class="btn px-3 py-1 text-xs font-semibold rounded active" data-sort="desc">Highest</button>
+                                        <button type="button" class="btn px-3 py-1 text-xs font-semibold rounded" data-sort="asc">Lowest</button>
                                     </div>
                                 </div>
                                 <div class="chart-container" style="position:relative;height:280px;"><canvas
