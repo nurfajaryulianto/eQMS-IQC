@@ -277,6 +277,9 @@ window.renderMasterTable = function () {
             ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus Master PO" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'"><span class='material-symbols-outlined' style='font-size:14px;'>delete</span></button>`
             : '';
         const vendorName = (d.supplier_name && String(d.supplier_name).trim() !== '') ? String(d.supplier_name).trim() : (d.supplier || d.vendor_name || '—');
+        const matDesc = (d.material_description || d.item_description || '').trim() || d.material_name || '—';
+        const matCode = (d.material_name || '').trim();
+        const matTitle = matDesc + (matCode && matCode !== matDesc ? ` (Kode: ${matCode})` : '');
 
         const canExpand = insps.length > 0 || d.status === 'done' || hasInspection;
         const expandBtn = canExpand
@@ -291,7 +294,7 @@ window.renderMasterTable = function () {
         let mainRow = `<tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition: background-color 0.2s; ${isExpanded ? 'background:rgba(16,185,129,0.04);' : ''}">
             <td style="padding:10px 4px;text-align:center;white-space:nowrap;">${expandBtn}</td>
             <td class="truncate" title="${esc(d.po_number)}" style="padding:10px 12px;font-weight:700;color:#ffffff;font-size:13px;">${esc(d.po_number)}</td>
-            <td class="truncate" title="${esc(d.material_name)}" style="padding:10px 12px;color:#34d399;font-weight:600;font-size:13px;">${esc(d.material_name)}</td>
+            <td class="truncate" title="${esc(matTitle)}" style="padding:10px 12px;color:#34d399;font-weight:600;font-size:13px;">${esc(matDesc)}</td>
             <td class="truncate" title="${esc(vendorName)}" style="padding:10px 12px;color:rgba(255,255,255,0.7);font-size:13px;">${esc(vendorName)}</td>
             <td class="truncate" style="padding:10px 8px;color:rgba(255,255,255,0.55);font-size:12px;text-align:center;">${esc(d.uom)}</td>
             <td style="padding:10px 12px;color:#ffffff;font-size:13px;text-align:right;font-weight:700;white-space:nowrap;">${Number(d.planned_qty || d.batch_size || 0).toLocaleString('id-ID')}</td>
@@ -370,6 +373,8 @@ function renderMasterPagination(totalPages, totalRows, startRow, endRow) {
 }
 
 function renderMasterInspectionDetailRow(d, insps) {
+    const matDesc = (d.material_description || d.item_description || '').trim() || d.material_name || '—';
+
     if (!insps || insps.length === 0) {
         return `
         <tr class="master-expand-row" style="background:rgba(10,25,18,0.55);border-bottom:1px solid rgba(255,255,255,0.08);">
@@ -380,7 +385,7 @@ function renderMasterInspectionDetailRow(d, insps) {
                             <span class="material-symbols-outlined" style="font-size:20px;">verified</span>
                         </div>
                         <div>
-                            <div style="font-size:13px;font-weight:700;color:#fff;">PO: <span style="color:#34d399;">${esc(d.po_number)}</span> — ${esc(d.material_name)}</div>
+                            <div style="font-size:13px;font-weight:700;color:#fff;">PO: <span style="color:#34d399;">${esc(d.po_number)}</span> — ${esc(matDesc)}</div>
                             <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">
                                 Status Material: <strong style="color:#34d399;">${esc((d.status || 'Done').toUpperCase())}</strong>
                                 ${d.released_by ? ` | Siap Kirim oleh: <strong style="color:#fff;">${esc(d.released_by)}</strong>` : ''}

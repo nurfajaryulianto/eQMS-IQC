@@ -777,6 +777,7 @@ async function fetchMasterData() {
             id:             row.id,
             po_number:      row.po_number || '',
             material_name:  row.material_name || '',
+            material_description: row.material_description || row.item_description || row.material_name || '',
             item_description: row.item_description || '',
             uom:            row.uom || '',
             vendor_name:    row.vendor_name || '',
@@ -890,8 +891,7 @@ function renderPOList(data) {
                 </div>
                 <span style="font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap; flex-shrink:0;" class="${badgeClass}">${badgeText}</span>
             </div>
-            <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_name)}</div>
-            <div style="font-size:11px; color:rgba(255, 255, 255, 0.5); margin-bottom:8px;">${esc(po.item_description)}</div>
+            <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_description || po.material_name)}</div>
             <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7); margin-bottom:8px;">
                 <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
                 <span><span style="color:rgba(255, 255, 255, 0.5);">STYLE </span>${esc(po.style)}</span>
@@ -1004,7 +1004,7 @@ async function selectPO(po, cardEl) {
     const bondingTargetPoNo = document.getElementById('bonding-target-po-no');
     const bondingTargetMatName = document.getElementById('bonding-target-mat-name');
     if (bondingTargetPoNo) bondingTargetPoNo.textContent = po.po_number;
-    if (bondingTargetMatName) bondingTargetMatName.textContent = po.material_name || '';
+    if (bondingTargetMatName) bondingTargetMatName.textContent = po.material_description || po.material_name || '';
 
     // Show detail
     const detailEl = document.getElementById('po-detail');
@@ -1072,8 +1072,7 @@ async function selectPO(po, cardEl) {
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
-                ${row('Material', po.material_name)}
-                ${row('Deskripsi', po.item_description)}
+                ${row('Material', po.material_description || po.material_name)}
                 ${row('UOM', po.uom)}
                 ${row('Vendor', po.vendor_name)}
                 ${row('Style', po.style)}
@@ -1372,7 +1371,7 @@ window.openValidationDialog = function (isStepDone = false) {
         let summaryHtml = `
             ${summaryRow('Tindakan', actionStatusText, true)}
             ${summaryRow('Target PO Number', selectedPO.po_number)}
-            ${summaryRow('Material Name', selectedPO.material_name)}
+            ${summaryRow('Material', selectedPO.material_description || selectedPO.material_name)}
             ${summaryRow('Vendor', selectedPO.vendor_name)}
             ${summaryRow('Jenis Inspeksi', inspectTypeLabel)}
         `;

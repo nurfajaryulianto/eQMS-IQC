@@ -264,7 +264,7 @@ function renderInspectionLog(data) {
 
         const matCode = d.material_name || '—';
         const matDesc = d.material_description || d.item_description || '';
-        const matFullTitle = matCode + (matDesc && matDesc !== matCode ? ` (${matDesc})` : '');
+        const matFullTitle = matDesc || matCode;
 
         let adminPassAllBadge = '';
         if (d.executed_by || d.input_type === 'batch_pass_all') {
@@ -459,7 +459,7 @@ window.editInspectionRow = function(id) {
 
     const subtitle = document.getElementById('edit-insp-subtitle');
     if (subtitle) {
-        subtitle.textContent = `PO: ${item.po_no || item.po_number || '-'} | Material: ${item.material_name || '-'}`;
+        subtitle.textContent = `PO: ${item.po_no || item.po_number || '-'} | Material: ${item.material_description || item.item_description || item.material_name || '-'}`;
     }
 
     modal.style.display = 'flex';
