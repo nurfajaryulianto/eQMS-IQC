@@ -15,6 +15,15 @@ let currentInspectionType = 'raw'; // 'raw' | 'rolling' | 'laminating' | 'bondin
 let lamColorChoice = 'YES'; // 'YES' | 'NO'
 let lamPackagingChoice = 'YES'; // 'YES' | 'NO'
 let pendingIsStepDone = false; // flag apakah submit tombol Selesai Inspect (true) atau Simpan Progress (false)
+let isFormDirty = false; // flag apakah user sedang mengedit form dan ada perubahan belum disimpan
+
+export function markFormDirty(dirty = true) {
+    if (!selectedPO) {
+        isFormDirty = false;
+        return;
+    }
+    isFormDirty = Boolean(dirty);
+}
 
 // ─── STEP CHECKERS & STATUS HELPERS ─────────────────────────
 export function countCompletedSteps(po) {
@@ -41,14 +50,31 @@ export function isPOFullyDone(po) {
     return (po.status === 'done' && (steps >= 3 || isReleasedByAdmin)) || (steps >= 4);
 }
 
+export function isPOWaitingDecision(po) {
+    if (!po || isPOFullyDone(po)) return false;
+    if (po.is_waiting_decision) return true;
+    if (Array.isArray(po.material_inspections) && po.material_inspections.length > 0) {
+        return po.material_inspections.some(insp => {
+            const st = String(insp.status || '').toLowerCase().trim();
+            return st === 'in-progress' || st === 'in progress';
+        });
+    }
+    return false;
+}
+
+export function isPOInStepProgress(po) {
+    if (!po || isPOFullyDone(po)) return false;
+    if (isPOWaitingDecision(po)) return false;
+    const steps = countCompletedSteps(po);
+    return steps > 0 && steps < 4;
+}
+
 export function isPOInProgress(po) {
     if (!po || isPOFullyDone(po)) return false;
-    const steps = countCompletedSteps(po);
-    return steps > 0 ||
+    return isPOWaitingDecision(po) || isPOInStepProgress(po) ||
            po.status === 'in-progress' ||
            po.status === 'in progress' ||
-           (po.checked_qty > 0) ||
-           po.status === 'done';
+           (po.checked_qty > 0);
 }
 
 // ─── GLOBAL SWITCHERS & TOGGLES FOR UI ───────────────────────
@@ -723,6 +749,57 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
+
+    // Setup input listeners untuk pelacakan form dirty (hanya aktif jika user aktif mengedit)
+    const dirtyInputIds = [
+        'qty-inspect', 'qty-fail', 'check-color', 'defect-notes',
+        'rolling-inspect-status', 'rolling-inspect-percentage', 'rolling-inspect-notes',
+        'lam-color-result', 'lam-packaging-reason', 'lam-roll-percentage', 'bonding-notes'
+    ];
+    dirtyInputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => markFormDirty(true));
+            el.addEventListener('change', () => markFormDirty(true));
+        }
+    });
+
+    ['bonding-file', 'evidence-file'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', () => {
+                if (el.files && el.files.length > 0) markFormDirty(true);
+            });
+        }
+    });
+
+    // Auto-select PO dari URL query jika ada (?po=...&id=...)
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qPo = urlParams.get('po');
+        const qId = urlParams.get('id');
+        const qType = urlParams.get('type');
+        if (qId || qPo) {
+            const target = allPOData.find(p => (qId && String(p.id) === String(qId)) || (qPo && p.po_number === qPo));
+            if (target) {
+                let cardEl = document.querySelector(`.po-card[data-id="${target.id}"]`) || document.querySelector(`.po-card[data-po-number="${target.po_number}"]`);
+                if (!cardEl) {
+                    const statusFilterEl = document.getElementById('status-filter');
+                    if (statusFilterEl) {
+                        statusFilterEl.value = 'all';
+                        filterPOList();
+                        cardEl = document.querySelector(`.po-card[data-id="${target.id}"]`) || document.querySelector(`.po-card[data-po-number="${target.po_number}"]`);
+                    }
+                }
+                await selectPO(target, cardEl || document.createElement('div'));
+                if (qType) {
+                    switchInspectionTab(qType);
+                }
+            }
+        }
+    } catch (urlErr) {
+        console.warn('URL auto-select error:', urlErr);
+    }
 });
 
 // ─── NAVBAR ──────────────────────────────────────────────────
@@ -852,12 +929,13 @@ function renderPOList(data) {
     // Remove existing cards (keep loading/empty elements)
     container.querySelectorAll('.po-card').forEach(el => el.remove());
 
-    // Sort: pending -> 0, in-progress -> 1, done -> 2
+    // Sort: waiting-decision (0) -> in-progress-steps (1) -> pending (2) -> done (3)
     const sorted = [...data].sort((a, b) => {
         const getRank = (po) => {
-            if (isPOFullyDone(po)) return 2;
-            if (isPOInProgress(po)) return 1;
-            return 0;
+            if (isPOFullyDone(po)) return 3;
+            if (isPOWaitingDecision(po)) return 0;
+            if (isPOInStepProgress(po)) return 1;
+            return 2;
         };
         return getRank(a) - getRank(b);
     });
@@ -869,9 +947,23 @@ function renderPOList(data) {
         if (po.id) card.dataset.id = po.id;
 
         const isDone = isPOFullyDone(po);
-        const isPartial = isPOInProgress(po);
-        const badgeClass = isDone ? 'badge-done' : (isPartial ? 'badge-progress' : 'badge-pending');
-        const badgeText = isDone ? 'Ready to Deliver' : (isPartial ? 'In-Progress' : 'Pending');
+        const isWaiting = isPOWaitingDecision(po);
+        const completedSteps = countCompletedSteps(po);
+        const isStepProgress = !isDone && !isWaiting && completedSteps > 0;
+
+        let badgeClass = 'badge-pending';
+        let badgeText = 'Pending';
+
+        if (isDone) {
+            badgeClass = 'badge-done';
+            badgeText = 'Ready to Deliver';
+        } else if (isWaiting) {
+            badgeClass = 'badge-hold';
+            badgeText = '⏸ Menunggu Keputusan';
+        } else if (isStepProgress) {
+            badgeClass = 'badge-stage';
+            badgeText = `Tahap Berjalan (${completedSteps}/4)`;
+        }
 
         const tagBadge = (done, label) => {
             if (done) {
@@ -969,20 +1061,25 @@ function showSwitchPOModal(fromPO, toPO) {
 }
 
 async function selectPO(po, cardEl) {
-    // Safety check: if user already chose a file or entered input for a different PO, confirm switch
+    // Safety check: if user actively entered unsaved data for a different PO, confirm switch
     const bondingFileEl = document.getElementById('bonding-file');
     const evidenceFileEl = document.getElementById('evidence-file');
-    const qtyInspectEl = document.getElementById('qty-inspect');
-    const hasUnsubmittedData = (bondingFileEl && bondingFileEl.files.length > 0) ||
-        (evidenceFileEl && evidenceFileEl.files.length > 0) ||
-        (qtyInspectEl && qtyInspectEl.value && parseInt(qtyInspectEl.value, 10) > 0);
+    const hasUnsavedFiles = (bondingFileEl && bondingFileEl.files.length > 0) ||
+        (evidenceFileEl && evidenceFileEl.files.length > 0);
 
-    if (selectedPO && selectedPO.po_number !== po.po_number && hasUnsubmittedData) {
-        const confirmSwitch = await showSwitchPOModal(selectedPO.po_number, po.po_number);
+    const isDifferentPO = selectedPO && String(selectedPO.id || selectedPO.po_number) !== String(po.id || po.po_number);
+
+    if (isDifferentPO && (isFormDirty || hasUnsavedFiles)) {
+        const fromLabel = selectedPO.po_number ? `${selectedPO.po_number} (${selectedPO.material_name || ''})` : 'PO Sebelumnya';
+        const toLabel = po.po_number ? `${po.po_number} (${po.material_name || ''})` : 'PO Baru';
+        const confirmSwitch = await showSwitchPOModal(fromLabel, toLabel);
         if (!confirmSwitch) {
             return; // Cancel PO switch
         }
     }
+
+    // Reset dirty flag once user switches to new PO
+    isFormDirty = false;
 
     // Deselect all
     document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
@@ -1069,6 +1166,17 @@ async function selectPO(po, cardEl) {
             `;
         }
 
+        const isWaiting = isPOWaitingDecision(po);
+        const waitingNoticeHtml = isWaiting ? `
+            <div style="margin-top:12px; padding:10px 14px; border-radius:12px; background:rgba(245, 158, 11, 0.12); border:1.5px solid rgba(245, 158, 11, 0.35); display:flex; align-items:center; gap:10px;">
+                <span class="material-symbols-outlined" style="color:#fbbf24; font-size:22px; flex-shrink:0;">pause_circle</span>
+                <div style="font-size:12px; color:rgba(255,255,255,0.85); line-height:1.4;">
+                    <strong style="color:#fbbf24;">Status: Menunggu Keputusan (On-Hold)</strong><br>
+                    Proses inspeksi di-pause / menunggu konfirmasi Leader atau pihak terkait. Klik <em>Edit / Lanjutkan</em> pada tab terkait untuk menyelesaikan.
+                </div>
+            </div>
+        ` : '';
+
         detailEl.innerHTML = `
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px;">
                 ${row('PO Number', po.po_number)}
@@ -1082,6 +1190,7 @@ async function selectPO(po, cardEl) {
                 <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">In-Progress Qty</span><span style="color:${inProgressColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${checkedQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
                 <span style="color:rgba(255,255,255,0.6); font-weight:600; white-space:nowrap; align-self:start;">Balance Qty</span><span style="color:${balanceColor}; font-weight:700; word-break:break-word; overflow-wrap:anywhere; line-height:1.4;">${balanceQty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
             </div>
+            ${waitingNoticeHtml}
             ${releaseBannerHtml}
         `;
     }
@@ -1135,13 +1244,20 @@ window.filterPOList = function () {
         ].some(f => (f || '').toLowerCase().includes(search));
 
         const isDone = isPOFullyDone(po);
-        const isPartial = isPOInProgress(po);
-        const isPending = !isDone && !isPartial;
+        const isWaiting = isPOWaitingDecision(po);
+        const completedSteps = countCompletedSteps(po);
+        const isStepProgress = !isDone && !isWaiting && completedSteps > 0;
+        const isPartial = isWaiting || isStepProgress || isPOInProgress(po);
+        const isPending = !isDone && !isWaiting && completedSteps === 0 && (Number(po.checked_qty) || 0) === 0;
 
         let matchStatus = true;
         if (status === 'pending') {
             matchStatus = isPending;
-        } else if (status === 'in-progress') {
+        } else if (status === 'waiting-decision') {
+            matchStatus = isWaiting;
+        } else if (status === 'in-progress-steps') {
+            matchStatus = isStepProgress;
+        } else if (status === 'in-progress' || status === 'in-progress-all') {
             matchStatus = isPartial;
         } else if (status === 'done') {
             matchStatus = isDone;
@@ -1597,6 +1713,7 @@ async function submitInspection() {
                 ? `Inspeksi tahap ${inspectTypeStr} pada PO ${selectedPO.po_number} berhasil diselesaikan!` 
                 : `Progress inspeksi tahap ${inspectTypeStr} pada PO ${selectedPO.po_number} berhasil disimpan!`);
             showToast(msg, 'success');
+            isFormDirty = false;
             const curPoNum = selectedPO.po_number;
             const curPoId = selectedPO.id;
             const curMatName = selectedPO.material_name;

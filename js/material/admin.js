@@ -7,12 +7,12 @@ import { showAlert } from '../dialog.js';
 import './inspection-log.js?v=20260922_expand1';
 import {
     apiGetMasterData, apiUpdateMasterData, apiDeleteMasterData, apiBulkUpsertMasterData,
-    apiPassAll, apiGetInspectionData,
+    apiPassAll, apiCancelPassAll, apiGetInspectionData, apiDeleteInspection,
     apiGetAssignments, apiSaveAssignment, apiDeleteAssignment,
     apiGetUsers, apiSaveUser, apiDeleteUser,
     apiSubmitClaim, apiGetClaims,
     getCurrentUserMeta, apiReleaseMaterialToProduction
-} from './api.js?v=20260922_expand1';
+} from './api.js?v=20260928_fix1';
 
 // ─── STATE ───────────────────────────────────────────────────
 let allMasterData = [];
@@ -272,6 +272,10 @@ window.renderMasterTable = function () {
         const releaseAdminBtn = d.status !== 'done'
             ? `<button onclick="window.adminReleaseMasterRow('${d.id}','${esc(d.po_number)}','${esc(d.material_name)}')" title="Rilis ke Produksi (Ready to Deliver by Admin)" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.background='rgba(16,185,129,0.25)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>local_shipping</span></button>`
             : `<span title="Dirilis oleh: ${esc(d.released_by || 'Admin')}&#10;Catatan: ${esc(d.release_notes || '—')}" style="color:#34d399;display:inline-flex;align-items:center;justify-content:center;padding:4px 6px;cursor:help;"><span class='material-symbols-outlined' style='font-size:16px;'>verified</span></span>`;
+        const isPassAllOrDone = d.status === 'done' || Boolean(d.released_by);
+        const cancelPassBtn = isPassAllOrDone
+            ? `<button onclick="window.cancelPassAllMasterRow('${d.id}','${esc(d.po_number)}')" title="Batalkan Pass All / Release (Kembalikan ke Pending)" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.background='rgba(245,158,11,0.22)'" onmouseout="this.style.background='rgba(245,158,11,0.12)'"><span class='material-symbols-outlined' style='font-size:14px;'>undo</span></button>`
+            : '';
         const editBtn = `<button onclick="window.editMasterRow('${d.id}')" title="Edit Master PO" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.background='rgba(96,165,250,0.25)'" onmouseout="this.style.background='rgba(96,165,250,0.1)'"><span class='material-symbols-outlined' style='font-size:14px;'>edit</span></button>`;
         const deleteBtn = d.status === 'pending'
             ? `<button onclick="window.deleteMasterRow('${d.id}','${esc(d.po_number)}')" title="Hapus Master PO" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.background='rgba(239,68,68,0.2)'" onmouseout="this.style.background='rgba(239,68,68,0.08)'"><span class='material-symbols-outlined' style='font-size:14px;'>delete</span></button>`
@@ -301,7 +305,7 @@ window.renderMasterTable = function () {
             <td style="padding:10px 8px;text-align:center;white-space:nowrap;">${badge}</td>
             <td style="padding:10px 8px;text-align:center;white-space:nowrap;">${claimBtn}</td>
             <td style="padding:10px 8px;text-align:center;white-space:nowrap;">
-                <div style="display:flex;gap:4px;justify-content:center;align-items:center;white-space:nowrap;">${releaseAdminBtn}${editBtn}${deleteBtn}</div>
+                <div style="display:flex;gap:4px;justify-content:center;align-items:center;white-space:nowrap;">${releaseAdminBtn}${cancelPassBtn}${editBtn}${deleteBtn}</div>
             </td>
         </tr>`;
 
@@ -709,6 +713,40 @@ window.adminReleaseMasterRow = async function (id, poNumber, materialName) {
     } catch (err) {
         console.error('adminReleaseMasterRow error:', err);
         showToast('Gagal merilis material: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
+
+window.cancelPassAllMasterRow = async function (id, poNumber) {
+    if (!confirm(`Batalkan status Pass All / Rilis untuk PO "${poNumber}"?\n\nStatus PO dan tahapan inspeksi akan di-reset kembali ke "Pending" agar dapat diinspeksi ulang secara manual.`)) {
+        return;
+    }
+    setLoading(true, 'Membatalkan Pass All & mereset status PO...');
+    try {
+        await apiCancelPassAll(id);
+        showToast(`Pass All untuk PO ${poNumber} berhasil dibatalkan. Status kembali ke Pending.`, 'success');
+        await loadMasterData();
+    } catch (err) {
+        console.error('cancelPassAllMasterRow error:', err);
+        showToast('Gagal membatalkan Pass All: ' + err.message, 'error');
+    } finally {
+        setLoading(false);
+    }
+};
+
+window.deleteInspectionRow = async function (inspId, poNumber) {
+    if (!confirm(`Yakin ingin menghapus baris data inspeksi untuk PO "${poNumber || inspId}"?\n\nStatus PO akan dihitung ulang secara otomatis.`)) {
+        return;
+    }
+    setLoading(true, 'Menghapus data inspeksi...');
+    try {
+        await apiDeleteInspection(inspId);
+        showToast(`Data inspeksi PO ${poNumber} berhasil dihapus. Status PO telah diperbarui.`, 'success');
+        await loadMasterData();
+    } catch (err) {
+        console.error('deleteInspectionRow error:', err);
+        showToast('Gagal menghapus data inspeksi: ' + err.message, 'error');
     } finally {
         setLoading(false);
     }

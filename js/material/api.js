@@ -1070,7 +1070,7 @@ export async function apiDeleteInspection(id) {
         .eq('id', id);
     if (error) throw new Error(error.message);
 
-    // 3. Self-healing: Cek sisa inspeksi untuk master_data terkait
+    // 3. Self-healing: Cek sisa inspeksi untuk master_data terkait dan hitung ulang flag tahapan
     if (insp) {
         let mdId = insp.master_data_id;
         if (!mdId && insp.po_no && insp.material_name) {
@@ -1086,28 +1086,158 @@ export async function apiDeleteInspection(id) {
         if (mdId) {
             const { data: remaining } = await supabase
                 .from('material_inspections')
-                .select('id, ok, no_qty, status')
+                .select('id, ok, no_qty, status, inspection_type, roll_inspection_flag, rolling_inspection, bonding_test_url, color_check_status, packaging_status, evidence_url')
                 .eq('master_data_id', mdId);
 
-            let newStatus = 'pending';
+            let newRawDone = false;
+            let newRollingDone = false;
+            let newLamDone = false;
+            let newBondDone = false;
+            let newCheckedQty = 0;
+            let hasInProgress = false;
+
             if (remaining && remaining.length > 0) {
-                const totalChecked = remaining.reduce((sum, r) => sum + (Number(r.ok) || 0) + (Number(r.no_qty) || 0), 0);
-                const hasDone = remaining.some(r => r.status === 'done' || r.status === 'pass');
-                if (hasDone) {
-                    newStatus = 'done';
-                } else if (totalChecked > 0) {
-                    newStatus = 'in-progress';
-                }
+                newCheckedQty = remaining.reduce((sum, r) => sum + (Number(r.ok) || 0) + (Number(r.no_qty) || 0), 0);
+                hasInProgress = remaining.some(r => {
+                    const st = String(r.status || '').toLowerCase().trim();
+                    return st === 'in-progress' || st === 'in progress';
+                });
+
+                remaining.forEach(r => {
+                    const rDone = String(r.status || '').toLowerCase().trim() === 'done';
+                    if (rDone) {
+                        const itype = String(r.inspection_type || '').toLowerCase();
+                        if (itype.includes('rolling') || String(r.rolling_inspection || '').toLowerCase() === 'yes' || String(r.roll_inspection_flag || '').toLowerCase() === 'yes') {
+                            newRollingDone = true;
+                        }
+                        if (itype.includes('laminating') || String(r.color_check_status || '').toUpperCase() === 'YES' || String(r.packaging_status || '').toUpperCase() === 'YES') {
+                            newLamDone = true;
+                        }
+                        if (itype.includes('bonding') || (r.bonding_test_url && String(r.bonding_test_url).trim() !== '')) {
+                            newBondDone = true;
+                        }
+                        if (itype.includes('raw') || (Number(r.ok) || 0) + (Number(r.no_qty) || 0) > 0 || (r.evidence_url && String(r.evidence_url).trim() !== '')) {
+                            newRawDone = true;
+                        }
+                    }
+                });
             }
 
-            // Restore status ke master_data
+            const completedSteps = (newRawDone ? 1 : 0) + (newRollingDone ? 1 : 0) + (newLamDone ? 1 : 0) + (newBondDone ? 1 : 0);
+            let newStatus = 'pending';
+            if (completedSteps === 4) {
+                newStatus = 'done';
+            } else if (completedSteps > 0 || hasInProgress || newCheckedQty > 0) {
+                newStatus = 'in-progress';
+            }
+
+            const mdPatch = {
+                status: newStatus,
+                raw_done: newRawDone,
+                rolling_done: newRollingDone,
+                laminating_done: newLamDone,
+                bonding_done: newBondDone,
+                checked_qty: newCheckedQty,
+                updated_at: new Date().toISOString()
+            };
+
+            if (newStatus !== 'done') {
+                mdPatch.released_by = null;
+                mdPatch.released_at = null;
+                mdPatch.release_notes = null;
+            }
+
             await supabase
                 .from('material_master_data')
-                .update({ status: newStatus })
+                .update(mdPatch)
                 .eq('id', mdId);
         }
     }
 
+    return { success: true };
+}
+
+/**
+ * Batalkan Pass All untuk satu Master Data:
+ * Menghapus baris inspeksi Pass All dan me-reset status & flag tahapan ke pending.
+ */
+export async function apiCancelPassAll(masterDataId) {
+    if (!masterDataId) throw new Error('Master Data ID tidak valid.');
+
+    // 1. Hapus record inspeksi Pass All terkait
+    await supabase
+        .from('material_inspections')
+        .delete()
+        .eq('master_data_id', masterDataId)
+        .or('input_type.eq.batch_pass_all,inspection_id.ilike.PASS-%');
+
+    // 2. Cek apakah masih ada inspeksi manual lainnya
+    const { data: remaining } = await supabase
+        .from('material_inspections')
+        .select('id, ok, no_qty, status, inspection_type, roll_inspection_flag, rolling_inspection, bonding_test_url, color_check_status, packaging_status, evidence_url')
+        .eq('master_data_id', masterDataId);
+
+    let newRawDone = false;
+    let newRollingDone = false;
+    let newLamDone = false;
+    let newBondDone = false;
+    let newCheckedQty = 0;
+    let hasInProgress = false;
+
+    if (remaining && remaining.length > 0) {
+        newCheckedQty = remaining.reduce((sum, r) => sum + (Number(r.ok) || 0) + (Number(r.no_qty) || 0), 0);
+        hasInProgress = remaining.some(r => {
+            const st = String(r.status || '').toLowerCase().trim();
+            return st === 'in-progress' || st === 'in progress';
+        });
+
+        remaining.forEach(r => {
+            const rDone = String(r.status || '').toLowerCase().trim() === 'done';
+            if (rDone) {
+                const itype = String(r.inspection_type || '').toLowerCase();
+                if (itype.includes('rolling') || String(r.rolling_inspection || '').toLowerCase() === 'yes' || String(r.roll_inspection_flag || '').toLowerCase() === 'yes') {
+                    newRollingDone = true;
+                }
+                if (itype.includes('laminating') || String(r.color_check_status || '').toUpperCase() === 'YES' || String(r.packaging_status || '').toUpperCase() === 'YES') {
+                    newLamDone = true;
+                }
+                if (itype.includes('bonding') || (r.bonding_test_url && String(r.bonding_test_url).trim() !== '')) {
+                    newBondDone = true;
+                }
+                if (itype.includes('raw') || (Number(r.ok) || 0) + (Number(r.no_qty) || 0) > 0 || (r.evidence_url && String(r.evidence_url).trim() !== '')) {
+                    newRawDone = true;
+                }
+            }
+        });
+    }
+
+    const completedSteps = (newRawDone ? 1 : 0) + (newRollingDone ? 1 : 0) + (newLamDone ? 1 : 0) + (newBondDone ? 1 : 0);
+    let newStatus = 'pending';
+    if (completedSteps === 4) {
+        newStatus = 'done';
+    } else if (completedSteps > 0 || hasInProgress || newCheckedQty > 0) {
+        newStatus = 'in-progress';
+    }
+
+    const mdPatch = {
+        status: newStatus,
+        raw_done: newRawDone,
+        rolling_done: newRollingDone,
+        laminating_done: newLamDone,
+        bonding_done: newBondDone,
+        checked_qty: newCheckedQty,
+        released_by: newStatus === 'done' ? undefined : null,
+        released_at: newStatus === 'done' ? undefined : null,
+        release_notes: newStatus === 'done' ? undefined : null,
+        updated_at: new Date().toISOString()
+    };
+
+    const { error: updErr } = await supabase
+        .from('material_master_data')
+        .update(mdPatch)
+        .eq('id', masterDataId);
+
+    if (updErr) throw new Error(updErr.message);
     return { success: true };
 }
 
@@ -1446,11 +1576,25 @@ function normalizeRow(row) {
     // 1. Sudah berstatus done di database DAN minimal 3 tahapan terpenuhi, ATAU
     // 2. Seluruh 4 tahapan selesai, ATAU
     // 3. Dirilis resmi oleh Admin/Supervisor (Admin Override).
+    const hasWaitingDecision = inspections.some(insp => {
+        const s = String(insp.status || '').toLowerCase().trim();
+        return s === 'in-progress' || s === 'in progress';
+    });
+
     const isAllDone = (stepsCount >= 3 && (row.status || '').toLowerCase() === 'done') ||
                       (stepsCount === 4) ||
                       (isReleasedByAdmin && (row.status || '').toLowerCase() === 'done');
-    const isPartial = !isAllDone && (stepsCount > 0 || checkedQty > 0 || (row.status || '').toLowerCase() === 'in-progress' || (row.status || '').toLowerCase() === 'done');
+    const isPartial = !isAllDone && (stepsCount > 0 || checkedQty > 0 || hasWaitingDecision || (row.status || '').toLowerCase() === 'in-progress' || (row.status || '').toLowerCase() === 'done');
     const computedStatus = isAllDone ? 'done' : (isPartial ? 'in-progress' : (row.status || 'pending').toLowerCase());
+
+    let displayStatus = 'pending';
+    if (isAllDone) {
+        displayStatus = 'done';
+    } else if (hasWaitingDecision) {
+        displayStatus = 'waiting-decision';
+    } else if (stepsCount > 0) {
+        displayStatus = 'in-progress-steps';
+    }
 
     const supName = (row.supplier_name && String(row.supplier_name).trim() !== '') ? String(row.supplier_name).trim() : '';
     const sup = (row.supplier && String(row.supplier).trim() !== '') ? String(row.supplier).trim() : '';
@@ -1475,6 +1619,10 @@ function normalizeRow(row) {
         balance_qty:          Math.max(0, (Number(row.batch_size) || 0) - checkedQty),
         receive_date:         row.receive_date || '',
         status:               computedStatus,
+        display_status:       displayStatus,
+        is_waiting_decision:  hasWaitingDecision,
+        steps_completed:      stepsCount,
+        material_inspections: inspections,
         material_type:        row.material_type || '',
         raw_done:             rawDone,
         rolling_done:         rollingDone,

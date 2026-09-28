@@ -244,8 +244,19 @@ function renderInspectionLog(data) {
             ? `<div style="display:inline-flex;gap:5px;justify-content:center;align-items:center;flex-direction:row;">${badges.join('')}</div>`
             : `<span style="color:rgba(255,255,255,0.25);font-size:11px;">—</span>`;
 
+        const isInProgress = String(d.status || '').toLowerCase().includes('progress');
+        const continueBtn = isInProgress
+            ? `<a href="index.html?po=${encodeURIComponent(d.po_no || d.po_number || '')}&id=${d.master_data_id || ''}&type=${encodeURIComponent(String(d.inspection_type || '').toLowerCase().includes('roll') ? 'rolling' : (String(d.inspection_type || '').toLowerCase().includes('lam') ? 'laminating' : (String(d.inspection_type || '').toLowerCase().includes('bond') ? 'bonding' : 'raw')))}"
+                title="Lanjutkan di Form Inspeksi"
+                style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;text-decoration:none;transition:all 0.15s;"
+                onmouseover="this.style.background='rgba(16,185,129,0.3)'" onmouseout="this.style.background='rgba(16,185,129,0.15)'">
+                <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span>
+            </a>`
+            : '';
+
         const actionHtml = `
             <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
+                ${continueBtn}
                 <button type="button" onclick="window.editInspectionRow(${d.id})" title="Edit Data Inspeksi"
                     style="background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);color:#60a5fa;border-radius:6px;padding:3px 6px;cursor:pointer;display:inline-flex;align-items:center;transition:all 0.15s;"
                     onmouseover="this.style.background='rgba(59,130,246,0.3)'" onmouseout="this.style.background='rgba(59,130,246,0.15)'">
