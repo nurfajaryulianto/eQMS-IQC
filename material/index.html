@@ -564,11 +564,11 @@
                         <select id="status-filter" onchange="filterPOList()"
                             class="styled-input" style="width: auto; cursor: pointer;">
                             <option value="all" selected>Semua Status</option>
-                            <option value="pending">Pending (Belum Diinspeksi)</option>
-                            <option value="waiting-decision">⏸ Menunggu Keputusan (On-Hold)</option>
-                            <option value="in-progress-steps">Tahap Berjalan (1-3 Selesai)</option>
-                            <option value="in-progress-all">Semua In-Progress (Gabungan)</option>
-                            <option value="done">Ready to Deliver (Done)</option>
+                            <option value="pending">Open (Belum Diinspeksi)</option>
+                            <option value="waiting-decision">⏸ On Hold (Pending Disposition)</option>
+                            <option value="in-progress-steps">In-Inspection (Tahap Berjalan)</option>
+                            <option value="in-progress-all">Semua Dalam Proses (In-Inspection & On Hold)</option>
+                            <option value="done">Passed & Released</option>
                         </select>
                         <div style="display: flex; align-items: center; gap: 4px;">
                             <input type="date" id="po-date-filter" onchange="filterPOList()"
@@ -631,7 +631,7 @@
                                 <span class="tab-step-label">Tahap 1</span>
                                 <span class="tab-main-label">Raw Material</span>
                             </div>
-                            <span id="badge-tab-raw" class="tab-status-pill">Pending</span>
+                            <span id="badge-tab-raw" class="tab-status-pill">Open</span>
                         </button>
                         <button type="button" id="tab-check-rolling" class="inspection-tab-btn" onclick="switchInspectionTab('rolling')">
                             <div class="tab-icon-box">
@@ -641,7 +641,7 @@
                                 <span class="tab-step-label">Tahap 2</span>
                                 <span class="tab-main-label">Rolling Insp</span>
                             </div>
-                            <span id="badge-tab-rolling" class="tab-status-pill">Pending</span>
+                            <span id="badge-tab-rolling" class="tab-status-pill">Open</span>
                         </button>
                         <button type="button" id="tab-check-laminating" class="inspection-tab-btn" onclick="switchInspectionTab('laminating')">
                             <div class="tab-icon-box">
@@ -651,7 +651,7 @@
                                 <span class="tab-step-label">Tahap 3</span>
                                 <span class="tab-main-label">Laminating</span>
                             </div>
-                            <span id="badge-tab-laminating" class="tab-status-pill">Pending</span>
+                            <span id="badge-tab-laminating" class="tab-status-pill">Open</span>
                         </button>
                         <button type="button" id="tab-check-bonding" class="inspection-tab-btn" onclick="switchInspectionTab('bonding')">
                             <div class="tab-icon-box">
@@ -661,7 +661,7 @@
                                 <span class="tab-step-label">Tahap 4</span>
                                 <span class="tab-main-label">Bonding Test</span>
                             </div>
-                            <span id="badge-tab-bonding" class="tab-status-pill">Pending</span>
+                            <span id="badge-tab-bonding" class="tab-status-pill">Open</span>
                         </button>
                     </div>
                 </div>
@@ -677,7 +677,7 @@
                         <!-- DONE PO NOTICE BANNER -->
                         <div id="done-po-notice" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1.5px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 12px 14px; font-size: 12px; color: #fbbf24; gap: 8px; align-items: center;">
                             <span class="material-symbols-outlined" style="font-size: 18px; flex-shrink: 0;">lock</span>
-                            <span>Material berstatus <strong>Done</strong> tidak dapat diisi lagi. Pilih jenis pengecekan lainnya yang masih Pending.</span>
+                            <span>Tahapan inspeksi ini telah <strong>Passed & Released</strong>. Silakan pilih tahapan lain yang masih Open atau On Hold.</span>
                         </div>
 
                         <!-- FORM SUB-CONTAINER 1: RAW MATERIAL -->

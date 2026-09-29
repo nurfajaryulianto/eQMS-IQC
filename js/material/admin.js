@@ -166,8 +166,18 @@ window.renderMasterTable = function () {
 
     const filtered = allMasterData.filter(d => {
         // 1. Status Filter
-        if (filterStatus !== 'all' && d.status !== filterStatus) {
-            return false;
+        if (filterStatus !== 'all') {
+            const isDone = d.status === 'done' || Boolean(d.released_by);
+            const isWaiting = Boolean(d.is_waiting_decision);
+            const stepsDone = d.steps_completed || 0;
+            const isStepProgress = !isDone && !isWaiting && (stepsDone > 0 || d.status === 'in-progress');
+            const isPending = !isDone && !isWaiting && stepsDone === 0 && d.status !== 'in-progress';
+
+            if (filterStatus === 'pending' && !isPending) return false;
+            if (filterStatus === 'waiting-decision' && !isWaiting) return false;
+            if (filterStatus === 'in-progress-steps' && !isStepProgress) return false;
+            if (filterStatus === 'in-progress' && !(isWaiting || isStepProgress)) return false;
+            if (filterStatus === 'done' && !isDone) return false;
         }
 
         // 2. Date Range Filter
@@ -258,12 +268,19 @@ window.renderMasterTable = function () {
         const isExpanded = expandedMasterRowIds.has(rowKey);
 
         let badge;
-        if (d.status === 'done') {
-            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-done">Done</span>`;
-        } else if (d.status === 'in-progress') {
-            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);white-space:nowrap;display:inline-block;">In Progress</span>`;
+        const isDone = d.status === 'done' || Boolean(d.released_by);
+        const isWaiting = Boolean(d.is_waiting_decision);
+        const stepsDone = d.steps_completed || 0;
+
+        if (isDone) {
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-done" title="Passed & Released">Passed & Released</span>`;
+        } else if (isWaiting) {
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-hold" title="On Hold (Pending Disposition)">⏸ On Hold</span>`;
+        } else if (stepsDone > 0 || d.status === 'in-progress') {
+            const stepLabel = stepsDone > 0 ? `In-Inspection (${stepsDone}/4)` : 'In-Inspection';
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-stage" title="In-Inspection">${stepLabel}</span>`;
         } else {
-            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-pending">Pending</span>`;
+            badge = `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;display:inline-block;" class="badge-pending" title="Open (Belum Diinspeksi)">Open</span>`;
         }
         const hasInspection = d.raw_done || d.laminating_done || d.bonding_done || d.checked_qty > 0 || insps.length > 0;
         const claimBtn = hasInspection
@@ -391,7 +408,7 @@ function renderMasterInspectionDetailRow(d, insps) {
                         <div>
                             <div style="font-size:13px;font-weight:700;color:#fff;">PO: <span style="color:#34d399;">${esc(d.po_number)}</span> — ${esc(matDesc)}</div>
                             <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:2px;">
-                                Status Material: <strong style="color:#34d399;">${esc((d.status || 'Done').toUpperCase())}</strong>
+                                Status Material: <strong style="color:${d.status === 'done' ? '#34d399' : (d.is_waiting_decision ? '#fbbf24' : '#60a5fa')};">${esc(d.status === 'done' ? 'PASSED & RELEASED' : (d.is_waiting_decision ? 'ON HOLD (PENDING DISPOSITION)' : (d.steps_completed > 0 ? 'IN-INSPECTION' : (d.status || 'OPEN').toUpperCase())))}</strong>
                                 ${d.released_by ? ` | Siap Kirim oleh: <strong style="color:#fff;">${esc(d.released_by)}</strong>` : ''}
                                 ${d.release_notes ? ` | Catatan: <em>${esc(d.release_notes)}</em>` : ''}
                             </div>
@@ -461,7 +478,7 @@ function renderMasterInspectionDetailRow(d, insps) {
             stLabel = 'REJECT/DEFECT';
         } else if (st === 'in-progress' || st === 'pending') {
             stColor = '#fbbf24';
-            stLabel = 'IN PROGRESS';
+            stLabel = 'ON HOLD';
         }
 
         // Berkas (Files)

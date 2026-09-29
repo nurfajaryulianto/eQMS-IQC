@@ -192,7 +192,12 @@ function renderInspectionLog(data) {
         const total = ok + noQty;
         const passRate = total > 0 ? ((ok / total) * 100).toFixed(0) + '%' : '—';
 
-        const statusColor = d.status === 'done' ? '#34d399' : d.status === 'in-progress' ? '#fbbf24' : '#94a3b8';
+        const statusUpper = String(d.status || '').toUpperCase().trim();
+        const isInspDone = statusUpper === 'DONE';
+        const statusColor = isInspDone ? '#34d399' : '#fbbf24';
+        const statusBg = isInspDone ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)';
+        const statusBorder = isInspDone ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)';
+        const statusText = isInspDone ? 'PASSED' : 'ON HOLD';
 
         const typeBadge = (type) => {
             const rawType = (type || '').trim();
@@ -301,7 +306,7 @@ function renderInspectionLog(data) {
             <td style="${TD}text-align:right;font-weight:700;color:#fff;font-size:11px;">${ok.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;font-weight:700;color:#f87171;font-size:11px;">${noQty.toLocaleString('id-ID')}</td>
             <td style="${TD}text-align:right;color:#94a3b8;font-size:11px;">${passRate}</td>
-            <td style="${TD}text-align:center;"><span style="font-size:10px;font-weight:700;color:${statusColor};">${(d.status || '—').toUpperCase()}</span></td>
+            <td style="${TD}text-align:center;"><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;background:${statusBg};color:${statusColor};border:1px solid ${statusBorder};white-space:nowrap;">${statusText}</span></td>
             <td style="padding:8px 4px;text-align:center;${T}">${filesHtml}</td>
             <td style="padding:8px 4px;text-align:center;">${actionHtml}</td>
         </tr>`;

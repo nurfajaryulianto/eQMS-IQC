@@ -111,7 +111,7 @@ window.updateTabBadges = function (po) {
     if (!po) {
         [badgeRaw, badgeRolling, badgeLam, badgeBond].forEach(b => {
             if (b) {
-                b.textContent = 'Pending';
+                b.textContent = 'Open';
                 b.style.background = 'rgba(255,255,255,0.08)';
                 b.style.color = 'rgba(255,255,255,0.6)';
                 b.style.border = 'none';
@@ -123,19 +123,19 @@ window.updateTabBadges = function (po) {
     const setBadge = (badgeEl, tabEl, isDone, isInProgress, doneColor, doneBg) => {
         if (!badgeEl) return;
         if (isDone) {
-            badgeEl.textContent = '✓ Selesai';
+            badgeEl.textContent = '✓ Passed';
             badgeEl.style.background = doneBg;
             badgeEl.style.color = doneColor;
             badgeEl.style.border = `1px solid ${doneColor}66`;
             if (tabEl) tabEl.style.borderColor = `${doneColor}4D`;
         } else if (isInProgress) {
-            badgeEl.textContent = 'In-Progress';
-            badgeEl.style.background = 'rgba(59, 130, 246, 0.2)';
-            badgeEl.style.color = '#60a5fa';
-            badgeEl.style.border = '1px solid rgba(59, 130, 246, 0.4)';
-            if (tabEl) tabEl.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+            badgeEl.textContent = '⏸ On Hold';
+            badgeEl.style.background = 'rgba(245, 158, 11, 0.2)';
+            badgeEl.style.color = '#fbbf24';
+            badgeEl.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+            if (tabEl) tabEl.style.borderColor = 'rgba(245, 158, 11, 0.35)';
         } else {
-            badgeEl.textContent = 'Pending';
+            badgeEl.textContent = 'Open';
             badgeEl.style.background = 'rgba(255,255,255,0.08)';
             badgeEl.style.color = 'rgba(255,255,255,0.6)';
             badgeEl.style.border = 'none';
@@ -407,9 +407,9 @@ window.switchInspectionTab = function (type) {
             doneNotice.style.flexDirection = 'row';
             doneNotice.style.alignItems = 'center';
             doneNotice.style.gap = '8px';
-            doneNotice.style.background = 'rgba(245, 158, 11, 0.10)';
-            doneNotice.style.borderColor = 'rgba(245, 158, 11, 0.35)';
-            doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#fbbf24;">lock</span><span>Pengecekan <strong>${labelMap[type]}</strong> untuk PO ini telah <strong>Selesai (Done)</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
+            doneNotice.style.background = 'rgba(16, 185, 129, 0.10)';
+            doneNotice.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+            doneNotice.innerHTML = `<span class="material-symbols-outlined" style="font-size:18px;flex-shrink:0;color:#34d399;">lock</span><span>Pengecekan <strong>${labelMap[type]}</strong> untuk PO ini telah <strong>Passed & Released</strong>. Pilih tab lainnya atau klik Rilis ke Produksi jika inspeksi sudah cukup.</span>`;
         }
         if (activeBody) {
             activeBody.style.opacity = '0.35';
@@ -470,8 +470,8 @@ window.switchInspectionTab = function (type) {
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span class="material-symbols-outlined" style="font-size:22px;flex-shrink:0;color:#60a5fa;">lock_clock</span>
                         <div>
-                            <div style="font-size:13px;font-weight:800;color:#93c5fd;">Inspeksi ${labelMap[type]} Tersimpan (In-Progress)</div>
-                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Disimpan: ${inspDate} &bull; Form sedang di-kunci. Klik Edit untuk melanjutkan atau merubah input.</div>
+                            <div style="font-size:13px;font-weight:800;color:#93c5fd;">Inspeksi ${labelMap[type]} Tersimpan (On Hold / In-Inspection)</div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Disimpan: ${inspDate} &bull; Form sedang di-hold. Klik Edit / Lanjutkan untuk memperbarui input.</div>
                         </div>
                     </div>
                     <button type="button" id="btn-edit-inprogress" onclick="window.unlockInProgressEdit()"
@@ -952,17 +952,17 @@ function renderPOList(data) {
         const isStepProgress = !isDone && !isWaiting && completedSteps > 0;
 
         let badgeClass = 'badge-pending';
-        let badgeText = 'Pending';
+        let badgeText = 'Open';
 
         if (isDone) {
             badgeClass = 'badge-done';
-            badgeText = 'Ready to Deliver';
+            badgeText = 'Passed & Released';
         } else if (isWaiting) {
             badgeClass = 'badge-hold';
-            badgeText = '⏸ Menunggu Keputusan';
+            badgeText = '⏸ On Hold';
         } else if (isStepProgress) {
             badgeClass = 'badge-stage';
-            badgeText = `Tahap Berjalan (${completedSteps}/4)`;
+            badgeText = `In-Inspection (${completedSteps}/4)`;
         }
 
         const tagBadge = (done, label) => {
@@ -1122,11 +1122,11 @@ async function selectPO(po, cardEl) {
                     <div style="display:flex; align-items:center; gap:10px;">
                         <span class="material-symbols-outlined" style="color:#34d399; font-size:24px;">verified</span>
                         <div>
-                            <div style="color:#34d399; font-weight:800; font-size:13px;">READY TO DELIVER (DONE)</div>
+                            <div style="color:#34d399; font-weight:800; font-size:13px; letter-spacing:0.02em;">PASSED &amp; RELEASED</div>
                             <div style="color:rgba(255,255,255,0.6); font-size:11px;">Rilis oleh: <strong style="color:white;">${esc(relBy)}</strong> &bull; ${esc(relAt)}</div>
                         </div>
                     </div>
-                    <span style="font-size:11px; font-weight:700; color:#34d399; background:rgba(16,185,129,0.2); padding:4px 8px; border-radius:6px;">Siap Kirim ke Produksi</span>
+                    <span style="font-size:11px; font-weight:700; color:#34d399; background:rgba(16,185,129,0.2); padding:4px 8px; border-radius:6px;">Passed &amp; Released (Siap Kirim)</span>
                 </div>
             `;
         } else {
@@ -1171,8 +1171,8 @@ async function selectPO(po, cardEl) {
             <div style="margin-top:12px; padding:10px 14px; border-radius:12px; background:rgba(245, 158, 11, 0.12); border:1.5px solid rgba(245, 158, 11, 0.35); display:flex; align-items:center; gap:10px;">
                 <span class="material-symbols-outlined" style="color:#fbbf24; font-size:22px; flex-shrink:0;">pause_circle</span>
                 <div style="font-size:12px; color:rgba(255,255,255,0.85); line-height:1.4;">
-                    <strong style="color:#fbbf24;">Status: Menunggu Keputusan (On-Hold)</strong><br>
-                    Proses inspeksi di-pause / menunggu konfirmasi Leader atau pihak terkait. Klik <em>Edit / Lanjutkan</em> pada tab terkait untuk menyelesaikan.
+                    <strong style="color:#fbbf24;">Status: On Hold (Pending Disposition)</strong><br>
+                    Inspeksi tertahan menunggu keputusan Leader atau disposisi departemen terkait. Klik <em>Edit / Lanjutkan</em> pada tab atau log terkait untuk menyelesaikan.
                 </div>
             </div>
         ` : '';
