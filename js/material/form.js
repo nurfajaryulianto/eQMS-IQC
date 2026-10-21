@@ -6,10 +6,12 @@ import { requireMaterialRole, materialLogout, MATERIAL_TEST_MODE, MATERIAL_ROLES
 import { apiGetMasterData, apiGetUsers, apiSubmitInspection, apiReleaseMaterialToProduction } from './api.js';
 
 // ─── STATE ───────────────────────────────────────────────────
-let allPOData = [];       // semua master_data dari GAS
+let allPOData = [];       // semua master_data dari GAS / Supabase
 let filteredPO = [];      // setelah filter/search
 let selectedPO = null;    // PO yang sedang dipilih user
 let currentUser = null;   // user yang sedang login
+let poCurrentPage = 1;    // halaman aktif pagination PO list
+const poPageSize = 10;    // jumlah PO card per halaman
 
 let currentInspectionType = 'raw'; // 'raw' | 'rolling' | 'laminating' | 'bonding'
 let lamColorChoice = 'YES'; // 'YES' | 'NO'
@@ -43,11 +45,8 @@ export function isPOFullyDone(po) {
         po.released_by.toLowerCase().includes('spv') ||
         po.released_by.toLowerCase().includes('manager')
     ));
-    // Ready to Deliver HANYA jika:
-    // 1. Sudah berstatus done di database DAN minimal 3 langkah terpenuhi, ATAU
-    // 2. Seluruh 4 langkah terpenuhi, ATAU
-    // 3. Sudah di-release resmi oleh Admin/Supervisor (Admin Override).
-    return (po.status === 'done' && (steps >= 3 || isReleasedByAdmin)) || (steps >= 4);
+    // Konsisten dengan Master Data: done di DB, dirilis admin/spv, atau seluruh 4 langkah terpenuhi
+    return (po.status === 'done' || Boolean(po.released_by)) || (steps >= 4);
 }
 
 export function isPOWaitingDecision(po) {
@@ -848,33 +847,27 @@ async function fetchMasterData() {
         }
 
         setSyncStatus('Memuat data...', 'loading');
-        const result = await apiGetMasterData({ status: 'all' });
+        const result = await apiGetMasterData({ status: 'all', limit: 10000 });
 
-        allPOData = (result.data || []).map(row => ({
-            id:             row.id,
-            po_number:      row.po_number || '',
-            material_name:  row.material_name || '',
-            material_description: row.material_description || row.item_description || row.material_name || '',
-            item_description: row.item_description || '',
-            uom:            row.uom || '',
-            vendor_name:    row.vendor_name || '',
-            style:          row.style || '',
-            model_shoe:     row.model_shoe || '',
-            planned_qty:    Number(row.planned_qty) || 0,
-            checked_qty:    Number(row.checked_qty) || 0,
-            balance_qty:    Math.max(0, (Number(row.planned_qty) || 0) - (Number(row.checked_qty) || 0)),
-            receive_date:   row.receive_date || '',
-            status:         (row.status || 'pending').toLowerCase(),
-            raw_done:       Boolean(row.raw_done),
-            rolling_done:   Boolean(row.rolling_done),
-            laminating_done: Boolean(row.laminating_done),
-            bonding_done:   Boolean(row.bonding_done),
-            material_type:  row.material_type || '',
-            released_by:    row.released_by || '',
-            released_at:    row.released_at || '',
-            release_notes:  row.release_notes || '',
-            material_inspections: Array.isArray(row.material_inspections) ? row.material_inspections : [],
-        }));
+        allPOData = (result.data || []).map(row => {
+            const plannedQty = Number(row.planned_qty ?? row.batch_size) || 0;
+            const checkedQty = Number(row.checked_qty) || 0;
+            const balanceQty = row.balance_qty != null ? Number(row.balance_qty) : Math.max(0, plannedQty - checkedQty);
+            const vendorName = (row.supplier_name && String(row.supplier_name).trim() !== '') 
+                ? String(row.supplier_name).trim() 
+                : (row.vendor_name || row.supplier || '');
+
+            return {
+                ...row,
+                planned_qty: plannedQty,
+                checked_qty: checkedQty,
+                balance_qty: balanceQty,
+                vendor_name: vendorName,
+                supplier_name: vendorName,
+                material_description: row.material_description || row.item_description || row.material_name || '',
+                material_inspections: Array.isArray(row.material_inspections) ? row.material_inspections : [],
+            };
+        });
 
         setSyncStatus(`${allPOData.length} item tersedia`, 'ok');
         filterPOList();
@@ -910,6 +903,7 @@ function setSyncStatus(text, state) {
 // ─── RENDER PO LIST ───────────────────────────────────────────
 
 function renderPOList(data) {
+    const listData = data || filteredPO;
     const container = document.getElementById('po-list');
     const loadingEl = document.getElementById('po-loading');
     const emptyEl = document.getElementById('po-empty');
@@ -917,20 +911,20 @@ function renderPOList(data) {
 
     if (loadingEl) loadingEl.style.display = 'none';
 
-    if (!data.length) {
+    if (!listData.length) {
         showPOEmpty();
         if (countEl) countEl.textContent = '0 item';
         return;
     }
 
     if (emptyEl) emptyEl.style.display = 'none';
-    if (countEl) countEl.textContent = `${data.length} item`;
+    if (countEl) countEl.textContent = `${listData.length} item`;
 
     // Remove existing cards (keep loading/empty elements)
     container.querySelectorAll('.po-card').forEach(el => el.remove());
 
     // Sort: waiting-decision (0) -> in-progress-steps (1) -> pending (2) -> done (3)
-    const sorted = [...data].sort((a, b) => {
+    const sorted = [...listData].sort((a, b) => {
         const getRank = (po) => {
             if (isPOFullyDone(po)) return 3;
             if (isPOWaitingDecision(po)) return 0;
@@ -940,16 +934,29 @@ function renderPOList(data) {
         return getRank(a) - getRank(b);
     });
 
-    sorted.forEach(po => {
+    // Pagination calculations
+    const totalPages = Math.ceil(sorted.length / poPageSize) || 1;
+    if (poCurrentPage > totalPages) poCurrentPage = totalPages;
+    if (poCurrentPage < 1) poCurrentPage = 1;
+
+    const startIdx = (poCurrentPage - 1) * poPageSize;
+    const endIdx = Math.min(startIdx + poPageSize, sorted.length);
+    const pageItems = sorted.slice(startIdx, endIdx);
+
+    pageItems.forEach(po => {
         const card = document.createElement('div');
         card.className = 'po-card';
         card.dataset.poNumber = po.po_number;
         if (po.id) card.dataset.id = po.id;
 
+        if (selectedPO && (String(po.id) === String(selectedPO.id) || String(po.po_number) === String(selectedPO.po_number))) {
+            card.classList.add('selected');
+        }
+
         const isDone = isPOFullyDone(po);
         const isWaiting = isPOWaitingDecision(po);
         const completedSteps = countCompletedSteps(po);
-        const isStepProgress = !isDone && !isWaiting && completedSteps > 0;
+        const isStepProgress = !isDone && !isWaiting && (completedSteps > 0 || po.status === 'in-progress' || po.status === 'in progress');
 
         let badgeClass = 'badge-pending';
         let badgeText = 'Open';
@@ -962,7 +969,7 @@ function renderPOList(data) {
             badgeText = '⏸ On Hold';
         } else if (isStepProgress) {
             badgeClass = 'badge-stage';
-            badgeText = `In-Inspection (${completedSteps}/4)`;
+            badgeText = completedSteps > 0 ? `In-Inspection (${completedSteps}/4)` : 'In-Inspection';
         }
 
         const tagBadge = (done, label) => {
@@ -979,13 +986,13 @@ function renderPOList(data) {
             <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;">
                 <div>
                     <div style="font-size:13px; font-weight:700; color:#ffffff; margin-bottom:2px;">${esc(po.po_number)}</div>
-                    <div style="font-size:12px; color:rgba(255, 255, 255, 0.7); font-weight:500;">${esc(po.vendor_name)}</div>
+                    <div style="font-size:12px; color:rgba(255, 255, 255, 0.7); font-weight:500;">${esc(po.vendor_name || po.supplier_name || '—')}</div>
                 </div>
                 <span style="font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; white-space:nowrap; flex-shrink:0;" class="${badgeClass}">${badgeText}</span>
             </div>
             <div style="font-size:13px; color:#34d399; font-weight:700; margin-bottom:4px; line-height:1.3;">${esc(po.material_description || po.material_name)}</div>
             <div style="display:flex; gap:12px; font-size:11px; color:rgba(255, 255, 255, 0.7); margin-bottom:8px;">
-                <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${po.planned_qty.toLocaleString('id-ID')} ${esc(po.uom)}</span>
+                <span><span style="color:rgba(255, 255, 255, 0.5);">QTY </span>${Number(po.planned_qty || 0).toLocaleString('id-ID')} ${esc(po.uom)}</span>
                 <span><span style="color:rgba(255, 255, 255, 0.5);">STYLE </span>${esc(po.style)}</span>
             </div>
             <div style="display:flex; gap:5px; flex-wrap:wrap; padding-top:6px; border-top:1px solid rgba(255,255,255,0.06);">
@@ -1001,13 +1008,85 @@ function renderPOList(data) {
 
         container.appendChild(card);
     });
+
+    renderPOPagination(totalPages, sorted.length, startIdx + 1, endIdx);
 }
+
+function renderPOPagination(totalPages, totalRows, startRow, endRow) {
+    const el = document.getElementById('po-pagination');
+    if (!el) return;
+
+    if (totalRows === 0 || totalPages <= 1) {
+        if (totalRows > 0) {
+            el.style.display = 'block';
+            el.innerHTML = `
+                <div style="font-size:11px; color:rgba(255,255,255,0.5); text-align:center;">
+                    Menampilkan <strong style="color:#fff;">${totalRows}</strong> PO
+                </div>
+            `;
+        } else {
+            el.style.display = 'none';
+            el.innerHTML = '';
+        }
+        return;
+    }
+
+    el.style.display = 'block';
+
+    const prevDisabled = poCurrentPage <= 1;
+    const nextDisabled = poCurrentPage >= totalPages;
+
+    const pages = [];
+    pages.push(`<button type="button" onclick="window.setPOPage(${poCurrentPage - 1})" ${prevDisabled ? 'disabled' : ''} style="padding:4px 9px; border-radius:6px; background:${prevDisabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.06)'}; border:1px solid ${prevDisabled ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)'}; color:${prevDisabled ? 'rgba(255,255,255,0.2)' : '#fff'}; cursor:${prevDisabled ? 'not-allowed' : 'pointer'}; font-size:11px; font-weight:600;">‹</button>`);
+
+    let startPage = Math.max(1, poCurrentPage - 2);
+    let endPage = Math.min(totalPages, poCurrentPage + 2);
+    if (poCurrentPage <= 3) endPage = Math.min(5, totalPages);
+    if (poCurrentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
+
+    if (startPage > 1) {
+        pages.push(`<button type="button" onclick="window.setPOPage(1)" style="padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; cursor:pointer; font-size:11px; min-width:24px;">1</button>`);
+        if (startPage > 2) pages.push(`<span style="color:rgba(255,255,255,0.3); font-size:11px; padding:0 1px;">...</span>`);
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        const active = p === poCurrentPage;
+        pages.push(`<button type="button" onclick="window.setPOPage(${p})" style="padding:4px 8px; border-radius:6px; background:${active ? '#10b981' : 'rgba(255,255,255,0.06)'}; border:1px solid ${active ? '#10b981' : 'rgba(255,255,255,0.1)'}; color:#fff; cursor:pointer; font-size:11px; font-weight:${active ? '700' : '500'}; min-width:24px; box-shadow:${active ? '0 2px 8px rgba(16,185,129,0.35)' : 'none'};">${p}</button>`);
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) pages.push(`<span style="color:rgba(255,255,255,0.3); font-size:11px; padding:0 1px;">...</span>`);
+        pages.push(`<button type="button" onclick="window.setPOPage(${totalPages})" style="padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; cursor:pointer; font-size:11px; min-width:24px;">${totalPages}</button>`);
+    }
+
+    pages.push(`<button type="button" onclick="window.setPOPage(${poCurrentPage + 1})" ${nextDisabled ? 'disabled' : ''} style="padding:4px 9px; border-radius:6px; background:${nextDisabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.06)'}; border:1px solid ${nextDisabled ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)'}; color:${nextDisabled ? 'rgba(255,255,255,0.2)' : '#fff'}; cursor:${nextDisabled ? 'not-allowed' : 'pointer'}; font-size:11px; font-weight:600;">›</button>`);
+
+    el.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:11px; color:rgba(255,255,255,0.5); text-align:center;">
+                Menampilkan <strong style="color:#fff;">${startRow} - ${endRow}</strong> dari <strong style="color:#34d399;">${totalRows}</strong> PO
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
+                ${pages.join('')}
+            </div>
+        </div>
+    `;
+}
+
+window.setPOPage = function(page) {
+    poCurrentPage = page;
+    renderPOList(filteredPO);
+    const container = document.getElementById('po-list');
+    if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+};
 
 function showPOEmpty() {
     const loadingEl = document.getElementById('po-loading');
     const emptyEl = document.getElementById('po-empty');
+    const paginationEl = document.getElementById('po-pagination');
     if (loadingEl) loadingEl.style.display = 'none';
     if (emptyEl) emptyEl.style.display = 'flex';
+    if (paginationEl) paginationEl.style.display = 'none';
 }
 
 function formatReceiveDate(raw) {
@@ -1228,7 +1307,11 @@ function row(label, value) {
 
 // ─── FILTER PO LIST ───────────────────────────────────────────
 
-window.filterPOList = function () {
+window.filterPOList = function (resetPage = true) {
+    if (resetPage) {
+        poCurrentPage = 1;
+    }
+
     const search = (document.getElementById('po-search')?.value || '').toLowerCase().trim();
     const status = document.getElementById('status-filter')?.value || 'all';
     const dateVal = document.getElementById('po-date-filter')?.value || '';
@@ -1240,15 +1323,15 @@ window.filterPOList = function () {
 
     filteredPO = allPOData.filter(po => {
         const matchSearch = !search || [
-            po.po_number, po.material_name, po.item_description, po.vendor_name, po.style, po.model_shoe
+            po.po_number, po.material_name, po.material_description, po.item_description, po.vendor_name, po.supplier_name, po.style, po.model_shoe
         ].some(f => (f || '').toLowerCase().includes(search));
 
         const isDone = isPOFullyDone(po);
         const isWaiting = isPOWaitingDecision(po);
         const completedSteps = countCompletedSteps(po);
-        const isStepProgress = !isDone && !isWaiting && completedSteps > 0;
+        const isStepProgress = !isDone && !isWaiting && (completedSteps > 0 || po.status === 'in-progress' || po.status === 'in progress');
         const isPartial = isWaiting || isStepProgress || isPOInProgress(po);
-        const isPending = !isDone && !isWaiting && completedSteps === 0 && (Number(po.checked_qty) || 0) === 0;
+        const isPending = !isDone && !isWaiting && completedSteps === 0 && (Number(po.checked_qty) || 0) === 0 && po.status !== 'in-progress' && po.status !== 'in progress';
 
         let matchStatus = true;
         if (status === 'pending') {
