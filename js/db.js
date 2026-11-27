@@ -84,16 +84,16 @@ async function callAdminApi(endpoint, method, body) {
  * Buat user baru di Supabase Auth + app_users via Vercel API.
  * Menggantikan dbInsertAppUser untuk pembuatan user yang bisa login.
  */
-export async function dbCreateAuthUser({ nik, display_name, role, password }) {
-    return callAdminApi('/api/create-user', 'POST', { nik, display_name, role, password });
+export async function dbCreateAuthUser({ nik, display_name, role, password, assigned_vendor }) {
+    return callAdminApi('/api/create-user', 'POST', { nik, display_name, role, password, assigned_vendor: assigned_vendor || null });
 }
 
 /**
- * Perbarui display_name, role (+ opsional reset password) di auth + app_users.
+ * Perbarui display_name, role (+ opsional reset password & assigned_vendor) di auth + app_users.
  * @param {number} app_user_id — id dari tabel app_users
  */
-export async function dbUpdateAuthUser(app_user_id, { display_name, role, password }) {
-    return callAdminApi('/api/update-user', 'PATCH', { app_user_id, display_name, role, password });
+export async function dbUpdateAuthUser(app_user_id, { display_name, role, password, assigned_vendor }) {
+    return callAdminApi('/api/update-user', 'PATCH', { app_user_id, display_name, role, password, assigned_vendor: assigned_vendor || null });
 }
 
 /**

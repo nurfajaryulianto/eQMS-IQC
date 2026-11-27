@@ -8,6 +8,7 @@ let allInspections = [];
 let allDefects = [];
 let chartInstances = {};
 let currentFttPeriod = 'days';
+let currentPassRatePeriod = 'days';
 let currentDefectPlant = 'all';
 let currentGradePlant = 'all';
 let ncvsFttSortOrder = 'desc';
@@ -73,6 +74,18 @@ export async function initDashboard() {
             updateDashboard();
         }
     });
+
+    const passRateFilterEl = document.getElementById('pass-rate-time-filter');
+    if (passRateFilterEl) {
+        passRateFilterEl.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                currentPassRatePeriod = e.target.dataset.period;
+                document.querySelectorAll('#pass-rate-time-filter .btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                updateDashboard();
+            }
+        });
+    }
 
     const defectPlantEl = document.getElementById('defect-plant-filter');
     if (defectPlantEl) defectPlantEl.addEventListener('click', (e) => {
@@ -207,6 +220,9 @@ async function fetchData() {
                 SessionId: item.session_id || '',
                 ApprovedByLeader: item.approved_by || '',
                 EvidenceUrl: item.evidence_url || '',
+                Status: item.status || 'Pass',
+                ParentSessionId: item.parent_session_id || null,
+                IsReinspection: Boolean(item.is_reinspection || item.parent_session_id),
             };
         });
 
@@ -318,22 +334,28 @@ function updateDashboard() {
             (!filters.model || item.Model === filters.model);
     });
 
-    // Match defects by SessionId from filtered sessions
-    const sessionIds = new Set(filteredInspections.map(s => s.SessionId).filter(Boolean));
-    const filteredDefects = sessionIds.size > 0
-        ? allDefects.filter(d => sessionIds.has(d.SessionId))
+    // FTT wajib murni First Time Through: kecualikan sesi Re-Inspection dari hitung FTT
+    const filteredInitial = filteredInspections.filter(item => !item.IsReinspection);
+
+    // Match defects by SessionId from filtered initial sessions
+    const initialSessionIds = new Set(filteredInitial.map(s => s.SessionId).filter(Boolean));
+    const reinspSessionIds = new Set(filteredInspections.filter(s => s.IsReinspection).map(s => s.SessionId).filter(Boolean));
+    const filteredDefects = initialSessionIds.size > 0
+        ? allDefects.filter(d => initialSessionIds.has(d.SessionId))
         : allDefects.filter(d => {
+            if (reinspSessionIds.has(d.SessionId)) return false;
             const dt = (d.TanggalIncoming || '').trim().substring(0, 10);
             return (!filters.startDate || (dt && dt >= filters.startDate)) &&
                 (!filters.endDate || (dt && dt <= filters.endDate)) &&
                 (!filters.vendor || d.Vendor === filters.vendor);
         });
 
-    updateMetrics(filteredInspections);
-    updateFttChart(filteredInspections, currentFttPeriod);
+    updateMetrics(filteredInitial);
+    updateFttChart(filteredInitial, currentFttPeriod);
+    updatePassRateChart(filteredInspections, currentPassRatePeriod);
     updateDefectChart(filteredDefects);
-    updateModelPerformanceChart(filteredInspections, modelFttSortOrder);
-    updateNcvsFttChart(filteredInspections, ncvsFttSortOrder);
+    updateModelPerformanceChart(filteredInitial, modelFttSortOrder);
+    updateNcvsFttChart(filteredInitial, ncvsFttSortOrder);
     
 }
 
@@ -469,6 +491,89 @@ function updateFttChart(data, period) {
         plugins: {
             legend: { display: false },
             tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}%` } }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 105,
+                ticks: { callback: v => v <= 100 ? `${v}%` : '' }
+            }
+        }
+    }, [fttDataLabelsPlugin]);
+}
+
+function updatePassRateChart(filteredAll, period) {
+    const canvas = document.getElementById('passRateChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Jika sesi awal memiliki child Re-Inspection di rentang filter, gunakan hasil final Re-Inspection untuk Pass Rate
+    const reinspectedParentIds = new Set(
+        filteredAll.filter(i => i.ParentSessionId).map(i => i.ParentSessionId)
+    );
+    const effectiveData = filteredAll.filter(i => !(!i.IsReinspection && reinspectedParentIds.has(i.SessionId)));
+
+    const groupedData = {};
+    effectiveData.forEach(item => {
+        const dateStr = getItemDateStr(item);
+        let key = '';
+        let sortKey = '';
+        if (dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const month = String(m).padStart(2, '0');
+            const day = String(d).padStart(2, '0');
+            if (period === 'days') {
+                key = `${day}/${month}`;
+                sortKey = `${y}-${month}-${day}`;
+            } else {
+                key = `${y}-${month}`;
+                sortKey = `${y}-${month}`;
+            }
+        }
+        if (key) {
+            if (!groupedData[key]) {
+                groupedData[key] = { sortKey, totalInspect: 0, totalPass: 0 };
+            }
+            groupedData[key].totalInspect += item.Qty_Inspect;
+            groupedData[key].totalPass += item.Pass;
+        }
+    });
+
+    const labels = Object.keys(groupedData).sort((a, b) => groupedData[a].sortKey.localeCompare(groupedData[b].sortKey));
+    const passRateValues = labels.map(key => {
+        const d = groupedData[key];
+        return d.totalInspect > 0 ? ((d.totalPass / d.totalInspect) * 100).toFixed(2) : '100.00';
+    });
+
+    renderChart(ctx, 'line', {
+        labels: labels,
+        datasets: [{
+            label: 'Pass Rate (%)',
+            data: passRateValues,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5
+        }]
+    }, {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+            padding: {
+                top: 20,
+                right: 12,
+                left: 8,
+                bottom: 4
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `Pass Rate: ${ctx.parsed.y}%` } }
         },
         scales: {
             y: {
@@ -792,7 +897,7 @@ window.approveSubcontLeader = async function (id) {
 
     try {
         if (window.supabaseClient) {
-            let q = window.supabaseClient.from('subcont_inspections').update({ approved_by_leader: leaderName });
+            let q = window.supabaseClient.from('subcont_inspections').update({ approved_by: leaderName });
             if (id && !isNaN(Number(id))) {
                 q = q.or(`id.eq.${id},session_id.eq.${id}`);
             } else if (id) {

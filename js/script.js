@@ -53,7 +53,11 @@ let selectedVendor = '';
 let selectedMaterialType = ''; // '' | 'upper' | 'bottom'
 let currentUser = null;
 let currentUserRole = ROLES.INSPECTOR;
+let currentUserAssignedVendors = [];
 let isRestoringDraft = false;
+let reinspectionParentSessionId = null;
+let loadedResultRangeStart = null;
+let loadedResultRangeEnd = null;
 
 // Variabel untuk limit dinamis
 let currentInspectionLimit = 0;
@@ -680,6 +684,8 @@ function resetContextSelection() {
 
 function resetAllFields() {
     editingSessionId = null;
+    reinspectionParentSessionId = null;
+    if (typeof setReinspectionFieldLocks === 'function') setReinspectionFieldLocks(false);
     if (typeof hideEditingSessionBanner === 'function') hideEditingSessionBanner();
     const detectBanner = document.getElementById('in-progress-detect-banner');
     if (detectBanner) detectBanner.classList.add('hidden');
@@ -750,7 +756,7 @@ function resetAllFields() {
     if (containerMobile) containerMobile.classList.add('hidden');
 
     if (typeof window.__syncInspectionStatusState === 'function') {
-        window.__syncInspectionStatusState('Done');
+        window.__syncInspectionStatusState('Pass');
     }
 
     updateTotalQtyInspect();
@@ -762,6 +768,9 @@ function resetAllFields() {
  * Returns true when all required info is filled so defect/grade buttons can be used.
  */
 function isInfoComplete() {
+    if (currentUserRole === ROLES.VENDOR && !reinspectionParentSessionId && !editingSessionId) {
+        return false;
+    }
     const tanggal = tanggalIncomingInput ? tanggalIncomingInput.value.trim() : '';
     const hasStyle = (selectedStyles && selectedStyles.length > 0) || (styleNumberInput && styleNumberInput.value.trim());
     const hasModel = (selectedStyles && selectedStyles.length > 0) || (modelNameInput && modelNameInput.value.trim());
@@ -775,7 +784,15 @@ function isInfoComplete() {
 function checkInfoCompleteAndLockButtons() {
     const complete = isInfoComplete();
     const hint = document.getElementById('inspection-info-hint');
-    if (hint) hint.classList.toggle('hidden', complete);
+    if (hint) {
+        if (currentUserRole === ROLES.VENDOR && !reinspectionParentSessionId && !editingSessionId) {
+            hint.innerHTML = '<span class="material-symbols-outlined text-[16px]">lock</span> Akun role Vendor hanya dapat melakukan Re-Inspection dari menu Inspection Result pada item berstatus Fail.';
+            hint.classList.remove('hidden');
+        } else {
+            hint.innerHTML = '<span class="material-symbols-outlined text-[16px]">info</span> Lengkapi Vendor, Tambahkan minimal 1 Item Inspeksi, dan isi Qty Incoming & Tanggal untuk menyimpan.';
+            hint.classList.toggle('hidden', complete);
+        }
+    }
 
     updateSaveButtonState();
 }
@@ -854,9 +871,10 @@ function saveToLocalStorage() {
             materialType: matType,
             vendor: vendor,
             inspectionLocation: inspLocation || 'In-House Inspection',
-            status: document.getElementById('inspection-status')?.value || 'Done',
+            status: document.getElementById('inspection-status')?.value || 'Pass',
             approvedByLeader: leader,
             editingSessionId: editingSessionId || null,
+            reinspectionParentSessionId: reinspectionParentSessionId || null,
             inspectionItems: items,
             savedAt: new Date().toISOString()
         };
@@ -894,6 +912,7 @@ function applyDraftToForm(draft) {
     isRestoringDraft = true;
     try {
         editingSessionId = draft.editingSessionId || null;
+        reinspectionParentSessionId = draft.reinspectionParentSessionId || null;
 
         if (draft.materialType) {
             selectedMaterialType = draft.materialType;
@@ -949,7 +968,8 @@ function applyDraftToForm(draft) {
         }
 
         if (draft.status && typeof window.__syncInspectionStatusState === 'function') {
-            window.__syncInspectionStatusState(draft.status);
+            const mappedStatus = String(draft.status).toLowerCase() === 'done' ? 'Pass' : draft.status;
+            window.__syncInspectionStatusState(mappedStatus);
         }
 
         if (draft.approvedByLeader) {
@@ -980,7 +1000,17 @@ function applyDraftToForm(draft) {
         checkInfoCompleteAndLockButtons();
         updateSaveButtonState();
 
-        if (editingSessionId) {
+        if (reinspectionParentSessionId) {
+            if (typeof setReinspectionFieldLocks === 'function') setReinspectionFieldLocks(true);
+            if (typeof renderReinspectionBanner === 'function') {
+                renderReinspectionBanner({
+                    sessionId: reinspectionParentSessionId,
+                    styleNumber: draft.styleNumber,
+                    modelName: draft.modelName,
+                    vendor: draft.vendor
+                });
+            }
+        } else if (editingSessionId) {
             const sessObj = (Array.isArray(allInspectionSessions) && allInspectionSessions.find(s => String(s.sessionId) === String(editingSessionId))) || {
                 sessionId: editingSessionId,
                 styleNumber: draft.styleNumber,
@@ -1512,6 +1542,11 @@ async function compressImageFile(file, maxWidth = 1600, quality = 0.82) {
 async function saveData() {
     console.log("Memulai proses simpan data...");
 
+    if (currentUserRole === ROLES.VENDOR && !reinspectionParentSessionId && !editingSessionId) {
+        showAlert('Akun role Vendor hanya dapat melakukan Re-Inspection dari menu Inspection Result pada item berstatus Fail.', 'warning', 'Akses Terbatas');
+        return;
+    }
+
     const loadingOverlay = document.getElementById('loading-overlay');
 
     if (!validateInputs() || !validateQtySampleSet()) {
@@ -1582,7 +1617,9 @@ async function saveData() {
         "defect": qtyInspectOutputs['defect'],
         approvedByLeader: leaderSelect ? leaderSelect.value : '',
         inspectionLocation: document.getElementById('inspection-location')?.value || 'In-House Inspection',
-        status: document.getElementById('inspection-status')?.value || 'Done',
+        status: document.getElementById('inspection-status')?.value || 'Pass',
+        parentSessionId: reinspectionParentSessionId || editingParentSessionId || null,
+        isReinspection: Boolean(reinspectionParentSessionId || editingIsReinspection),
         file_data: fileData,
         file_name: fileName,
         file_type: fileType,
@@ -1624,7 +1661,7 @@ async function saveData() {
                 }
             } else {
                 allInspectionSessions.unshift({
-                    sessionId: dataToSend.sessionId || (`SESS-${Date.now()}`),
+                    sessionId: reinspectionParentSessionId ? `${reinspectionParentSessionId}-RE1` : (dataToSend.sessionId || (`SESS-${Date.now()}`)),
                     timestamp: dataToSend.timestamp,
                     tanggalIncoming: dataToSend.tanggalIncoming,
                     tanggalInspection: dataToSend.tanggalInspection,
@@ -1644,6 +1681,8 @@ async function saveData() {
                     auditor: dataToSend.auditor,
                     approvedByLeader: dataToSend.approvedByLeader,
                     status: dataToSend.status,
+                    parentSessionId: dataToSend.parentSessionId || null,
+                    isReinspection: Boolean(dataToSend.isReinspection),
                     evidenceUrl: '',
                     items: dataToSend.items
                 });
@@ -1686,7 +1725,21 @@ async function saveData() {
             }
         }
 
-        const baseSessId = dataToSend.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+        if (reinspectionParentSessionId) {
+            const { data: existingRe, error: checkReErr } = await supabase
+                .from('subcont_inspections')
+                .select('session_id')
+                .eq('parent_session_id', reinspectionParentSessionId)
+                .limit(1);
+            if (checkReErr) throw new Error(checkReErr.message);
+            if (existingRe && existingRe.length > 0) {
+                throw new Error('Item Fail ini sudah pernah dilakukan Re-Inspection (maksimal 1x).');
+            }
+        }
+
+        const baseSessId = reinspectionParentSessionId
+            ? (reinspectionParentSessionId.length <= 90 ? `${reinspectionParentSessionId}-RE1` : `SESS-RE-${Date.now()}-${Math.floor(Math.random() * 1000)}`)
+            : (dataToSend.sessionId || (`SESS-${Date.now()}-${Math.floor(Math.random() * 1000)}`));
         const isMultiItem = Array.isArray(dataToSend.items) && dataToSend.items.length > 1;
 
         const sessionRowsToInsert = [];
@@ -1724,7 +1777,9 @@ async function saveData() {
                     bucket: dataToSend.tanggalBucket || null,
                     approved_by: dataToSend.approvedByLeader || '',
                     evidence_url: evidenceUrl,
-                    status: dataToSend.status || 'Done',
+                    status: dataToSend.status || 'Pass',
+                    parent_session_id: dataToSend.parentSessionId || null,
+                    is_reinspection: Boolean(dataToSend.isReinspection),
                     updated_at: new Date().toISOString()
                 });
 
@@ -1777,7 +1832,9 @@ async function saveData() {
                 bucket: dataToSend.tanggalBucket || null,
                 approved_by: dataToSend.approvedByLeader || '',
                 evidence_url: evidenceUrl,
-                status: dataToSend.status || 'Done',
+                status: dataToSend.status || 'Pass',
+                parent_session_id: dataToSend.parentSessionId || null,
+                is_reinspection: Boolean(dataToSend.isReinspection),
                 updated_at: new Date().toISOString()
             });
         }
@@ -2614,8 +2671,11 @@ async function initApp() {
     const userRole = user?.user_metadata?.role || ROLES.INSPECTOR;
     currentUserRole = userRole;
     const statisticBtn = document.querySelector('.statistic-button');
-    if (statisticBtn && userRole === ROLES.INSPECTOR) {
+    if (statisticBtn && (userRole === ROLES.INSPECTOR || userRole === ROLES.VENDOR)) {
         statisticBtn.style.display = 'none';
+    }
+    if (userRole === ROLES.VENDOR) {
+        document.querySelectorAll('[data-view="analytics"]').forEach(el => { el.style.display = 'none'; });
     }
 
     // Bridge: expose role synchronously for showView() gate in inline script
@@ -2633,6 +2693,8 @@ async function initApp() {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 capitalize';
         } else if (userRole === ROLES.MANAGER) {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 capitalize';
+        } else if (userRole === ROLES.VENDOR) {
+            roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 capitalize';
         } else {
             roleBadgeEl.className = 'hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 capitalize';
         }
@@ -2693,6 +2755,14 @@ async function initApp() {
 
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
+    currentUserAssignedVendors = resolveAssignedVendors(user);
+    if (userRole === ROLES.VENDOR) {
+        if (!viewParam && typeof window.showView === 'function') {
+            window.showView('inspection-result');
+        } else if (viewParam === 'inspection-result' && typeof window.loadInspectionResults === 'function') {
+            window.loadInspectionResults();
+        }
+    }
     populateStyleDatalist();
     renderStyleTags(true);
 
@@ -2989,7 +3059,13 @@ async function initApp() {
 
     const refreshResultBtn = document.getElementById('inspection-result-refresh-btn');
     if (refreshResultBtn) {
-        refreshResultBtn.addEventListener('click', () => window.loadInspectionResults());
+        refreshResultBtn.addEventListener('click', () => {
+            const defRange = getDefault14DaysRange();
+            const dStart = document.getElementById('inspection-result-date-start')?.value || '';
+            const dEnd = document.getElementById('inspection-result-date-end')?.value || '';
+            const isDefault = (!dStart && !dEnd) || (dStart === defRange.start && dEnd === defRange.end);
+            window.loadInspectionResults({ customRange: !isDefault, showNotice: isDefault });
+        });
     }
 
     const resultSearch = document.getElementById('inspection-result-search');
@@ -3014,8 +3090,26 @@ async function initApp() {
 
     const dateStartInput = document.getElementById('inspection-result-date-start');
     const dateEndInput = document.getElementById('inspection-result-date-end');
-    if (dateStartInput) dateStartInput.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
-    if (dateEndInput) dateEndInput.addEventListener('change', () => renderInspectionResultTable(allInspectionSessions));
+    if (dateStartInput) {
+        dateStartInput.addEventListener('change', () => {
+            const val = dateStartInput.value;
+            if (val && (!loadedResultRangeStart || val < loadedResultRangeStart)) {
+                window.loadInspectionResults({ customRange: true, showNotice: false });
+            } else {
+                renderInspectionResultTable(allInspectionSessions);
+            }
+        });
+    }
+    if (dateEndInput) {
+        dateEndInput.addEventListener('change', () => {
+            const val = dateEndInput.value;
+            if (val && (!loadedResultRangeEnd || val > loadedResultRangeEnd)) {
+                window.loadInspectionResults({ customRange: true, showNotice: false });
+            } else {
+                renderInspectionResultTable(allInspectionSessions);
+            }
+        });
+    }
 
     const btnToday = document.getElementById('btn-filter-today');
     if (btnToday) {
@@ -3033,18 +3127,22 @@ async function initApp() {
             const today = new Date();
             const past7 = new Date();
             past7.setDate(today.getDate() - 6);
-            if (dateStartInput) dateStartInput.value = past7.toISOString().split('T')[0];
-            if (dateEndInput) dateEndInput.value = today.toISOString().split('T')[0];
-            renderInspectionResultTable(allInspectionSessions);
+            const past7Str = past7.toISOString().split('T')[0];
+            const todayStr = today.toISOString().split('T')[0];
+            if (dateStartInput) dateStartInput.value = past7Str;
+            if (dateEndInput) dateEndInput.value = todayStr;
+            if (loadedResultRangeStart && past7Str < loadedResultRangeStart) {
+                window.loadInspectionResults({ customRange: true, showNotice: false });
+            } else {
+                renderInspectionResultTable(allInspectionSessions);
+            }
         });
     }
 
     const btnResetDate = document.getElementById('btn-filter-reset-date');
     if (btnResetDate) {
         btnResetDate.addEventListener('click', () => {
-            if (dateStartInput) dateStartInput.value = '';
-            if (dateEndInput) dateEndInput.value = '';
-            renderInspectionResultTable(allInspectionSessions);
+            window.loadInspectionResults({ customRange: false, showNotice: true });
         });
     }
 
@@ -3073,17 +3171,146 @@ document.addEventListener('DOMContentLoaded', initApp);
 
 
 // ===========================================
-// INSPECTION RESULT FEATURE (DONE & IN-PROGRESS)
+// INSPECTION RESULT FEATURE (PASS, FAIL & IN-PROGRESS + RE-INSPECTION)
 // ===========================================
 
 let allInspectionSessions = [];
 let filterOptionsInitialized = false;
 let editingSessionId = null;
+let editingParentSessionId = null;
+let editingIsReinspection = false;
 
-/** Load all Inspection Results (Done & In-Progress) from Supabase */
-window.loadInspectionResults = async function () {
+function toLocalDateString(d = new Date()) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function getDefault14DaysRange() {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 14);
+    return {
+        start: toLocalDateString(start),
+        end: toLocalDateString(end)
+    };
+}
+
+function showTopRightToast(message, durationMs = 4500) {
+    let container = document.getElementById('eqms-top-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'eqms-top-toast-container';
+        document.body.appendChild(container);
+    }
+    container.innerHTML = '';
+
+    const toast = document.createElement('div');
+    toast.className = 'eqms-top-toast';
+    toast.innerHTML = `
+        <span class="material-symbols-outlined text-sky-400 text-[20px] flex-shrink-0">info</span>
+        <span class="flex-1 leading-snug">${message}</span>
+        <button type="button" class="text-slate-400 hover:text-white p-0.5 cursor-pointer flex-shrink-0" aria-label="Tutup">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+    `;
+    const closeBtn = toast.querySelector('button');
+    const dismiss = () => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    };
+    if (closeBtn) closeBtn.addEventListener('click', dismiss);
+    container.appendChild(toast);
+    setTimeout(dismiss, durationMs);
+}
+
+function resolveAssignedVendors(user) {
+    if (!user) return [];
+    const uMeta = user.user_metadata || {};
+    const nik = String(uMeta.nik || '').trim().toLowerCase();
+    const dName = String(uMeta.display_name || '').trim().toLowerCase();
+    let rawVendor = '';
+    try {
+        const dbUser = getUsers().find(u =>
+            (nik && String(u.nik || '').trim().toLowerCase() === nik) ||
+            (dName && String(u.display_name || '').trim().toLowerCase() === dName)
+        );
+        rawVendor = dbUser?.assigned_vendor || uMeta.assigned_vendor || '';
+    } catch {
+        rawVendor = uMeta.assigned_vendor || '';
+    }
+    return String(rawVendor || '').split(',').map(v => v.trim()).filter(Boolean);
+}
+
+function isPassStatus(st) {
+    const lower = String(st || '').trim().toLowerCase();
+    return lower === 'pass' || lower === 'done';
+}
+
+function isFailStatus(st) {
+    return String(st || '').trim().toLowerCase() === 'fail';
+}
+
+function normalizeDisplayStatus(st) {
+    const lower = String(st || '').trim().toLowerCase();
+    if (lower === 'done' || lower === 'pass') return 'Pass';
+    if (lower === 'fail') return 'Fail';
+    if (lower.includes('progress')) return 'In-Progress';
+    return st || 'Pass';
+}
+
+function buildReinspectionMap(sessions) {
+    const map = new Map();
+    (sessions || []).forEach(s => {
+        if (s.parentSessionId && !map.has(s.parentSessionId)) {
+            map.set(s.parentSessionId, s);
+        }
+    });
+    return map;
+}
+
+function canUserReinspectSession(session, user, reinspectionMap) {
+    if (!session) return false;
+    const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
+    if (role !== ROLES.VENDOR) return false;
+    if (!isFailStatus(session.status) || session.isReinspection) return false;
+    if (reinspectionMap && reinspectionMap.has(session.sessionId)) return false;
+
+    const vendors = currentUserAssignedVendors.length ? currentUserAssignedVendors : resolveAssignedVendors(user);
+    const sessionVendor = String(session.vendor || '').trim().toLowerCase();
+    return Boolean(sessionVendor) && vendors.some(v => v.toLowerCase() === sessionVendor);
+}
+
+function setReinspectionFieldLocks(locked) {
+    const idsToLock = ['material-type', 'tanggal-incoming', 'style-number-input', 'btn-add-style', 'bucket-date-picker', 'btn-add-bucket', 'reset-selection-btn'];
+    idsToLock.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = Boolean(locked);
+    });
+    document.querySelectorAll('.vendor-sel-btn').forEach(btn => {
+        btn.disabled = Boolean(locked);
+        btn.classList.toggle('opacity-60', Boolean(locked));
+        btn.classList.toggle('cursor-not-allowed', Boolean(locked));
+    });
+}
+
+/** Load Inspection Results (default max 14 days back) from Supabase */
+window.loadInspectionResults = async function (options = {}) {
+    const { customRange = false, showNotice = true } = options || {};
     const gallery = document.getElementById('inspection-result-gallery');
-    const badge = document.getElementById('inspection-result-count-badge');
+    const dateStartEl = document.getElementById('inspection-result-date-start');
+    const dateEndEl = document.getElementById('inspection-result-date-end');
+
+    const defaultRange = getDefault14DaysRange();
+    if (!customRange) {
+        if (dateStartEl) dateStartEl.value = defaultRange.start;
+        if (dateEndEl) dateEndEl.value = defaultRange.end;
+    }
+
+    const queryStart = dateStartEl?.value || defaultRange.start;
+    const queryEnd = dateEndEl?.value || '';
+    loadedResultRangeStart = queryStart || null;
+    loadedResultRangeEnd = queryEnd || toLocalDateString(new Date());
+
     if (gallery) {
         gallery.innerHTML = `
             <div class="col-span-full flex flex-col items-center justify-center py-16 text-slate-400">
@@ -3098,44 +3325,53 @@ window.loadInspectionResults = async function () {
             allInspectionSessions = [
                 {
                     sessionId: 'SESS-INSP-001',
-                    tanggalInspection: '2026-07-20',
-                    vendor: 'PT Forward Subcont',
+                    tanggalInspection: defaultRange.end,
+                    vendor: 'Vendor A',
                     materialType: 'upper',
                     styleNumber: 'NK-DYN-01',
                     modelName: 'NIKE DYNAMO FREE',
-                    component: 'Vamp',
-                    process: 'Stitching, Emboss',
+                    component: 'Foxing',
+                    process: 'Stitching',
                     auditor: 'Ninik Mulyani',
-                    status: 'In-Progress',
+                    status: 'Fail',
+                    isReinspection: false,
+                    parentSessionId: null,
                     items: [
-                        { component: 'Vamp', process: 'Stitching, Emboss', qtyIncoming: 500, qtyInspect: 100, pass: 95, defect: 5 }
+                        { component: 'Foxing', process: 'Stitching', qtyIncoming: 500, qtyInspect: 100, pass: 88, defect: 12 }
                     ]
                 },
                 {
                     sessionId: 'SESS-INSP-002',
-                    tanggalInspection: '2026-07-19',
-                    vendor: 'PT Victory Leather',
+                    tanggalInspection: defaultRange.end,
+                    vendor: 'Vendor B',
                     materialType: 'bottom',
                     styleNumber: 'NK-AIR-90',
                     modelName: 'AIR MAX 90',
-                    component: 'Outsole',
-                    process: 'Cementing',
+                    component: 'Mudguard',
+                    process: 'Buffing',
                     auditor: 'Ninik Mulyani',
-                    status: 'Done',
+                    status: 'Pass',
+                    isReinspection: false,
+                    parentSessionId: null,
                     items: [
-                        { component: 'Outsole', process: 'Cementing', qtyIncoming: 1000, qtyInspect: 100, pass: 100, defect: 0 }
+                        { component: 'Mudguard', process: 'Buffing', qtyIncoming: 1000, qtyInspect: 100, pass: 100, defect: 0 }
                     ]
                 }
             ];
         } else {
-            // Query langsung dari Supabase subcont_inspections dengan auto-chunking
+            // Query langsung dari Supabase subcont_inspections dengan auto-chunking (default 14 hari terakhir)
             let sessData = [], from = 0;
             while (sessData.length < 5000) {
-                const { data, error } = await supabase
+                let q = supabase
                     .from('subcont_inspections')
                     .select('*')
-                    .order('timestamp', { ascending: false })
-                    .range(from, from + 999);
+                    .order('timestamp', { ascending: false });
+
+                if (queryStart) {
+                    q = q.or(`tanggal_insp.gte.${queryStart},timestamp.gte.${queryStart}T00:00:00`);
+                }
+
+                const { data, error } = await q.range(from, from + 999);
                 if (error) throw error;
                 const batch = data || [];
                 sessData = sessData.concat(batch);
@@ -3164,7 +3400,9 @@ window.loadInspectionResults = async function () {
                 redoRate: Number(row.redo_rate) || 0,
                 approvedByLeader: row.approved_by || '',
                 evidenceUrl: row.evidence_url || '',
-                status: row.status || 'Done',
+                status: row.status || 'Pass',
+                parentSessionId: row.parent_session_id || null,
+                isReinspection: Boolean(row.is_reinspection || row.parent_session_id),
                 items: row.component ? [{
                     component: row.component,
                     process: row.process || '',
@@ -3178,6 +3416,10 @@ window.loadInspectionResults = async function () {
 
         populateFilterOptions();
         renderInspectionResultTable(allInspectionSessions);
+
+        if (!customRange && showNotice) {
+            showTopRightToast('Data yang di load adalah 14 hari terkahir');
+        }
 
     } catch (e) {
         console.error('[Inspection Result] Gagal memuat:', e);
@@ -3194,8 +3436,12 @@ window.loadInspectionResults = async function () {
 
 /** Populate unique Auditor and Vendor dropdown filters */
 function populateFilterOptions() {
-    const auditors = [...new Set(allInspectionSessions.map(s => s.auditor).filter(Boolean))].sort();
-    const vendors = [...new Set(allInspectionSessions.map(s => s.vendor).filter(Boolean))].sort();
+    const visibleBase = (currentUserRole === ROLES.VENDOR && currentUserAssignedVendors.length)
+        ? allInspectionSessions.filter(s => currentUserAssignedVendors.some(v => v.toLowerCase() === String(s.vendor || '').trim().toLowerCase()))
+        : allInspectionSessions;
+
+    const auditors = [...new Set(visibleBase.map(s => s.auditor).filter(Boolean))].sort();
+    const vendors = [...new Set(visibleBase.map(s => s.vendor).filter(Boolean))].sort();
 
     // Populate Auditor filter
     const auditorSelect = document.getElementById('inspection-result-auditor-filter');
@@ -3209,20 +3455,20 @@ function populateFilterOptions() {
             auditorSelect.appendChild(opt);
         });
 
-        // Set default to current user only on first initialization
+        // Set default to current user only on first initialization (non-vendor)
         if (!filterOptionsInitialized) {
-            const uMeta = currentUser?.user_metadata || {};
-            const userDisplayName = (uMeta.display_name || uMeta.name || window.__eqmsDisplayName || '').trim().toLowerCase();
-            const userNik = (uMeta.nik || '').trim().toLowerCase();
-            const matched = auditors.find(a => {
-                const audLower = a.trim().toLowerCase();
-                return (userDisplayName && (audLower === userDisplayName || audLower.includes(userDisplayName))) ||
-                       (userNik && (audLower === userNik || audLower.includes(userNik)));
-            });
-            if (matched) {
-                auditorSelect.value = matched;
-            } else {
+            if (currentUserRole === ROLES.VENDOR) {
                 auditorSelect.value = 'all';
+            } else {
+                const uMeta = currentUser?.user_metadata || {};
+                const userDisplayName = (uMeta.display_name || uMeta.name || window.__eqmsDisplayName || '').trim().toLowerCase();
+                const userNik = (uMeta.nik || '').trim().toLowerCase();
+                const matched = auditors.find(a => {
+                    const audLower = a.trim().toLowerCase();
+                    return (userDisplayName && (audLower === userDisplayName || audLower.includes(userDisplayName))) ||
+                           (userNik && (audLower === userNik || audLower.includes(userNik)));
+                });
+                auditorSelect.value = matched || 'all';
             }
         } else {
             if (currentVal && [...auditorSelect.options].some(o => o.value === currentVal)) {
@@ -3258,7 +3504,7 @@ function populateFilterOptions() {
 function canUserEditSession(session, user) {
     if (!session) return false;
     const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
-    // Admin dan Supervisor berwenang mengedit semua sesi
+    // Admin dan Supervisor berwenang mengedit semua sesi In-Progress
     if (role === ROLES.ADMIN || role === ROLES.SUPERVISOR) {
         return true;
     }
@@ -3289,7 +3535,15 @@ function renderInspectionResultTable(sessions) {
     const dateStart = document.getElementById('inspection-result-date-start')?.value || '';
     const dateEnd = document.getElementById('inspection-result-date-end')?.value || '';
 
+    const reinspectionMap = buildReinspectionMap(sessions);
+
     const filtered = sessions.filter(s => {
+        if (currentUserRole === ROLES.VENDOR) {
+            const vendLower = String(s.vendor || '').trim().toLowerCase();
+            const isAssigned = currentUserAssignedVendors.some(v => v.toLowerCase() === vendLower);
+            if (!isAssigned) return false;
+        }
+
         let compStr = s.component || '';
         let procStr = s.process || '';
         if (s.items && s.items.length > 0) {
@@ -3305,14 +3559,15 @@ function renderInspectionResultTable(sessions) {
             (compStr || '').toLowerCase().includes(searchVal) ||
             (procStr || '').toLowerCase().includes(searchVal);
 
-        const stLower = (s.status || 'Done').toLowerCase();
+        const stLower = (s.status || 'Pass').toLowerCase();
         const matchesStatus = statusFilter === 'all' ||
-            (statusFilter === 'Done' && stLower === 'done') ||
+            ((statusFilter === 'Pass' || statusFilter === 'Done') && (stLower === 'pass' || stLower === 'done')) ||
+            (statusFilter === 'Fail' && stLower === 'fail') ||
             (statusFilter === 'In-Progress' && stLower.includes('progress')) ||
             (statusFilter === 'Pending Leader Approval' && (
                 stLower.includes('leader') ||
                 stLower.includes('approval') ||
-                (Boolean(s.approvedByLeader) && stLower !== 'done')
+                (Boolean(s.approvedByLeader) && !isPassStatus(stLower) && !isFailStatus(stLower))
             ));
 
         const matchesAuditor = auditorFilter === 'all' ||
@@ -3359,19 +3614,21 @@ function renderInspectionResultTable(sessions) {
         return;
     }
 
-    // Group filtered sessions by style number, model name & inspector/auditor
+    // Group filtered sessions by style number, model name, auditor & cycle (initial vs reinspection)
     const grouped = {};
     filtered.forEach(s => {
         const styleStr = (s.styleNumber || '—').trim();
         const modelStr = (s.modelName || '—').trim();
         const auditorStr = (s.auditor || '—').trim();
-        const key = `${styleStr}|${modelStr}|${auditorStr}`;
+        const stGroup = isFailStatus(s.status) ? 'FAIL' : (isPassStatus(s.status) ? 'PASS' : 'INPROG');
+        const key = `${styleStr}|${modelStr}|${auditorStr}|${s.isReinspection ? 'RE' : 'INIT'}|${stGroup}`;
 
         if (!grouped[key]) {
             grouped[key] = {
                 styleNumber: styleStr,
                 modelName: modelStr,
                 auditor: auditorStr,
+                hasReinspection: Boolean(s.isReinspection),
                 vendors: new Set(),
                 materials: new Set(),
                 auditors: new Set(),
@@ -3382,6 +3639,7 @@ function renderInspectionResultTable(sessions) {
         }
 
         const g = grouped[key];
+        if (s.isReinspection) g.hasReinspection = true;
         if (s.vendor) g.vendors.add(s.vendor);
         if (s.materialType) g.materials.add(s.materialType);
         if (s.auditor) g.auditors.add(s.auditor);
@@ -3412,7 +3670,8 @@ function renderInspectionResultTable(sessions) {
                     qtyInspect: Number(it.qtyInspect || 0),
                     pass: Number(it.pass || 0),
                     defect: Number(it.defect || 0),
-                    status: s.status || 'Done'
+                    status: s.status || 'Pass',
+                    isReinspection: Boolean(s.isReinspection)
                 });
             });
         } else {
@@ -3424,17 +3683,33 @@ function renderInspectionResultTable(sessions) {
                 qtyInspect: Number(s.qtyInspect || 0),
                 pass: Number(s.pass || 0),
                 defect: Number(s.defect || 0),
-                status: s.status || 'Done'
+                status: s.status || 'Pass',
+                isReinspection: Boolean(s.isReinspection)
             });
         }
     });
 
     gallery.innerHTML = Object.values(grouped).map(g => {
+        const hasFail = [...g.statuses].some(st => st === 'fail');
         const hasPendingApproval = [...g.statuses].some(st => st.includes('leader') || st.includes('approval'));
         const hasInProgress = [...g.statuses].some(st => st.includes('progress') || st.includes('in-progress') || st.includes('in progress'));
 
         let statusBadgeHTML = '';
-        if (hasPendingApproval) {
+        let cardBorderClass = 'result-card-pass';
+        let topBarClass = 'bg-gradient-to-r from-emerald-400 to-teal-500';
+
+        if (hasFail) {
+            cardBorderClass = 'result-card-fail';
+            topBarClass = 'bg-gradient-to-r from-rose-500 to-red-600';
+            statusBadgeHTML = `
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                    Fail
+                </span>
+            `;
+        } else if (hasPendingApproval) {
+            cardBorderClass = 'result-card-progress';
+            topBarClass = 'bg-gradient-to-r from-amber-400 to-orange-500';
             statusBadgeHTML = `
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
@@ -3442,6 +3717,8 @@ function renderInspectionResultTable(sessions) {
                 </span>
             `;
         } else if (hasInProgress) {
+            cardBorderClass = 'result-card-progress';
+            topBarClass = 'bg-gradient-to-r from-amber-400 to-orange-500';
             statusBadgeHTML = `
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
@@ -3452,22 +3729,30 @@ function renderInspectionResultTable(sessions) {
             statusBadgeHTML = `
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    Done
+                    Pass
                 </span>
             `;
         }
 
+        const reinspHeaderBadge = g.hasReinspection
+            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Re-Inspection</span>`
+            : '';
+
         const dateArr = [...g.dates].sort();
         const dateStr = dateArr.length > 1 ? `${dateArr[0]} s/d ${dateArr[dateArr.length - 1]}` : (dateArr[0] || '—');
 
-        // Aggregate items by component and process — prevent doubling incoming for same component lot across inspection days
+        // Aggregate items by component and process while keeping Fail and Re-Inspection sessions distinct
         const itemAgg = {};
         g.items.forEach(it => {
-            const itemKey = `${it.component}|${it.process}`;
+            const stLow = (it.status || '').toLowerCase();
+            const keepSeparate = stLow === 'fail' || it.isReinspection;
+            const itemKey = `${it.component}|${it.process}|${stLow}|${it.isReinspection ? 're' : 'init'}|${keepSeparate ? it.sessionId : 'agg'}`;
             if (!itemAgg[itemKey]) {
                 itemAgg[itemKey] = {
                     component: it.component,
                     process: it.process,
+                    status: it.status,
+                    isReinspection: it.isReinspection,
                     qtyIncoming: 0,
                     qtyInspect: 0,
                     pass: 0,
@@ -3485,18 +3770,21 @@ function renderInspectionResultTable(sessions) {
         const aggregatedItems = Object.values(itemAgg);
 
         return `
-            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${(hasInProgress || hasPendingApproval) ? 'border-amber-400/30' : 'border-slate-200/40'}" style="min-height: 320px;">
+            <div class="bg-white rounded-xl border shadow-sm relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all duration-200 ${cardBorderClass}" style="min-height: 320px;">
                 <!-- Decorative top bar -->
-                <div class="h-1.5 w-full ${(hasInProgress || hasPendingApproval) ? 'bg-gradient-to-r from-amber-400 to-orange-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}"></div>
+                <div class="h-1.5 w-full ${topBarClass}"></div>
                 
                 <div class="p-5 flex-1 flex flex-col gap-4">
                     <!-- Style and model name & Status -->
-                    <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start justify-between gap-3">
                         <div>
                             <h3 class="text-base font-extrabold text-slate-100 leading-tight mb-0.5">${g.modelName}</h3>
                             <p class="text-[11px] text-slate-400">Style Number: <span class="text-slate-300 font-semibold">${g.styleNumber}</span> • Inspector: <span class="text-emerald-400 font-semibold">${g.auditor}</span></p>
                         </div>
-                        ${statusBadgeHTML}
+                        <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                            ${statusBadgeHTML}
+                            ${reinspHeaderBadge}
+                        </div>
                     </div>
 
                     <!-- Meta details -->
@@ -3536,17 +3824,50 @@ function renderInspectionResultTable(sessions) {
                 const sObj = sessions.find(sess => sess.sessionId === sid);
                 if (!sObj) return false;
                 const st = (sObj.status || '').toLowerCase();
-                return st.includes('progress') || st.includes('leader') || st.includes('approval') || (Boolean(sObj.approvedByLeader) && st !== 'done');
+                return st.includes('progress') || st.includes('leader') || st.includes('approval') || (Boolean(sObj.approvedByLeader) && !isPassStatus(st) && !isFailStatus(st));
             }) || sessionIds[0];
 
             const targetObj = sessions.find(sess => sess.sessionId === activeInProgSession);
-            const isDone = targetObj && (targetObj.status || '').toLowerCase() === 'done';
+            const targetStatusLower = (targetObj?.status || '').toLowerCase();
+            const isItemPass = isPassStatus(targetStatusLower);
+            const isItemFail = isFailStatus(targetStatusLower);
 
-            if (!isDone && activeInProgSession) {
+            if (isItemFail && activeInProgSession) {
+                if (targetObj.isReinspection) {
+                    actionHTML = `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded text-[9px] font-bold" title="Re-Inspection gagal (batas maksimal 1x)">Fail (Max 1x)</span>`;
+                } else {
+                    const childReinsp = reinspectionMap.get(activeInProgSession);
+                    if (childReinsp) {
+                        const childLabel = normalizeDisplayStatus(childReinsp.status);
+                        const childCls = isPassStatus(childReinsp.status)
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+                        actionHTML = `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 ${childCls} border rounded text-[9px] font-bold" title="Sudah dilakukan Re-Inspection 1x (${childReinsp.sessionId})">Re-Insp: ${childLabel}</span>`;
+                    } else if (canUserReinspectSession(targetObj, currentUser, reinspectionMap)) {
+                        const safeSid = String(activeInProgSession).replace(/'/g, "\\'");
+                        actionHTML = `
+                            <button onclick="window.startReinspection('${safeSid}')"
+                                    title="Lakukan Re-Inspection (Max 1x) untuk ${activeInProgSession}"
+                                    class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-rose-500/25 hover:bg-rose-500/45 text-rose-200 border border-rose-400/50 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
+                                <span class="material-symbols-outlined text-[12px]">restart_alt</span>
+                                <span>Re-Inspect</span>
+                            </button>
+                        `;
+                    } else {
+                        actionHTML = `
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 text-rose-300 border border-rose-500/30 rounded text-[9px] font-medium" title="Hanya user role Vendor yang di-assign ke ${targetObj?.vendor || 'vendor ini'} yang dapat melakukan Re-Inspection">
+                                <span class="material-symbols-outlined text-[11px] text-rose-400">lock</span>
+                                <span>Fail</span>
+                            </span>
+                        `;
+                    }
+                }
+            } else if (!isItemPass && activeInProgSession) {
                 const canEdit = canUserEditSession(targetObj, currentUser);
                 if (canEdit) {
+                    const safeSid = String(activeInProgSession).replace(/'/g, "\\'");
                     actionHTML = `
-                        <button onclick="window.continueInProgressSession('${activeInProgSession}')" 
+                        <button onclick="window.continueInProgressSession('${safeSid}')" 
                                 title="Edit / Lanjutkan Sesi ${activeInProgSession}" 
                                 class="inline-flex items-center justify-center gap-1 px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded text-[10px] font-bold cursor-pointer transition-all duration-150">
                             <span class="material-symbols-outlined text-[12px]">edit</span>
@@ -3563,7 +3884,7 @@ function renderInspectionResultTable(sessions) {
                     `;
                 }
             } else {
-                actionHTML = `<span class="text-[9px] text-slate-500 font-bold">Done</span>`;
+                actionHTML = `<span class="text-[9px] text-emerald-400 font-bold">Pass</span>`;
             }
 
             return `
@@ -3600,6 +3921,116 @@ function renderInspectionResultTable(sessions) {
     }).join('');
 }
 
+/** Start a Re-Inspection session (max 1x) from a Fail session — Vendor role only */
+window.startReinspection = async function (parentSessionId) {
+    const parentSession = allInspectionSessions.find(s => String(s.sessionId) === String(parentSessionId));
+    if (!parentSession) {
+        showAlert('Data sesi Fail tidak ditemukan.', 'error');
+        return;
+    }
+
+    const reinspectionMap = buildReinspectionMap(allInspectionSessions);
+    if (reinspectionMap.has(parentSession.sessionId)) {
+        showAlert('Sesi ini sudah pernah dilakukan Re-Inspection (maksimal 1x).', 'warning', 'Batas Re-Inspection');
+        return;
+    }
+
+    if (!canUserReinspectSession(parentSession, currentUser, reinspectionMap)) {
+        showAlert(
+            `Akses ditolak: Hanya user dengan role Vendor yang di-assign ke "${parentSession.vendor || '—'}" yang dapat melakukan Re-Inspection.`,
+            'error',
+            'Wewenang Terbatas'
+        );
+        return;
+    }
+
+    resetAllFields();
+    clearDraftStorage(true);
+
+    reinspectionParentSessionId = parentSession.sessionId;
+    editingSessionId = null;
+    editingParentSessionId = parentSession.sessionId;
+    editingIsReinspection = true;
+
+    const mtSelect = document.getElementById('material-type');
+    if (mtSelect) {
+        mtSelect.value = parentSession.materialType || '';
+        selectedMaterialType = parentSession.materialType || '';
+    }
+    renderVendorButtons();
+
+    if (parentSession.vendor) {
+        selectedVendor = parentSession.vendor;
+        document.querySelectorAll('.vendor-sel-btn').forEach(btn => {
+            btn.classList.toggle('bg-emerald-600', btn.dataset.vendor === parentSession.vendor);
+            btn.classList.toggle('text-white', btn.dataset.vendor === parentSession.vendor);
+            btn.classList.toggle('border-emerald-600', btn.dataset.vendor === parentSession.vendor);
+        });
+        if (addItemBtn) addItemBtn.disabled = false;
+    }
+
+    const tinEl = document.getElementById('tanggal-incoming');
+    if (tinEl && parentSession.tanggalIncoming) tinEl.value = getLatestSingleDate(parentSession.tanggalIncoming);
+
+    const todayStr = toLocalDateString(new Date());
+    window.setInspectionDates(todayStr);
+
+    const rawBucket = parentSession.tanggalBucket || parentSession.bucket || '';
+    if (rawBucket) window.setBucketDates(rawBucket);
+
+    const styleEl = document.getElementById('style-number');
+    if (styleEl && parentSession.styleNumber) styleEl.value = parentSession.styleNumber;
+    const modelEl = document.getElementById('model-name');
+    if (modelEl && parentSession.modelName) modelEl.value = parentSession.modelName;
+    if (parentSession.styleNumber) {
+        window.setStyles(parentSession.styleNumber, parentSession.modelName);
+    }
+
+    if (typeof window.__syncInspectionStatusState === 'function') {
+        window.__syncInspectionStatusState('Pass');
+    }
+
+    // Pre-fill item component/process/qtyIncoming with zeroed inspection counters for fresh reinspection
+    if (Array.isArray(parentSession.items) && parentSession.items.length > 0) {
+        inspectionItems = parentSession.items.map(it => ({
+            component: it.component,
+            process: it.process || '',
+            qtyIncoming: Number(it.qtyIncoming || 0),
+            qtyInspect: 0,
+            pass: 0,
+            defect: 0,
+            defects: []
+        }));
+    } else if (parentSession.component) {
+        inspectionItems = [{
+            component: parentSession.component,
+            process: parentSession.process || '',
+            qtyIncoming: Number(parentSession.qtyIncoming || 0),
+            qtyInspect: 0,
+            pass: 0,
+            defect: 0,
+            defects: []
+        }];
+    }
+
+    setReinspectionFieldLocks(true);
+    renderInspectedItems();
+    updateTotalQtyInspect();
+    checkInfoCompleteAndLockButtons();
+    saveToLocalStorage();
+
+    if (typeof window.showView === 'function') {
+        window.showView('dashboard');
+    }
+
+    renderReinspectionBanner(parentSession);
+    showAlert(
+        `Mode Re-Inspection aktif untuk ${parentSession.vendor} (${parentSession.sessionId}). Silakan edit item untuk memasukkan hasil pemeriksaan ulang.`,
+        'info',
+        'Mode Re-Inspection'
+    );
+};
+
 /** Continue/Load an in-progress or pending approval session back into the form */
 window.continueInProgressSession = function (sessionId) {
     const session = allInspectionSessions.find(s => String(s.sessionId) === String(sessionId));
@@ -3614,7 +4045,11 @@ window.continueInProgressSession = function (sessionId) {
         return;
     }
 
+    reinspectionParentSessionId = null;
     editingSessionId = session.sessionId;
+    editingParentSessionId = session.parentSessionId || null;
+    editingIsReinspection = Boolean(session.isReinspection);
+    setReinspectionFieldLocks(editingIsReinspection);
 
     // Set header fields
     const mtSelect = document.getElementById('material-type');
@@ -3650,7 +4085,8 @@ window.continueInProgressSession = function (sessionId) {
     }
 
     if (typeof window.__syncInspectionStatusState === 'function') {
-        window.__syncInspectionStatusState(session.status || 'In-Progress');
+        const mappedSt = String(session.status || '').toLowerCase() === 'done' ? 'Pass' : (session.status || 'In-Progress');
+        window.__syncInspectionStatusState(mappedSt);
     }
 
     const leaderSelect = document.getElementById('approved-by-leader');
@@ -3691,16 +4127,49 @@ window.continueInProgressSession = function (sessionId) {
     showAlert(`Sesi inspeksi ${session.vendor} (${session.sessionId}) berhasil dimuat ke form untuk di-edit/dilanjutkan!`, 'success', 'Sesi Dimuat');
 };
 
-/** Exit editing mode without deleting any session, returning to a clean form */
+/** Exit editing / reinspection mode without deleting any session, returning to a clean form */
 window.exitEditingSession = function (silent = false) {
     editingSessionId = null;
+    reinspectionParentSessionId = null;
+    editingParentSessionId = null;
+    editingIsReinspection = false;
+    setReinspectionFieldLocks(false);
     hideEditingSessionBanner();
     resetAllFields();
-    clearDraftStorage();
+    clearDraftStorage(true);
     if (!silent) {
-        showAlert('Mode edit sesi dibatalkan. Form kembali ke status baru.', 'info', 'Form Direset');
+        showAlert('Mode edit / re-inspection dibatalkan. Form kembali ke status baru.', 'info', 'Form Direset');
     }
 };
+
+function renderReinspectionBanner(session) {
+    const banner = document.getElementById('in-progress-editing-banner');
+    if (!banner || !session) return;
+
+    banner.innerHTML = `
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-rose-400 text-2xl animate-pulse">restart_alt</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-rose-200 bg-rose-500/30 border border-rose-400/40 px-2 py-0.5 rounded">Mode Re-Inspection (Max 1x)</span>
+                    <span class="text-xs font-bold text-slate-200 font-mono">Induk: ${session.sessionId}</span>
+                </div>
+                <p class="text-xs text-slate-300 mt-0.5">
+                    Re-Inspection <strong class="text-white">${session.styleNumber || '—'}</strong> (${session.modelName || '—'}) - Vendor: <strong class="text-white">${session.vendor || '—'}</strong>
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
+            <button type="button" onclick="window.exitEditingSession()" 
+                    class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                    title="Batalkan proses Re-Inspection ini">
+                <span class="material-symbols-outlined text-sm">close</span>
+                <span>Batal Re-Inspection</span>
+            </button>
+        </div>
+    `;
+    banner.classList.remove('hidden');
+}
 
 /** Render banner when form is in In-Progress editing mode */
 function renderEditingSessionBanner(session) {

@@ -284,6 +284,10 @@ export async function initAdminPanel() {
 
     document.getElementById('admin-user-form').addEventListener('submit', handleUserSubmit);
     document.getElementById('admin-user-cancel').addEventListener('click', cancelUserEdit);
+    const userRoleSelect = document.getElementById('user-input-role');
+    if (userRoleSelect) {
+        userRoleSelect.addEventListener('change', () => toggleUserVendorAssignment(userRoleSelect.value));
+    }
 
     document.getElementById('admin-vendor-form').addEventListener('submit', handleVendorSubmit);
     document.getElementById('admin-vendor-cancel').addEventListener('click', cancelVendorEdit);
@@ -581,6 +585,46 @@ function cancelDefectEdit() {
 
 // ─── USERS TAB ───────────────────────────────────────────────
 
+function renderUserVendorCheckboxes(selectedList = []) {
+    const container = document.getElementById('user-vendor-checkboxes');
+    if (!container) return;
+    const vendors = getVendors();
+    const selectedSet = new Set(selectedList.map(v => String(v).trim().toLowerCase()).filter(Boolean));
+
+    if (!vendors.length) {
+        container.innerHTML = '<span class="text-slate-400 italic">Belum ada master vendor.</span>';
+        return;
+    }
+
+    container.innerHTML = vendors.map(v => {
+        const isChecked = selectedSet.has(String(v.name || '').trim().toLowerCase());
+        return `
+            <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-100 cursor-pointer select-none">
+                <input type="checkbox" name="user-assigned-vendor" value="${escHtml(v.name)}" ${isChecked ? 'checked' : ''}
+                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                <span class="font-medium text-slate-700">${escHtml(v.name)}</span>
+                ${v.material_type ? `<span class="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">${escHtml(v.material_type)}</span>` : ''}
+            </label>
+        `;
+    }).join('');
+}
+
+function toggleUserVendorAssignment(role, selectedVendorStr = '') {
+    const group = document.getElementById('user-vendor-assignment-group');
+    if (!group) return;
+    const isVendor = String(role || '').toLowerCase() === 'vendor';
+    group.classList.toggle('hidden', !isVendor);
+    if (isVendor) {
+        const list = String(selectedVendorStr || '').split(',').map(s => s.trim()).filter(Boolean);
+        renderUserVendorCheckboxes(list);
+    }
+}
+
+function getSelectedAssignedVendors() {
+    const checked = Array.from(document.querySelectorAll('input[name="user-assigned-vendor"]:checked'));
+    return checked.map(el => el.value.trim()).filter(Boolean).join(', ');
+}
+
 function renderUsersTab() {
     const users = getUsers();
     const tbody = document.getElementById('admin-users-tbody');
@@ -600,6 +644,9 @@ function renderUsersTab() {
         const authBadge = hasAuth
             ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700">\u2713 Can Login</span>'
             : '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">No Auth</span>';
+        const vendorText = u.role === 'vendor' && u.assigned_vendor
+            ? `<span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800">${escHtml(u.assigned_vendor)}</span>`
+            : '<span class="text-xs text-slate-400">\u2014</span>';
         return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
             <td class="px-4 py-2.5 font-mono text-slate-700 text-sm">${escHtml(u.nik)}</td>
@@ -607,6 +654,7 @@ function renderUsersTab() {
             <td class="px-4 py-2.5">
                 <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${roleBadge(u.role)} capitalize">${u.role}</span>
             </td>
+            <td class="px-4 py-2.5 text-xs">${vendorText}</td>
             <td class="px-4 py-2.5">${authBadge}</td>
             <td class="px-4 py-2.5 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString('id-ID')}</td>
             <td class="px-4 py-2.5">
@@ -622,7 +670,13 @@ function renderUsersTab() {
 }
 
 function roleBadge(role) {
-    return { admin: 'bg-purple-100 text-purple-700', supervisor: 'bg-blue-100 text-blue-700', manager: 'bg-emerald-100 text-emerald-700', inspector: 'bg-slate-100 text-slate-600' }[role] || 'bg-slate-100 text-slate-600';
+    return {
+        admin: 'bg-purple-100 text-purple-700',
+        supervisor: 'bg-blue-100 text-blue-700',
+        manager: 'bg-emerald-100 text-emerald-700',
+        vendor: 'bg-amber-100 text-amber-700',
+        inspector: 'bg-slate-100 text-slate-600'
+    }[role] || 'bg-slate-100 text-slate-600';
 }
 
 function handleUserSubmit(e) {
@@ -631,11 +685,16 @@ function handleUserSubmit(e) {
     const name     = document.getElementById('user-input-name').value.trim();
     const role     = document.getElementById('user-input-role').value;
     const password = document.getElementById('user-input-password')?.value ?? '';
+    const assigned_vendor = role === 'vendor' ? getSelectedAssignedVendors() : null;
 
     if (!nik || !name || !role) return;
 
     if (!/^[a-zA-Z0-9]{1,20}$/.test(nik)) {
         showAlert('NIK hanya boleh alfanumerik, maks 20 karakter.', 'warning', 'Format NIK Tidak Valid');
+        return;
+    }
+    if (role === 'vendor' && !assigned_vendor) {
+        showAlert('User dengan role Vendor wajib di-assign minimal ke 1 vendor.', 'warning', 'Vendor Belum Dipilih');
         return;
     }
     if (editingUserId === null && !password) {
@@ -653,16 +712,17 @@ function handleUserSubmit(e) {
     const finish = async () => {
         try {
             if (editingUserId !== null) {
-                await dbUpdateAuthUser(editingUserId, { display_name: name, role, password: password || undefined });
+                await dbUpdateAuthUser(editingUserId, { display_name: name, role, password: password || undefined, assigned_vendor });
             } else {
-                await dbCreateAuthUser({ nik, display_name: name, role, password });
+                await dbCreateAuthUser({ nik, display_name: name, role, password, assigned_vendor });
             }
             const fresh = await dbGetAppUsers();
             saveUsers(fresh);
             renderUsersTab();
+            const isEdit = editingUserId !== null;
             cancelUserEdit();
             await showAlert(
-                editingUserId !== null ? `User "${name}" berhasil diperbarui.` : `User "${name}" berhasil dibuat. User sekarang bisa login dengan NIK: ${nik}`,
+                isEdit ? `User "${name}" berhasil diperbarui.` : `User "${name}" berhasil dibuat. User sekarang bisa login dengan NIK: ${nik}`,
                 'success'
             );
         } catch (err) {
@@ -682,6 +742,7 @@ window.__adminEditUser = function(id) {
     if (nikInput) { nikInput.value = user.nik; nikInput.disabled = true; }
     document.getElementById('user-input-name').value = user.display_name;
     document.getElementById('user-input-role').value = user.role;
+    toggleUserVendorAssignment(user.role, user.assigned_vendor || '');
     // Password optional saat edit
     const pwInput = document.getElementById('user-input-password');
     const pwHint  = document.getElementById('user-password-hint');
@@ -710,6 +771,7 @@ window.__adminDeleteUser = async function(id) {
 function cancelUserEdit() {
     editingUserId = null;
     document.getElementById('admin-user-form').reset();
+    toggleUserVendorAssignment('', '');
     const nikInput = document.getElementById('user-input-nik');
     if (nikInput) nikInput.disabled = false;
     const pwInput = document.getElementById('user-input-password');
@@ -991,6 +1053,10 @@ function populateAdminFormSelects() {
     }
     // Component select in process form (filtered by vendor if selected)
     _populateProcessFormComponent(procVendorSel ? procVendorSel.value : '');
+    const roleVal = document.getElementById('user-input-role')?.value;
+    if (roleVal === 'vendor') {
+        renderUserVendorCheckboxes(getSelectedAssignedVendors().split(',').map(s => s.trim()).filter(Boolean));
+    }
 }
 
 function _populateProcessFormComponent(vendorId) {
@@ -1398,7 +1464,13 @@ window.loadSubcontInspectionLog = async function() {
             if (dateStart) q = q.gte('tanggal_insp', dateStart);
             if (dateEnd) q = q.lte('tanggal_insp', dateEnd);
             if (vendorVal !== 'all') q = q.ilike('vendor', `%${vendorVal}%`);
-            if (statusVal !== 'all') q = q.eq('status', statusVal);
+            if (statusVal === 'Pass') {
+                q = q.in('status', ['Pass', 'pass', 'Done', 'done']);
+            } else if (statusVal === 'Fail') {
+                q = q.in('status', ['Fail', 'fail']);
+            } else if (statusVal !== 'all') {
+                q = q.eq('status', statusVal);
+            }
             if (fileVal === 'has_evidence') {
                 q = q.not('evidence_url', 'is', null).neq('evidence_url', '');
             } else if (fileVal === 'no_evidence') {
@@ -1470,9 +1542,19 @@ function renderSubcontLogSessions(sessions) {
 
     tbody.innerHTML = pageItems.map(s => {
         const tgl = s.tanggal_insp || s.date || (s.timestamp ? String(s.timestamp).substring(0, 10) : '-');
-        const stClass = (s.status || 'Done').toLowerCase() === 'done'
+        const rawStatus = s.status || 'Pass';
+        const stLower = rawStatus.toLowerCase();
+        const isPass = stLower === 'done' || stLower === 'pass';
+        const isFail = stLower === 'fail';
+        const displayStatus = stLower === 'done' ? 'Pass' : rawStatus;
+        const stClass = isPass
             ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+            : isFail
+            ? 'bg-rose-100 text-rose-700 border-rose-200'
             : 'bg-amber-100 text-amber-700 border-amber-200';
+        const reBadge = (s.is_reinspection || s.parent_session_id)
+            ? '<span class="ml-1 inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-sky-100 text-sky-700">Re-Insp</span>'
+            : '';
 
         const safeSessionId = encodeURIComponent(s.session_id);
 
@@ -1505,8 +1587,8 @@ function renderSubcontLogSessions(sessions) {
                 <td class="py-2.5 px-3 text-right font-mono font-bold text-rose-600">${(Number(s.qty_defect) || 0).toLocaleString()}</td>
                 <td class="py-2.5 px-3 text-center">
                     <span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full border ${stClass}">
-                        ${s.status || 'Done'}
-                    </span>
+                        ${displayStatus}
+                    </span>${reBadge}
                 </td>
                 <td class="py-2.5 px-3 text-center whitespace-nowrap">${berkasBadge}</td>
                 <td class="py-2.5 px-3 text-center whitespace-nowrap">
@@ -1716,7 +1798,9 @@ window.exportSubcontInspectionLog = function() {
             'Tanggal Bucket':      s.bucket ? String(s.bucket).trim() : '',
             'ApprovedBy':          s.approved_by || '',
             'EvidenceUrl':         s.evidence_url || '',
-            'Status':              s.status || 'Done',
+            'Status':              (String(s.status || '').toLowerCase() === 'done' ? 'Pass' : (s.status || 'Pass')),
+            'Is Re-Inspection':    (s.is_reinspection || s.parent_session_id) ? 'Yes' : 'No',
+            'Parent Session ID':   s.parent_session_id || '',
         };
     });
     const ws1 = XLSX.utils.json_to_sheet(sRows);
@@ -1762,7 +1846,8 @@ window.editSubcontSession = function(rawSessionId) {
         const isVend = (s.inspection_location || '').toLowerCase().includes('vendor');
         document.getElementById('edit-subcont-location').value = isVend ? 'In-Vendor Inspection' : 'In-House Inspection';
     }
-    document.getElementById('edit-subcont-status').value = s.status || 'Done';
+    const stRaw = s.status || 'Pass';
+    document.getElementById('edit-subcont-status').value = stRaw;
     document.getElementById('edit-subcont-model').value = s.model || '';
     document.getElementById('edit-subcont-style').value = s.style_number || '';
     document.getElementById('edit-subcont-component').value = s.component || '';

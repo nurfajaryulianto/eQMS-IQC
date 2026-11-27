@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
     }
 
     // ── Validasi payload ──────────────────────────────────────
-    const { nik, display_name, role, password } = req.body ?? {};
+    const { nik, display_name, role, password, assigned_vendor } = req.body ?? {};
 
     if (!nik || !display_name || !role || !password) {
         return res.status(400).json({ error: 'NIK, Display Name, Role, dan Password wajib diisi.' });
@@ -41,8 +41,12 @@ module.exports = async function handler(req, res) {
     if (!/^[a-zA-Z0-9]{1,20}$/.test(nik)) {
         return res.status(400).json({ error: 'NIK hanya boleh alfanumerik, maks 20 karakter.' });
     }
-    if (!['inspector', 'auditor', 'supervisor', 'manager', 'admin'].includes(role)) {
+    if (!['inspector', 'auditor', 'supervisor', 'manager', 'admin', 'vendor'].includes(role)) {
         return res.status(400).json({ error: 'Role tidak valid.' });
+    }
+    const cleanAssignedVendor = role === 'vendor' ? String(assigned_vendor || '').trim() : '';
+    if (role === 'vendor' && !cleanAssignedVendor) {
+        return res.status(400).json({ error: 'User dengan role Vendor wajib di-assign minimal ke 1 vendor.' });
     }
     if (password.length < 6) {
         return res.status(400).json({ error: 'Password minimal 6 karakter.' });
@@ -55,14 +59,20 @@ module.exports = async function handler(req, res) {
         email,
         password,
         email_confirm: true,
-        user_metadata: { display_name, nik, role },
+        user_metadata: { display_name, nik, role, assigned_vendor: cleanAssignedVendor || null },
     });
     if (createErr) return res.status(400).json({ error: createErr.message });
 
     // ── Insert ke app_users (serta simpan auth_user_id) ───────
     const { error: dbErr } = await supabaseAdmin
         .from('app_users')
-        .insert({ nik, display_name, role, auth_user_id: newUser.id });
+        .insert({
+            nik,
+            display_name,
+            role,
+            assigned_vendor: cleanAssignedVendor || null,
+            auth_user_id: newUser.id,
+        });
 
     if (dbErr) {
         // Rollback: hapus auth user yang baru dibuat

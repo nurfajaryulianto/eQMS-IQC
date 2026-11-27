@@ -1042,6 +1042,55 @@
         .thin-scroll::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.15) !important;
         }
+
+        /* Inspection Result status borders (override .bg-white border !important) */
+        .bg-white.result-card-pass {
+            border: 1.5px solid rgba(16, 185, 129, 0.55) !important;
+        }
+        .bg-white.result-card-fail {
+            border: 1.5px solid rgba(239, 68, 68, 0.85) !important;
+            box-shadow: 0 8px 28px rgba(239, 68, 68, 0.18) !important;
+        }
+        .bg-white.result-card-fail:hover {
+            border-color: rgba(239, 68, 68, 1) !important;
+            box-shadow: 0 12px 34px rgba(239, 68, 68, 0.25) !important;
+        }
+        .bg-white.result-card-progress {
+            border: 1.5px solid rgba(245, 158, 11, 0.55) !important;
+        }
+
+        /* Top-right auto-dismiss toast */
+        #eqms-top-toast-container {
+            position: fixed;
+            top: 76px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .eqms-top-toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+            color: #f8fafc;
+            font-size: 13px;
+            font-weight: 600;
+            max-width: 380px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .eqms-top-toast.hiding {
+            opacity: 0;
+            transform: translateX(20px);
+        }
     </style>
 </head>
 
@@ -1311,7 +1360,8 @@
                                                 <select id="inspection-status"
                                                     class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                                     <option value="In-Progress">In-Progress (Belum Selesai)</option>
-                                                    <option value="Done" selected>Done (Selesai)</option>
+                                                    <option value="Pass" selected>Pass (Lolos)</option>
+                                                    <option value="Fail">Fail (Gagal / Re-Inspection)</option>
                                                 </select>
                                             </div>
                                             <div>
@@ -1480,7 +1530,8 @@
                                     <select id="inspection-status-mobile"
                                         class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                         <option value="In-Progress">In-Progress (Belum Selesai)</option>
-                                        <option value="Done" selected>Done (Selesai)</option>
+                                        <option value="Pass" selected>Pass (Lolos)</option>
+                                        <option value="Fail">Fail (Gagal / Re-Inspection)</option>
                                     </select>
                                 </div>
 
@@ -1677,11 +1728,14 @@
                             </div>
                         </section>
 
-                        <!-- Top Row: FTT Trend & Top Defects (2-column Grid) -->
+                        <!-- Top Row: FTT Trend & Pass Rate (2-column Grid) -->
                         <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                             <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
                                 <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-base font-semibold text-slate-900">FTT Trend</h3>
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">FTT Trend</h3>
+                                        <p class="text-[11px] text-slate-400">Murni inspeksi awal (tanpa reinspection)</p>
+                                    </div>
                                     <div id="ftt-time-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
                                         <button type="button"
                                             class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
@@ -1696,16 +1750,35 @@
                             </div>
                             <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
                                 <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-base font-semibold text-slate-900">Top Defects</h3>
-                                    <span class="text-xs text-slate-400">by total count</span>
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">Pass Rate</h3>
+                                        <p class="text-[11px] text-slate-400">Final pass rate termasuk hasil reinspection</p>
+                                    </div>
+                                    <div id="pass-rate-time-filter" class="flex bg-slate-100 rounded-lg p-1 gap-1">
+                                        <button type="button"
+                                            class="btn px-3 py-1 text-xs font-semibold bg-white shadow-sm rounded text-slate-900 active"
+                                            data-period="days">Daily</button>
+                                        <button type="button"
+                                            class="btn px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-900 rounded"
+                                            data-period="months">Monthly</button>
+                                    </div>
                                 </div>
                                 <div class="chart-container" style="position:relative;height:240px;"><canvas
-                                        id="defectChart"></canvas></div>
+                                        id="passRateChart"></canvas></div>
                             </div>
                         </section>
 
                         <!-- Full Width Large Containers Stack -->
                         <div class="space-y-6">
+                            <!-- Top Defects (Full Width) -->
+                            <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-base font-semibold text-slate-900">Top Defects</h3>
+                                    <span class="text-xs text-slate-400">by total count (initial inspection)</span>
+                                </div>
+                                <div class="chart-container" style="position:relative;height:260px;"><canvas
+                                        id="defectChart"></canvas></div>
+                            </div>
                             <!-- Vendor Performance (Full Width) -->
                             <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
                                 <div class="flex justify-between items-center mb-4">
@@ -1775,8 +1848,9 @@
                                         <select id="inspection-result-status-filter"
                                             class="w-full border border-slate-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                             <option value="all">Semua Status</option>
-                                            <option value="Done">Done (Selesai)</option>
-                                            <option value="In-Progress">In-Progress</option>
+                                            <option value="Pass">Pass (Lolos)</option>
+                                            <option value="Fail">Fail (Gagal)</option>
+                                            <option value="In-Progress">In-Progress (Belum Selesai)</option>
                                             <option value="Pending Leader Approval">Pending Leader Approval</option>
                                         </select>
                                     </div>
@@ -2308,6 +2382,9 @@
                                                         Role</th>
                                                     <th
                                                         class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                        Vendor</th>
+                                                    <th
+                                                        class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                                         Login</th>
                                                     <th
                                                         class="px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -2361,10 +2438,20 @@
                                                 class="w-full rounded-md border border-slate-300 text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none">
                                                 <option value="">Select role</option>
                                                 <option value="inspector">Inspector</option>
+                                                <option value="vendor">Vendor (Re-Inspection)</option>
                                                 <option value="supervisor">Supervisor</option>
                                                 <option value="manager">Manager</option>
                                                 <option value="admin">Admin</option>
                                             </select>
+                                        </div>
+                                        <div id="user-vendor-assignment-group" class="hidden">
+                                            <label
+                                                class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Assigned Vendor <span class="text-rose-400">*</span></label>
+                                            <div id="user-vendor-checkboxes"
+                                                class="max-h-40 overflow-y-auto thin-scroll p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1.5 text-xs">
+                                                <!-- Populated by admin.js -->
+                                            </div>
+                                            <p class="text-[11px] text-slate-400 mt-1">Pilih vendor yang menjadi wewenang user untuk Re-Inspection item Fail.</p>
                                         </div>
                                         <div>
                                             <label
@@ -2621,7 +2708,9 @@
                                         <select id="subcont-log-status-filter"
                                             class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-emerald-500">
                                             <option value="all">Semua Status</option>
-                                            <option value="Done">Done</option>
+                                            <option value="Pass">Pass</option>
+                                            <option value="Fail">Fail</option>
+                                            <option value="Done">Done (Legacy)</option>
                                             <option value="In-Progress">In-Progress</option>
                                         </select>
                                         <select id="subcont-log-file-filter"
@@ -2822,6 +2911,8 @@
                             <label class="block font-semibold text-slate-600 mb-1">Status</label>
                             <select id="edit-subcont-status"
                                 class="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-emerald-500">
+                                <option value="Pass">Pass</option>
+                                <option value="Fail">Fail</option>
                                 <option value="Done">Done</option>
                                 <option value="In-Progress">In-Progress</option>
                             </select>

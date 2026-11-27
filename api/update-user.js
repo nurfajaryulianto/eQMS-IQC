@@ -29,12 +29,16 @@ module.exports = async function handler(req, res) {
         return res.status(403).json({ error: 'Hanya admin yang dapat mengubah user.' });
     }
 
-    const { app_user_id, display_name, role, password } = req.body ?? {};
+    const { app_user_id, display_name, role, password, assigned_vendor } = req.body ?? {};
     if (!app_user_id || !display_name || !role) {
         return res.status(400).json({ error: 'app_user_id, Display Name, dan Role wajib diisi.' });
     }
-    if (!['inspector', 'auditor', 'supervisor', 'manager', 'admin'].includes(role)) {
+    if (!['inspector', 'auditor', 'supervisor', 'manager', 'admin', 'vendor'].includes(role)) {
         return res.status(400).json({ error: 'Role tidak valid.' });
+    }
+    const cleanAssignedVendor = role === 'vendor' ? String(assigned_vendor || '').trim() : '';
+    if (role === 'vendor' && !cleanAssignedVendor) {
+        return res.status(400).json({ error: 'User dengan role Vendor wajib di-assign minimal ke 1 vendor.' });
     }
     if (password && password.length < 6) {
         return res.status(400).json({ error: 'Password minimal 6 karakter.' });
@@ -63,7 +67,7 @@ module.exports = async function handler(req, res) {
     // ── Perbarui Supabase Auth user ───────────────────────────
     if (authUserId) {
         const updatePayload = {
-            user_metadata: { display_name, nik: appUser.nik, role },
+            user_metadata: { display_name, nik: appUser.nik, role, assigned_vendor: cleanAssignedVendor || null },
         };
         if (password) updatePayload.password = password;
 
@@ -79,7 +83,7 @@ module.exports = async function handler(req, res) {
     // ── Perbarui app_users ─────────────────────────────────────
     const { error: dbErr } = await supabaseAdmin
         .from('app_users')
-        .update({ display_name, role })
+        .update({ display_name, role, assigned_vendor: cleanAssignedVendor || null })
         .eq('id', app_user_id);
     if (dbErr) return res.status(400).json({ error: dbErr.message });
 

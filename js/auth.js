@@ -32,6 +32,7 @@ export const ROLES = {
     SUPERVISOR: 'supervisor',
     MANAGER: 'manager',
     ADMIN: 'admin',
+    VENDOR: 'vendor',
 };
 
 const SUPABASE_URL = 'https://mymzszufrwmpkpmmlnnc.supabase.co';
@@ -220,6 +221,7 @@ export async function getUser() {
                 display_name: mockSession.display_name,
                 nik: mockSession.nik,
                 role: mockSession.role || 'inspector',
+                assigned_vendor: mockSession.assigned_vendor || '',
             }
         };
     }
