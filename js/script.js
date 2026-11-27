@@ -2675,7 +2675,11 @@ async function initApp() {
         statisticBtn.style.display = 'none';
     }
     if (userRole === ROLES.VENDOR) {
-        document.querySelectorAll('[data-view="analytics"]').forEach(el => { el.style.display = 'none'; });
+        document.querySelectorAll('[data-view]').forEach(el => {
+            if (el.dataset.view !== 'inspection-result') {
+                el.style.display = 'none';
+            }
+        });
     }
 
     // Bridge: expose role synchronously for showView() gate in inline script
@@ -2713,7 +2717,9 @@ async function initApp() {
     // Auto-navigate via URL param (e.g. direct link to a view)
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get('view');
-    if (viewParam && typeof window.showView === 'function') {
+    if (userRole === ROLES.VENDOR) {
+        // Vendor hanya boleh mengakses Inspection Result (tunggu sync selesai sebelum load)
+    } else if (viewParam && typeof window.showView === 'function') {
         window.showView(viewParam);
     } else {
         // Refresh inspection results if currently on results view to apply correct default filters
@@ -2756,12 +2762,8 @@ async function initApp() {
     // Sync catalog dari Supabase ke localStorage cache (agar defect buttons & dropdowns terisi)
     try { await syncAllFromSupabase(); } catch (e) { console.warn('Catalog sync failed, menggunakan cache:', e); }
     currentUserAssignedVendors = resolveAssignedVendors(user);
-    if (userRole === ROLES.VENDOR) {
-        if (!viewParam && typeof window.showView === 'function') {
-            window.showView('inspection-result');
-        } else if (viewParam === 'inspection-result' && typeof window.loadInspectionResults === 'function') {
-            window.loadInspectionResults();
-        }
+    if (userRole === ROLES.VENDOR && typeof window.showView === 'function') {
+        window.showView('inspection-result');
     }
     populateStyleDatalist();
     renderStyleTags(true);
@@ -3270,10 +3272,12 @@ function buildReinspectionMap(sessions) {
 
 function canUserReinspectSession(session, user, reinspectionMap) {
     if (!session) return false;
-    const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
-    if (role !== ROLES.VENDOR) return false;
     if (!isFailStatus(session.status) || session.isReinspection) return false;
     if (reinspectionMap && reinspectionMap.has(session.sessionId)) return false;
+
+    const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
+    if (role === ROLES.ADMIN) return true;
+    if (role !== ROLES.VENDOR) return false;
 
     const vendors = currentUserAssignedVendors.length ? currentUserAssignedVendors : resolveAssignedVendors(user);
     const sessionVendor = String(session.vendor || '').trim().toLowerCase();
@@ -3504,6 +3508,10 @@ function populateFilterOptions() {
 function canUserEditSession(session, user) {
     if (!session) return false;
     const role = (user?.user_metadata?.role || window.__eqmsUserRole || currentUserRole || ROLES.INSPECTOR).toLowerCase();
+    // Vendor hanya boleh mengakses Inspection Result & melakukan Re-Inspection via modal
+    if (role === ROLES.VENDOR) {
+        return false;
+    }
     // Admin dan Supervisor berwenang mengedit semua sesi In-Progress
     if (role === ROLES.ADMIN || role === ROLES.SUPERVISOR) {
         return true;
@@ -3855,7 +3863,7 @@ function renderInspectionResultTable(sessions) {
                         `;
                     } else {
                         actionHTML = `
-                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 text-rose-300 border border-rose-500/30 rounded text-[9px] font-medium" title="Hanya user role Vendor yang di-assign ke ${targetObj?.vendor || 'vendor ini'} yang dapat melakukan Re-Inspection">
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 text-rose-300 border border-rose-500/30 rounded text-[9px] font-medium" title="Hanya Admin atau user role Vendor yang di-assign ke ${targetObj?.vendor || 'vendor ini'} yang dapat melakukan Re-Inspection">
                                 <span class="material-symbols-outlined text-[11px] text-rose-400">lock</span>
                                 <span>Fail</span>
                             </span>
@@ -3921,7 +3929,257 @@ function renderInspectionResultTable(sessions) {
     }).join('');
 }
 
-/** Start a Re-Inspection session (max 1x) from a Fail session — Vendor role only */
+// ===========================================
+// RE-INSPECTION MODAL ON INSPECTION RESULT PAGE (Admin & Assigned Vendor)
+// ===========================================
+let activeReinspParentSession = null;
+let reinspDefectsMap = {};
+let reinspDefectSearchQuery = '';
+
+function updateReinspCounters() {
+    const qtyInput = document.getElementById('reinsp-qty-inspect');
+    const passEl = document.getElementById('reinsp-pass-counter');
+    const defEl = document.getElementById('reinsp-defect-counter');
+    let qtyInspect = parseInt(qtyInput?.value, 10) || 0;
+    const defectSum = Object.values(reinspDefectsMap).reduce((sum, n) => sum + (Number(n) || 0), 0);
+    if (defectSum > qtyInspect) {
+        qtyInspect = defectSum;
+        if (qtyInput) qtyInput.value = qtyInspect;
+    }
+    const passVal = Math.max(0, qtyInspect - defectSum);
+    if (passEl) passEl.textContent = passVal;
+    if (defEl) defEl.textContent = defectSum;
+    renderReinspLoggedDefects();
+}
+
+function renderReinspDefectButtons() {
+    const container = document.getElementById('reinsp-defect-buttons');
+    if (!container) return;
+    const allDefects = getDefects() || [];
+    const q = reinspDefectSearchQuery.trim().toLowerCase();
+    const filtered = q
+        ? allDefects.filter(d => (d.label || '').toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q))
+        : allDefects;
+
+    if (!filtered.length) {
+        container.innerHTML = '<div class="col-span-full text-center text-xs text-slate-400 py-3 italic">Tidak ada defect ditemukan.</div>';
+        return;
+    }
+
+    const catStyles = {
+        minor: 'bg-blue-50 text-blue-800 border-blue-200',
+        major: 'bg-amber-50 text-amber-800 border-amber-200',
+        critical: 'bg-red-50 text-red-800 border-red-200'
+    };
+
+    container.innerHTML = filtered.map(d => {
+        const cls = catStyles[d.category] || catStyles.minor;
+        const count = reinspDefectsMap[d.name] || 0;
+        const safeName = String(d.name).replace(/'/g, "\\'");
+        const countBadge = count > 0
+            ? `<span class="ml-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold">${count}</span>`
+            : '';
+        return `
+            <button type="button" onclick="window.adjustReinspDefect('${safeName}', 1)"
+                class="defect-button ${cls} border rounded-lg px-2 py-2 text-[11px] font-medium flex items-center justify-center text-center leading-tight cursor-pointer">
+                <span>${d.label || d.name}</span>${countBadge}
+            </button>
+        `;
+    }).join('');
+}
+
+function renderReinspLoggedDefects() {
+    const container = document.getElementById('reinsp-logged-defects');
+    if (!container) return;
+    const entries = Object.entries(reinspDefectsMap).filter(([, cnt]) => cnt > 0);
+    if (!entries.length) {
+        container.innerHTML = '<span class="text-xs text-slate-400 italic">Belum ada defect tercatat.</span>';
+        return;
+    }
+    container.innerHTML = entries.map(([type, count]) => {
+        const safeType = String(type).replace(/'/g, "\\'");
+        return `
+            <div class="flex items-center justify-between py-1.5 text-xs">
+                <span class="font-medium text-slate-200">${type}</span>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="window.adjustReinspDefect('${safeType}', -1)"
+                        class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[10px] font-bold rounded text-slate-200 cursor-pointer">-1</button>
+                    <span class="w-8 text-center font-bold text-rose-400">${count}</span>
+                    <button type="button" onclick="window.adjustReinspDefect('${safeType}', 1)"
+                        class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-[10px] font-bold rounded text-slate-200 cursor-pointer">+1</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.adjustReinspDefect = function (defectType, delta) {
+    const cur = reinspDefectsMap[defectType] || 0;
+    const next = Math.max(0, cur + delta);
+    if (next === 0) delete reinspDefectsMap[defectType];
+    else reinspDefectsMap[defectType] = next;
+    renderReinspDefectButtons();
+    updateReinspCounters();
+};
+
+function closeReinspectionModal() {
+    const modal = document.getElementById('reinspection-modal');
+    if (modal) modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+    activeReinspParentSession = null;
+    reinspDefectsMap = {};
+    reinspDefectSearchQuery = '';
+}
+
+async function submitReinspectionModal() {
+    const parent = activeReinspParentSession;
+    if (!parent) return;
+
+    const reinspDate = document.getElementById('reinsp-date')?.value || toLocalDateString(new Date());
+    const qtyInspect = parseInt(document.getElementById('reinsp-qty-inspect')?.value, 10) || 0;
+    const status = document.getElementById('reinsp-status')?.value || 'Pass';
+    const defectCount = Object.values(reinspDefectsMap).reduce((sum, n) => sum + (Number(n) || 0), 0);
+    const passCount = Math.max(0, qtyInspect - defectCount);
+
+    if (qtyInspect <= 0) {
+        showAlert('Qty Inspect harus lebih besar dari 0.', 'warning', 'Data Tidak Valid');
+        return;
+    }
+
+    const reinspectionMap = buildReinspectionMap(allInspectionSessions);
+    if (!canUserReinspectSession(parent, currentUser, reinspectionMap)) {
+        showAlert('Anda tidak berwenang melakukan Re-Inspection untuk sesi ini.', 'error', 'Akses Ditolak');
+        return;
+    }
+
+    const submitBtn = document.getElementById('reinsp-submit-btn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Menyimpan...';
+    }
+
+    try {
+        const auditorName = currentUser?.user_metadata?.display_name || currentUser?.user_metadata?.nik || 'User';
+        const ftt = qtyInspect > 0 ? (passCount / qtyInspect) : 0;
+        const redoRate = qtyInspect > 0 ? (defectCount / qtyInspect) : 0;
+        const newSessionId = parent.sessionId.length <= 90
+            ? `${parent.sessionId}-RE1`
+            : `SESS-RE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+        if (UI_TEST_MODE) {
+            allInspectionSessions.unshift({
+                sessionId: newSessionId,
+                timestamp: new Date().toISOString(),
+                tanggalIncoming: parent.tanggalIncoming || '',
+                tanggalInspection: reinspDate,
+                tanggalBucket: parent.tanggalBucket || '',
+                materialType: parent.materialType || '',
+                auditor: auditorName,
+                vendor: parent.vendor || '',
+                component: parent.component || '',
+                process: parent.process || '',
+                styleNumber: parent.styleNumber || '',
+                modelName: parent.modelName || '',
+                qtyIncoming: Number(parent.qtyIncoming) || 0,
+                qtyInspect,
+                pass: passCount,
+                defect: defectCount,
+                ftt,
+                redoRate,
+                approvedByLeader: '',
+                evidenceUrl: '',
+                status,
+                parentSessionId: parent.sessionId,
+                isReinspection: true,
+                items: [{
+                    component: parent.component || '',
+                    process: parent.process || '',
+                    qtyIncoming: Number(parent.qtyIncoming) || 0,
+                    qtyInspect,
+                    pass: passCount,
+                    defect: defectCount
+                }]
+            });
+            closeReinspectionModal();
+            populateFilterOptions();
+            renderInspectionResultTable(allInspectionSessions);
+            await showAlert('Re-Inspection berhasil disimpan! (simulasi)', 'success', '[TEST MODE]');
+            return;
+        }
+
+        const { data: existingRe, error: checkReErr } = await supabase
+            .from('subcont_inspections')
+            .select('session_id')
+            .eq('parent_session_id', parent.sessionId)
+            .limit(1);
+        if (checkReErr) throw new Error(checkReErr.message);
+        if (existingRe && existingRe.length > 0) {
+            throw new Error('Item Fail ini sudah pernah dilakukan Re-Inspection (maksimal 1x).');
+        }
+
+        const newRow = {
+            session_id: newSessionId,
+            timestamp: new Date().toISOString(),
+            date: parent.tanggalIncoming ? getLatestSingleDate(parent.tanggalIncoming) : null,
+            material_type: parent.materialType || '',
+            inspection_location: 'In-House Inspection',
+            user_login: auditorName,
+            vendor: parent.vendor || '',
+            component: parent.component || '',
+            process: parent.process || '',
+            style_number: parent.styleNumber || '',
+            model: parent.modelName || '',
+            qty_incoming: Number(parent.qtyIncoming) || 0,
+            qty_inspect: qtyInspect,
+            qty_pass: passCount,
+            qty_defect: defectCount,
+            ftt: Number(ftt.toFixed(4)),
+            redo_rate: Number(redoRate.toFixed(4)),
+            tanggal_insp: reinspDate,
+            bucket: parent.tanggalBucket || null,
+            approved_by: '',
+            evidence_url: '',
+            status,
+            parent_session_id: parent.sessionId,
+            is_reinspection: true,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error: insErr } = await supabase.from('subcont_inspections').insert(newRow);
+        if (insErr) throw new Error(insErr.message);
+
+        if (defectCount > 0) {
+            const defectRows = Object.entries(reinspDefectsMap)
+                .filter(([, cnt]) => cnt > 0)
+                .map(([issue, cnt]) => ({
+                    session_id: newSessionId,
+                    date: reinspDate,
+                    vendor: parent.vendor || '',
+                    component: parent.component || '',
+                    issue_finding: issue,
+                    count: cnt
+                }));
+            if (defectRows.length > 0) {
+                const { error: defErr } = await supabase.from('subcont_defect_logs').insert(defectRows);
+                if (defErr) console.warn('Gagal insert reinspection defect logs:', defErr.message);
+            }
+        }
+
+        closeReinspectionModal();
+        await showAlert(`Re-Inspection berhasil disimpan (${status})!`, 'success', 'Tersimpan');
+        await window.loadInspectionResults({ customRange: true, showNotice: false });
+    } catch (err) {
+        console.error('submitReinspectionModal error:', err);
+        await showAlert(err.message || 'Gagal menyimpan Re-Inspection.', 'error', 'Gagal Menyimpan');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="material-symbols-outlined text-[16px]">check_circle</span><span>Simpan Re-Inspection</span>';
+        }
+    }
+}
+
+/** Open Re-Inspection modal directly inside Inspection Result Page (Admin & Assigned Vendor) */
 window.startReinspection = async function (parentSessionId) {
     const parentSession = allInspectionSessions.find(s => String(s.sessionId) === String(parentSessionId));
     if (!parentSession) {
@@ -3937,98 +4195,63 @@ window.startReinspection = async function (parentSessionId) {
 
     if (!canUserReinspectSession(parentSession, currentUser, reinspectionMap)) {
         showAlert(
-            `Akses ditolak: Hanya user dengan role Vendor yang di-assign ke "${parentSession.vendor || '—'}" yang dapat melakukan Re-Inspection.`,
+            `Akses ditolak: Hanya Admin atau user role Vendor yang di-assign ke "${parentSession.vendor || '—'}" yang dapat melakukan Re-Inspection.`,
             'error',
             'Wewenang Terbatas'
         );
         return;
     }
 
-    resetAllFields();
-    clearDraftStorage(true);
+    activeReinspParentSession = parentSession;
+    reinspDefectsMap = {};
+    reinspDefectSearchQuery = '';
 
-    reinspectionParentSessionId = parentSession.sessionId;
-    editingSessionId = null;
-    editingParentSessionId = parentSession.sessionId;
-    editingIsReinspection = true;
+    const modal = document.getElementById('reinspection-modal');
+    const subEl = document.getElementById('reinsp-modal-subtitle');
+    const infoEl = document.getElementById('reinsp-parent-info');
+    const dateEl = document.getElementById('reinsp-date');
+    const qtyEl = document.getElementById('reinsp-qty-inspect');
+    const statusEl = document.getElementById('reinsp-status');
+    const searchEl = document.getElementById('reinsp-defect-search');
 
-    const mtSelect = document.getElementById('material-type');
-    if (mtSelect) {
-        mtSelect.value = parentSession.materialType || '';
-        selectedMaterialType = parentSession.materialType || '';
-    }
-    renderVendorButtons();
-
-    if (parentSession.vendor) {
-        selectedVendor = parentSession.vendor;
-        document.querySelectorAll('.vendor-sel-btn').forEach(btn => {
-            btn.classList.toggle('bg-emerald-600', btn.dataset.vendor === parentSession.vendor);
-            btn.classList.toggle('text-white', btn.dataset.vendor === parentSession.vendor);
-            btn.classList.toggle('border-emerald-600', btn.dataset.vendor === parentSession.vendor);
-        });
-        if (addItemBtn) addItemBtn.disabled = false;
-    }
-
-    const tinEl = document.getElementById('tanggal-incoming');
-    if (tinEl && parentSession.tanggalIncoming) tinEl.value = getLatestSingleDate(parentSession.tanggalIncoming);
-
-    const todayStr = toLocalDateString(new Date());
-    window.setInspectionDates(todayStr);
-
-    const rawBucket = parentSession.tanggalBucket || parentSession.bucket || '';
-    if (rawBucket) window.setBucketDates(rawBucket);
-
-    const styleEl = document.getElementById('style-number');
-    if (styleEl && parentSession.styleNumber) styleEl.value = parentSession.styleNumber;
-    const modelEl = document.getElementById('model-name');
-    if (modelEl && parentSession.modelName) modelEl.value = parentSession.modelName;
-    if (parentSession.styleNumber) {
-        window.setStyles(parentSession.styleNumber, parentSession.modelName);
+    if (subEl) subEl.textContent = `Induk: ${parentSession.sessionId}`;
+    if (infoEl) {
+        infoEl.innerHTML = `
+            <div><span class="text-slate-400 block text-[10px]">Vendor</span><span class="font-bold text-slate-200">${parentSession.vendor || '—'}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Model / Style</span><span class="font-bold text-slate-200">${parentSession.modelName || '—'} (${parentSession.styleNumber || '—'})</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Komponen / Proses</span><span class="font-bold text-slate-200">${parentSession.component || '—'} (${parentSession.process || '—'})</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Qty Incoming</span><span class="font-bold text-slate-200">${(Number(parentSession.qtyIncoming) || 0).toLocaleString('id-ID')}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Fail Awal (Insp / Def)</span><span class="font-bold text-rose-400">${parentSession.qtyInspect} / ${parentSession.defect}</span></div>
+            <div><span class="text-slate-400 block text-[10px]">Tgl Incoming</span><span class="font-bold text-slate-200">${parentSession.tanggalIncoming || '—'}</span></div>
+        `;
     }
 
-    if (typeof window.__syncInspectionStatusState === 'function') {
-        window.__syncInspectionStatusState('Pass');
+    if (dateEl) dateEl.value = toLocalDateString(new Date());
+    if (qtyEl) {
+        qtyEl.value = 0;
+        qtyEl.oninput = updateReinspCounters;
+    }
+    if (statusEl) statusEl.value = 'Pass';
+    if (searchEl) {
+        searchEl.value = '';
+        searchEl.oninput = () => {
+            reinspDefectSearchQuery = searchEl.value;
+            renderReinspDefectButtons();
+        };
     }
 
-    // Pre-fill item component/process/qtyIncoming with zeroed inspection counters for fresh reinspection
-    if (Array.isArray(parentSession.items) && parentSession.items.length > 0) {
-        inspectionItems = parentSession.items.map(it => ({
-            component: it.component,
-            process: it.process || '',
-            qtyIncoming: Number(it.qtyIncoming || 0),
-            qtyInspect: 0,
-            pass: 0,
-            defect: 0,
-            defects: []
-        }));
-    } else if (parentSession.component) {
-        inspectionItems = [{
-            component: parentSession.component,
-            process: parentSession.process || '',
-            qtyIncoming: Number(parentSession.qtyIncoming || 0),
-            qtyInspect: 0,
-            pass: 0,
-            defect: 0,
-            defects: []
-        }];
-    }
+    const closeBtn = document.getElementById('reinsp-close-btn');
+    const cancelBtn = document.getElementById('reinsp-cancel-btn');
+    const submitBtn = document.getElementById('reinsp-submit-btn');
+    if (closeBtn) closeBtn.onclick = closeReinspectionModal;
+    if (cancelBtn) cancelBtn.onclick = closeReinspectionModal;
+    if (submitBtn) submitBtn.onclick = submitReinspectionModal;
 
-    setReinspectionFieldLocks(true);
-    renderInspectedItems();
-    updateTotalQtyInspect();
-    checkInfoCompleteAndLockButtons();
-    saveToLocalStorage();
+    renderReinspDefectButtons();
+    updateReinspCounters();
 
-    if (typeof window.showView === 'function') {
-        window.showView('dashboard');
-    }
-
-    renderReinspectionBanner(parentSession);
-    showAlert(
-        `Mode Re-Inspection aktif untuk ${parentSession.vendor} (${parentSession.sessionId}). Silakan edit item untuk memasukkan hasil pemeriksaan ulang.`,
-        'info',
-        'Mode Re-Inspection'
-    );
+    if (modal) modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
 };
 
 /** Continue/Load an in-progress or pending approval session back into the form */

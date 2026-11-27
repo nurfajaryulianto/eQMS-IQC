@@ -179,7 +179,8 @@
         /* Ensure all modal overlays are strictly above header and mobile bottom navbar */
         #inspection-item-modal,
         #subcont-session-detail-modal,
-        #subcont-session-edit-modal {
+        #subcont-session-edit-modal,
+        #reinspection-modal {
             z-index: 100 !important;
         }
 
@@ -187,7 +188,8 @@
         body.modal-open .mobile-bottom-nav,
         body:has(#inspection-item-modal:not(.hidden)) .mobile-bottom-nav,
         body:has(#subcont-session-detail-modal:not(.hidden)) .mobile-bottom-nav,
-        body:has(#subcont-session-edit-modal:not(.hidden)) .mobile-bottom-nav {
+        body:has(#subcont-session-edit-modal:not(.hidden)) .mobile-bottom-nav,
+        body:has(#reinspection-modal:not(.hidden)) .mobile-bottom-nav {
             display: none !important;
         }
 
@@ -3006,11 +3008,15 @@
             let adminReady = false;
             const VIEW_ROLES = {
                 'admin': ['admin'],
-                'leader-monitor': ['admin', 'supervisor', 'manager']
+                'leader-monitor': ['admin', 'supervisor', 'manager'],
+                'dashboard': ['inspector', 'auditor', 'supervisor', 'manager', 'admin'],
+                'analytics': ['supervisor', 'manager', 'admin']
             };
             function showView(name) {
-                if (VIEW_ROLES[name]) {
-                    const role = window.__eqmsUserRole;
+                const role = window.__eqmsUserRole;
+                if (role === 'vendor' && name !== 'inspection-result') {
+                    name = 'inspection-result';
+                } else if (VIEW_ROLES[name]) {
                     if (!role || !VIEW_ROLES[name].includes(role)) return;
                 }
                 document.querySelectorAll('.app-view').forEach(v => v.classList.add('hidden'));
@@ -3228,6 +3234,104 @@
                     <button type="button" id="modal-save-item-btn"
                         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer">Simpan
                         Item</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== MODAL: RE-INSPECTION (MAX 1X ON FAIL) ====== -->
+        <div id="reinspection-modal"
+            class="fixed inset-0 z-[100] hidden bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <div
+                class="bg-white rounded-xl shadow-2xl border border-rose-500/40 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-rose-400 text-[20px]">restart_alt</span>
+                            <span>Re-Inspection Lot Fail (Max 1x)</span>
+                        </h3>
+                        <p id="reinsp-modal-subtitle" class="text-[11px] text-slate-400 font-mono mt-0.5"></p>
+                    </div>
+                    <button type="button" id="reinsp-close-btn"
+                        class="text-slate-400 hover:text-slate-600 cursor-pointer p-1">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs thin-scroll">
+                    <!-- Parent Lot Info -->
+                    <div id="reinsp-parent-info"
+                        class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-lg border border-slate-200 bg-slate-50">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label for="reinsp-date"
+                                class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Tanggal Re-Inspection</label>
+                            <input type="date" id="reinsp-date"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="reinsp-qty-inspect"
+                                class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Qty Inspect</label>
+                            <input type="number" id="reinsp-qty-inspect" min="1" value="0"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="reinsp-status"
+                                class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Status Hasil</label>
+                            <select id="reinsp-status"
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm px-3 py-2 focus:border-blue-500 focus:outline-none">
+                                <option value="Pass" selected>Pass (Lolos)</option>
+                                <option value="Fail">Fail (Gagal)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pass / Defect Counters -->
+                    <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <div class="flex flex-col items-center gap-0.5">
+                            <span class="text-[11px] font-semibold text-emerald-400 uppercase">Pass</span>
+                            <div id="reinsp-pass-counter" class="text-xl font-bold text-emerald-400">0</div>
+                        </div>
+                        <div class="flex flex-col items-center gap-0.5">
+                            <span class="text-[11px] font-semibold text-rose-400 uppercase">Defect</span>
+                            <div id="reinsp-defect-counter" class="text-xl font-bold text-rose-400">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Defect Catalog -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Defect Catalog (Opsional jika ada temuan)</label>
+                        <div class="relative mb-2">
+                            <span class="material-symbols-outlined absolute left-2.5 top-2 text-[16px] text-slate-400">search</span>
+                            <input type="text" id="reinsp-defect-search" placeholder="Cari defect..."
+                                class="w-full rounded-md border border-slate-300 bg-white text-slate-900 text-xs pl-8 pr-3 py-1.5 focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div id="reinsp-defect-buttons"
+                            class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-[140px] overflow-y-auto pr-1 thin-scroll">
+                        </div>
+                    </div>
+
+                    <!-- Logged Defects -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Logged Defects</label>
+                        <div id="reinsp-logged-defects"
+                            class="text-xs text-slate-400 border border-slate-100 rounded-lg p-2 bg-slate-50 min-h-[44px] divide-y divide-slate-200">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5">
+                    <button type="button" id="reinsp-cancel-btn"
+                        class="px-4 py-2 border border-slate-200 text-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">Batal</button>
+                    <button type="button" id="reinsp-submit-btn"
+                        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>Simpan Re-Inspection</span>
+                    </button>
                 </div>
             </div>
         </div>
